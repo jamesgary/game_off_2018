@@ -31,6 +31,8 @@ type alias Model =
     { hero : Hero
     , bullets : List Bullet
     , keysPressed : Set Key
+    , mouseLoc : Vec2
+    , isMouseDown : Bool
     }
 
 
@@ -52,7 +54,9 @@ type alias Key =
 type Msg
     = KeyDown String
     | KeyUp String
-    | MouseDownAt ( Float, Float )
+    | MouseDown
+    | MouseUp
+    | MouseMove ( Float, Float )
     | Tick Float
 
 
@@ -63,6 +67,8 @@ init flags =
             }
       , bullets = []
       , keysPressed = Set.empty
+      , mouseLoc = Vec2.vec2 0 0
+      , isMouseDown = False
       }
     , Cmd.none
     )
@@ -141,7 +147,12 @@ update msg model =
                                 }
                            )
                 , bullets =
-                    model.bullets
+                    (if model.isMouseDown then
+                        makeBullet model.hero.loc model.mouseLoc :: model.bullets
+
+                     else
+                        model.bullets
+                    )
                         |> List.map
                             (\bullet ->
                                 { bullet
@@ -161,26 +172,40 @@ update msg model =
         KeyDown str ->
             ( { model | keysPressed = Set.insert str model.keysPressed }, Cmd.none )
 
-        MouseDownAt ( x, y ) ->
-            let
-                bulletLoc =
+        MouseMove ( x, y ) ->
+            ( { model
+                | mouseLoc =
                     { x = (x - (canvasWidth / 2)) / (canvasWidth / tilesToShowLengthwise)
                     , y = (y - (canvasHeight / 2)) / (-canvasHeight / tilesToShowHeightwise)
                     }
                         |> Vec2.fromRecord
-            in
-            ( { model
-                | bullets =
-                    { loc = model.hero.loc
-                    , angle =
-                        toPolar
-                            (Vec2.sub bulletLoc model.hero.loc |> vec2ToTuple)
-                            |> Tuple.second
-                    }
-                        :: model.bullets
               }
             , Cmd.none
             )
+
+        MouseDown ->
+            ( { model
+                | isMouseDown = True
+              }
+            , Cmd.none
+            )
+
+        MouseUp ->
+            ( { model
+                | isMouseDown = False
+              }
+            , Cmd.none
+            )
+
+
+makeBullet : Vec2 -> Vec2 -> Bullet
+makeBullet heroLoc aimLoc =
+    { loc = heroLoc
+    , angle =
+        toPolar
+            (Vec2.sub aimLoc heroLoc |> vec2ToTuple)
+            |> Tuple.second
+    }
 
 
 subscriptions : Model -> Sub Msg
@@ -256,7 +281,9 @@ view model =
             , Html.Attributes.style "display" "inline-block"
             , Html.Attributes.style "margin" "20px"
             , Html.Attributes.style "font-size" "0"
-            , Mouse.onDown (\event -> MouseDownAt event.offsetPos)
+            , Mouse.onDown (\_ -> MouseDown)
+            , Mouse.onUp (\_ -> MouseUp)
+            , Mouse.onMove (\event -> MouseMove event.offsetPos)
             ]
             [ GameTwoD.render
                 { time = 0
