@@ -1,16 +1,11 @@
 module Main exposing (main)
 
 import Browser exposing (Document, document)
+import Color
+import Game.TwoD as GameTwoD
+import Game.TwoD.Camera as GameTwoDCamera
+import Game.TwoD.Render as GameTwoDRender
 import Html
-
-
-
---main :
---    { init : flags -> ( model, Cmd msg )
---    , view : model -> Document msg
---    , update : msg -> model -> ( model, Cmd msg )
---    , subscriptions : model -> Sub msg
---    }
 
 
 main =
@@ -27,7 +22,12 @@ type alias Flags =
 
 
 type alias Model =
-    { foo : Int
+    { hero : Hero
+    }
+
+
+type alias Hero =
+    { loc : ( Float, Float )
     }
 
 
@@ -37,7 +37,7 @@ type Msg
 
 init : Flags -> ( Model, Cmd msg )
 init flags =
-    ( { foo = 0
+    ( { hero = { loc = ( 0, 0 ) }
       }
     , Cmd.none
     )
@@ -58,5 +58,19 @@ subscriptions model =
 view : Model -> Document Msg
 view model =
     { title = "GAME"
-    , body = [ Html.text "Game" ]
+    , body =
+        [ Html.h1 [] [ Html.text "Game" ]
+        , GameTwoD.render
+            { time = 0
+            , size = ( 400, 300 )
+            , camera = GameTwoDCamera.fixedArea (16 * 9) ( 160, 90 )
+            }
+            [ GameTwoDRender.shape
+                GameTwoDRender.circle
+                { color = Color.lightBlue
+                , position = ( 10, 10 )
+                , size = ( 200, 100 )
+                }
+            ]
+        ]
     }
