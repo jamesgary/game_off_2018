@@ -218,32 +218,36 @@ drawCircle color pos rad =
         }
 
 
+drawRect : Color -> Vec2 -> Vec2 -> GameTwoDRender.Renderable
+drawRect color pos size =
+    GameTwoDRender.shape
+        GameTwoDRender.rectangle
+        { color = color
+        , position = Vec2.add (Vec2.scale -0.5 size) pos |> vec2ToTuple
+        , size = size |> vec2ToTuple
+        }
+
+
 view : Model -> Browser.Document Msg
 view model =
     let
         background =
-            GameTwoDRender.shape
-                GameTwoDRender.rectangle
-                { color = Color.lightGreen
-                , position = ( -100, -100 )
-                , size = ( 200, 200 )
-                }
+            drawRect
+                Color.lightGreen
+                (Vec2.vec2 0 0)
+                (Vec2.vec2 tilesToShowLengthwise tilesToShowHeightwise)
 
         hero =
-            GameTwoDRender.shape
-                GameTwoDRender.rectangle
-                { color = Color.black
-                , position = model.hero.loc |> vec2ToTuple
-                , size = ( 1, 1 )
-                }
+            drawRect
+                Color.black
+                model.hero.loc
+                (Vec2.vec2 1 1)
 
         lake =
-            GameTwoDRender.shape
-                GameTwoDRender.rectangle
-                { color = Color.lightBlue
-                , position = ( 0, 0 )
-                , size = ( 2, 4 )
-                }
+            drawRect
+                Color.lightBlue
+                (Vec2.vec2 2 2)
+                (Vec2.vec2 2 4)
     in
     { title = "GAME"
     , body =
