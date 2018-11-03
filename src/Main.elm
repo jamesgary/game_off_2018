@@ -38,7 +38,7 @@ type Msg
 
 init : Flags -> ( Model, Cmd msg )
 init flags =
-    ( { hero = { loc = ( 0, 0 ) }
+    ( { hero = { loc = ( -2, 0 ) }
       }
     , Cmd.none
     )
@@ -83,7 +83,7 @@ view model =
             GameTwoDRender.shape
                 GameTwoDRender.rectangle
                 { color = Color.black
-                , position = ( -5, 0 )
+                , position = model.hero.loc
                 , size = ( 1, 1 )
                 }
     in
