@@ -2,12 +2,13 @@ module Main exposing (main)
 
 import Browser
 import Browser.Events
-import Color
+import Color exposing (Color)
 import Game.TwoD as GameTwoD
 import Game.TwoD.Camera as GameTwoDCamera
 import Game.TwoD.Render as GameTwoDRender
 import Html
 import Html.Attributes
+import Html.Events.Extra.Mouse as Mouse
 import Json.Decode as Decode
 import Math.Vector2 as Vec2 exposing (Vec2)
 import Set exposing (Set)
@@ -28,11 +29,17 @@ type alias Flags =
 
 type alias Model =
     { hero : Hero
+    , bullets : List Bullet
     , keysPressed : Set Key
     }
 
 
 type alias Hero =
+    { loc : Vec2
+    }
+
+
+type alias Bullet =
     { loc : Vec2
     }
 
@@ -44,6 +51,7 @@ type alias Key =
 type Msg
     = KeyDown String
     | KeyUp String
+    | MouseDownAt ( Float, Float )
     | Tick Float
 
 
@@ -52,6 +60,10 @@ init flags =
     ( { hero =
             { loc = Vec2.fromRecord { x = -2, y = 0 }
             }
+      , bullets =
+            [ { loc = Vec2.fromRecord { x = 3, y = 3 }
+              }
+            ]
       , keysPressed = Set.empty
       }
     , Cmd.none
@@ -66,7 +78,7 @@ vec2ToTuple vec2 =
 
 
 speed =
-    0.001
+    0.008
 
 
 heroDirInput : Model -> Vec2
@@ -128,6 +140,20 @@ update msg model =
         KeyDown str ->
             ( { model | keysPressed = Set.insert str model.keysPressed }, Cmd.none )
 
+        MouseDownAt ( x, y ) ->
+            ( { model
+                | bullets =
+                    { loc =
+                        Vec2.fromRecord
+                            { x = (x - (canvasWidth / 2)) / (canvasWidth / tilesToShowLengthwise)
+                            , y = (y - (canvasHeight / 2)) / (-canvasHeight / tilesToShowHeightwise)
+                            }
+                    }
+                        :: model.bullets
+              }
+            , Cmd.none
+            )
+
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
@@ -138,21 +164,35 @@ subscriptions model =
         ]
 
 
+canvasWidth =
+    800
+
+
+canvasHeight =
+    600
+
+
+tilesToShowLengthwise =
+    20
+
+
+tilesToShowHeightwise =
+    tilesToShowLengthwise * (canvasHeight / canvasWidth)
+
+
+drawCircle : Color -> Vec2 -> Float -> GameTwoDRender.Renderable
+drawCircle color pos rad =
+    GameTwoDRender.shape
+        GameTwoDRender.circle
+        { color = color
+        , position = Vec2.add (Vec2.vec2 (rad / -2) (rad / -2)) pos |> vec2ToTuple
+        , size = Vec2.vec2 rad rad |> vec2ToTuple
+        }
+
+
 view : Model -> Browser.Document Msg
 view model =
     let
-        canvasWidth =
-            400
-
-        canvasHeight =
-            300
-
-        tilesToShowLengthwise =
-            20
-
-        tilesToShowHeightwise =
-            tilesToShowLengthwise * (canvasHeight / canvasWidth)
-
         background =
             GameTwoDRender.shape
                 GameTwoDRender.rectangle
@@ -168,6 +208,14 @@ view model =
                 , position = model.hero.loc |> vec2ToTuple
                 , size = ( 1, 1 )
                 }
+
+        lake =
+            GameTwoDRender.shape
+                GameTwoDRender.rectangle
+                { color = Color.lightBlue
+                , position = ( 0, 0 )
+                , size = ( 2, 4 )
+                }
     in
     { title = "GAME"
     , body =
@@ -176,6 +224,7 @@ view model =
             , Html.Attributes.style "display" "inline-block"
             , Html.Attributes.style "margin" "20px"
             , Html.Attributes.style "font-size" "0"
+            , Mouse.onDown (\event -> MouseDownAt event.offsetPos)
             ]
             [ GameTwoD.render
                 { time = 0
@@ -185,15 +234,14 @@ view model =
                         (tilesToShowHeightwise * tilesToShowLengthwise)
                         ( 0, 0 )
                 }
-                [ background
-                , GameTwoDRender.shape
-                    GameTwoDRender.rectangle
-                    { color = Color.lightBlue
-                    , position = ( 0, 0 )
-                    , size = ( 2, 4 )
-                    }
-                , hero
-                ]
+                (List.concat
+                    [ [ background ]
+                    , [ lake ]
+                    , [ hero ]
+                    , model.bullets
+                        |> List.map (\bullet -> drawCircle Color.red bullet.loc 0.5)
+                    ]
+                )
             ]
         ]
     }
