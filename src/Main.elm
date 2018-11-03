@@ -9,6 +9,7 @@ import Game.TwoD.Render as GameTwoDRender
 import Html
 import Html.Attributes
 import Json.Decode as Decode
+import Math.Vector2 as Vec2 exposing (Vec2)
 import Set exposing (Set)
 
 
@@ -19,12 +20,6 @@ main =
         , update = update
         , subscriptions = subscriptions
         }
-
-
-type alias Vec2 =
-    { x : Float
-    , y : Float
-    }
 
 
 type alias Flags =
@@ -55,7 +50,7 @@ type Msg
 init : Flags -> ( Model, Cmd msg )
 init flags =
     ( { hero =
-            { loc = { x = -2, y = 0 }
+            { loc = Vec2.fromRecord { x = -2, y = 0 }
             }
       , keysPressed = Set.empty
       }
@@ -64,8 +59,50 @@ init flags =
 
 
 vec2ToTuple : Vec2 -> ( Float, Float )
-vec2ToTuple { x, y } =
-    ( x, y )
+vec2ToTuple vec2 =
+    vec2
+        |> Vec2.toRecord
+        |> (\{ x, y } -> ( x, y ))
+
+
+speed =
+    0.001
+
+
+heroDirInput : Model -> Vec2
+heroDirInput model =
+    { x =
+        if
+            Set.member "ArrowLeft" model.keysPressed
+                || Set.member "a" model.keysPressed
+        then
+            -1
+
+        else if
+            Set.member "ArrowRight" model.keysPressed
+                || Set.member "d" model.keysPressed
+        then
+            1
+
+        else
+            0
+    , y =
+        if
+            Set.member "ArrowUp" model.keysPressed
+                || Set.member "w" model.keysPressed
+        then
+            1
+
+        else if
+            Set.member "ArrowDown" model.keysPressed
+                || Set.member "s" model.keysPressed
+        then
+            -1
+
+        else
+            0
+    }
+        |> Vec2.fromRecord
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -78,37 +115,7 @@ update msg model =
                         |> (\hero ->
                                 { hero
                                     | loc =
-                                        { x =
-                                            if
-                                                Set.member "ArrowLeft" model.keysPressed
-                                                    || Set.member "a" model.keysPressed
-                                            then
-                                                hero.loc.x - 1
-
-                                            else if
-                                                Set.member "ArrowRight" model.keysPressed
-                                                    || Set.member "d" model.keysPressed
-                                            then
-                                                hero.loc.x + 1
-
-                                            else
-                                                hero.loc.x
-                                        , y =
-                                            if
-                                                Set.member "ArrowUp" model.keysPressed
-                                                    || Set.member "w" model.keysPressed
-                                            then
-                                                hero.loc.y + 1
-
-                                            else if
-                                                Set.member "ArrowDown" model.keysPressed
-                                                    || Set.member "s" model.keysPressed
-                                            then
-                                                hero.loc.y - 1
-
-                                            else
-                                                hero.loc.y
-                                        }
+                                        Vec2.add (Vec2.scale (speed * delta) (heroDirInput model)) hero.loc
                                 }
                            )
               }
@@ -120,7 +127,6 @@ update msg model =
 
         KeyDown str ->
             ( { model | keysPressed = Set.insert str model.keysPressed }, Cmd.none )
-                |> Debug.log str
 
 
 subscriptions : Model -> Sub Msg
