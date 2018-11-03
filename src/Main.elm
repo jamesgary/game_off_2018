@@ -44,6 +44,7 @@ type alias Hero =
 type alias Bullet =
     { loc : Vec2
     , angle : Float
+    , age : Float
     }
 
 
@@ -131,6 +132,10 @@ heroDirInput model =
         |> Vec2.fromRecord
 
 
+bulletMaxAge =
+    1000
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -160,7 +165,12 @@ update msg model =
                                         Vec2.add
                                             (tupleToVec2 (fromPolar ( bulletSpeed * delta, bullet.angle )))
                                             bullet.loc
+                                    , age = bullet.age + delta
                                 }
+                            )
+                        |> List.filter
+                            (\bullet ->
+                                bullet.age < bulletMaxAge
                             )
               }
             , Cmd.none
@@ -205,6 +215,7 @@ makeBullet heroLoc aimLoc =
         toPolar
             (Vec2.sub aimLoc heroLoc |> vec2ToTuple)
             |> Tuple.second
+    , age = 0
     }
 
 
