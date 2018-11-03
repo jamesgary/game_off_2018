@@ -41,6 +41,7 @@ type alias Hero =
 
 type alias Bullet =
     { loc : Vec2
+    , angle : Float
     }
 
 
@@ -60,10 +61,7 @@ init flags =
     ( { hero =
             { loc = Vec2.fromRecord { x = -2, y = 0 }
             }
-      , bullets =
-            [ { loc = Vec2.fromRecord { x = 3, y = 3 }
-              }
-            ]
+      , bullets = []
       , keysPressed = Set.empty
       }
     , Cmd.none
@@ -77,8 +75,18 @@ vec2ToTuple vec2 =
         |> (\{ x, y } -> ( x, y ))
 
 
-speed =
+tupleToVec2 : ( Float, Float ) -> Vec2
+tupleToVec2 ( x, y ) =
+    { x = x, y = y }
+        |> Vec2.fromRecord
+
+
+playerSpeed =
     0.008
+
+
+bulletSpeed =
+    0.018
 
 
 heroDirInput : Model -> Vec2
@@ -127,9 +135,22 @@ update msg model =
                         |> (\hero ->
                                 { hero
                                     | loc =
-                                        Vec2.add (Vec2.scale (speed * delta) (heroDirInput model)) hero.loc
+                                        Vec2.add
+                                            (Vec2.scale (playerSpeed * delta) (heroDirInput model))
+                                            hero.loc
                                 }
                            )
+                , bullets =
+                    model.bullets
+                        |> List.map
+                            (\bullet ->
+                                { bullet
+                                    | loc =
+                                        Vec2.add
+                                            (tupleToVec2 (fromPolar ( bulletSpeed * delta, bullet.angle )))
+                                            bullet.loc
+                                }
+                            )
               }
             , Cmd.none
             )
@@ -141,13 +162,20 @@ update msg model =
             ( { model | keysPressed = Set.insert str model.keysPressed }, Cmd.none )
 
         MouseDownAt ( x, y ) ->
+            let
+                bulletLoc =
+                    { x = (x - (canvasWidth / 2)) / (canvasWidth / tilesToShowLengthwise)
+                    , y = (y - (canvasHeight / 2)) / (-canvasHeight / tilesToShowHeightwise)
+                    }
+                        |> Vec2.fromRecord
+            in
             ( { model
                 | bullets =
-                    { loc =
-                        Vec2.fromRecord
-                            { x = (x - (canvasWidth / 2)) / (canvasWidth / tilesToShowLengthwise)
-                            , y = (y - (canvasHeight / 2)) / (-canvasHeight / tilesToShowHeightwise)
-                            }
+                    { loc = model.hero.loc
+                    , angle =
+                        toPolar
+                            (Vec2.sub bulletLoc model.hero.loc |> vec2ToTuple)
+                            |> Tuple.second
                     }
                         :: model.bullets
               }
