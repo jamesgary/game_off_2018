@@ -38,6 +38,7 @@ type alias Model =
 
 type alias Hero =
     { loc : Vec2
+    , vel : Vec2
     }
 
 
@@ -65,6 +66,7 @@ init : Flags -> ( Model, Cmd msg )
 init flags =
     ( { hero =
             { loc = Vec2.fromRecord { x = -2, y = 0 }
+            , vel = Vec2.vec2 0 0
             }
       , bullets = []
       , keysPressed = Set.empty
@@ -88,8 +90,12 @@ tupleToVec2 ( x, y ) =
         |> Vec2.fromRecord
 
 
-playerSpeed =
-    0.008
+playerAcc =
+    2
+
+
+playerMaxSpeed =
+    0.01
 
 
 bulletSpeed =
@@ -144,11 +150,31 @@ update msg model =
                 | hero =
                     model.hero
                         |> (\hero ->
+                                let
+                                    newAcc =
+                                        Vec2.scale playerAcc (heroDirInput model)
+
+                                    newVelUncapped =
+                                        Vec2.add model.hero.vel (Vec2.scale delta newAcc)
+
+                                    percentBeyondCap =
+                                        Vec2.length newVelUncapped / playerMaxSpeed
+
+                                    newVel =
+                                        (if percentBeyondCap > 1.0 then
+                                            Vec2.scale (1 / percentBeyondCap) newVelUncapped
+
+                                         else
+                                            newVelUncapped
+                                        )
+                                            |> Vec2.scale 0.8
+
+                                    newLoc =
+                                        Vec2.add model.hero.loc (Vec2.scale delta newVel)
+                                in
                                 { hero
-                                    | loc =
-                                        Vec2.add
-                                            (Vec2.scale (playerSpeed * delta) (heroDirInput model))
-                                            hero.loc
+                                    | loc = newLoc
+                                    , vel = newVel
                                 }
                            )
                 , bullets =
@@ -168,10 +194,7 @@ update msg model =
                                     , age = bullet.age + delta
                                 }
                             )
-                        |> List.filter
-                            (\bullet ->
-                                bullet.age < bulletMaxAge
-                            )
+                        |> List.filter (\bullet -> bullet.age < bulletMaxAge)
               }
             , Cmd.none
             )
