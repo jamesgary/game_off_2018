@@ -3,6 +3,7 @@ module Main exposing (main)
 import Browser
 import Browser.Events
 import Color exposing (Color)
+import Game.Resources as Resources exposing (Resources)
 import Game.TwoD as GameTwoD
 import Game.TwoD.Camera as GameTwoDCamera
 import Game.TwoD.Render as GameTwoDRender
@@ -33,6 +34,7 @@ type alias Model =
     , keysPressed : Set Key
     , mouseLoc : Vec2
     , isMouseDown : Bool
+    , resources : Resources
     }
 
 
@@ -60,9 +62,10 @@ type Msg
     | MouseUp
     | MouseMove ( Float, Float )
     | Tick Float
+    | Resources Resources.Msg
 
 
-init : Flags -> ( Model, Cmd msg )
+init : Flags -> ( Model, Cmd Msg )
 init flags =
     ( { hero =
             { loc = Vec2.fromRecord { x = -2, y = 0 }
@@ -72,8 +75,10 @@ init flags =
       , keysPressed = Set.empty
       , mouseLoc = Vec2.vec2 0 0
       , isMouseDown = False
+      , resources = Resources.init
       }
-    , Cmd.none
+    , Resources.loadTextures [ "images/grass.png" ]
+        |> Cmd.map Resources
     )
 
 
@@ -230,6 +235,9 @@ update msg model =
             , Cmd.none
             )
 
+        Resources resourcesMsg ->
+            ( { model | resources = Resources.update resourcesMsg model.resources }, Cmd.none )
+
 
 makeBullet : Vec2 -> Vec2 -> Bullet
 makeBullet heroLoc aimLoc =
@@ -291,10 +299,14 @@ view : Model -> Browser.Document Msg
 view model =
     let
         background =
-            drawRect
-                Color.lightGreen
-                (Vec2.vec2 0 0)
-                (Vec2.vec2 tilesToShowLengthwise tilesToShowHeightwise)
+            GameTwoDRender.spriteWithOptions
+                { position = ( -10, -10, 0 )
+                , size = ( 20, 20 )
+                , texture = Resources.getTexture "images/grass.png" model.resources
+                , rotation = 0
+                , pivot = ( 0, 0 )
+                , tiling = ( 20, 20 )
+                }
 
         hero =
             drawRect
