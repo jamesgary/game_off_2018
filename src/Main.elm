@@ -32,20 +32,21 @@ type alias Model =
     { hero : Hero
     , bullets : List Bullet
     , keysPressed : Set Key
-    , mouseLoc : Vec2
+    , mousePos : Vec2
     , isMouseDown : Bool
     , resources : Resources
+    , selectedTile : Maybe Pos
     }
 
 
 type alias Hero =
-    { loc : Vec2
+    { pos : Vec2
     , vel : Vec2
     }
 
 
 type alias Bullet =
-    { loc : Vec2
+    { pos : Vec2
     , angle : Float
     , age : Float
     }
@@ -53,6 +54,10 @@ type alias Bullet =
 
 type alias Key =
     String
+
+
+type alias Pos =
+    { x : Int, y : Int }
 
 
 type Msg
@@ -68,16 +73,17 @@ type Msg
 init : Flags -> ( Model, Cmd Msg )
 init flags =
     ( { hero =
-            { loc = Vec2.fromRecord { x = -2, y = 0 }
+            { pos = Vec2.fromRecord { x = -2, y = 0 }
             , vel = Vec2.vec2 0 0
             }
       , bullets = []
       , keysPressed = Set.empty
-      , mouseLoc = Vec2.vec2 0 0
+      , mousePos = Vec2.vec2 0 0
       , isMouseDown = False
       , resources = Resources.init
+      , selectedTile = Nothing
       }
-    , Resources.loadTextures [ "images/grass.png" ]
+    , Resources.loadTextures [ "images/grass.png", "images/selectedTile.png" ]
         |> Cmd.map Resources
     )
 
@@ -174,17 +180,17 @@ update msg model =
                                         )
                                             |> Vec2.scale 0.8
 
-                                    newLoc =
-                                        Vec2.add model.hero.loc (Vec2.scale delta newVel)
+                                    newPos =
+                                        Vec2.add model.hero.pos (Vec2.scale delta newVel)
                                 in
                                 { hero
-                                    | loc = newLoc
+                                    | pos = newPos
                                     , vel = newVel
                                 }
                            )
                 , bullets =
                     (if model.isMouseDown then
-                        makeBullet model.hero.loc model.mouseLoc :: model.bullets
+                        makeBullet model.hero.pos model.mousePos :: model.bullets
 
                      else
                         model.bullets
@@ -192,10 +198,10 @@ update msg model =
                         |> List.map
                             (\bullet ->
                                 { bullet
-                                    | loc =
+                                    | pos =
                                         Vec2.add
                                             (tupleToVec2 (fromPolar ( bulletSpeed * delta, bullet.angle )))
-                                            bullet.loc
+                                            bullet.pos
                                     , age = bullet.age + delta
                                 }
                             )
@@ -211,12 +217,15 @@ update msg model =
             ( { model | keysPressed = Set.insert str model.keysPressed }, Cmd.none )
 
         MouseMove ( x, y ) ->
-            ( { model
-                | mouseLoc =
+            let
+                newMousePos =
                     { x = (x - (canvasWidth / 2)) / (canvasWidth / tilesToShowLengthwise)
                     , y = (y - (canvasHeight / 2)) / (-canvasHeight / tilesToShowHeightwise)
                     }
-                        |> Vec2.fromRecord
+            in
+            ( { model
+                | mousePos = newMousePos |> Vec2.fromRecord
+                , selectedTile = Just { x = round newMousePos.x, y = round newMousePos.y }
               }
             , Cmd.none
             )
@@ -240,11 +249,11 @@ update msg model =
 
 
 makeBullet : Vec2 -> Vec2 -> Bullet
-makeBullet heroLoc aimLoc =
-    { loc = heroLoc
+makeBullet heroPos aimPos =
+    { pos = heroPos
     , angle =
         toPolar
-            (Vec2.sub aimLoc heroLoc |> vec2ToTuple)
+            (Vec2.sub aimPos heroPos |> vec2ToTuple)
             |> Tuple.second
     , age = 0
     }
@@ -311,7 +320,7 @@ view model =
         hero =
             drawRect
                 Color.black
-                model.hero.loc
+                model.hero.pos
                 (Vec2.vec2 1 1)
 
         lake =
@@ -319,6 +328,22 @@ view model =
                 Color.lightBlue
                 (Vec2.vec2 2 2)
                 (Vec2.vec2 2 4)
+
+        selectedTileOutline =
+            case model.selectedTile of
+                Just { x, y } ->
+                    [ GameTwoDRender.spriteWithOptions
+                        { position = ( toFloat x - 0.5, toFloat y - 0.5, 0 )
+                        , size = ( 1, 1 )
+                        , texture = Resources.getTexture "images/selectedTile.png" model.resources
+                        , rotation = 0
+                        , pivot = ( 0, 0 )
+                        , tiling = ( 1, 1 )
+                        }
+                    ]
+
+                Nothing ->
+                    []
     in
     { title = "GAME"
     , body =
@@ -344,7 +369,8 @@ view model =
                     , [ lake ]
                     , [ hero ]
                     , model.bullets
-                        |> List.map (\bullet -> drawCircle Color.red bullet.loc 0.5)
+                        |> List.map (\bullet -> drawCircle Color.red bullet.pos 0.5)
+                    , selectedTileOutline
                     ]
                 )
             ]
