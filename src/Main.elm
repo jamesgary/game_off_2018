@@ -3,9 +3,10 @@ module Main exposing (main)
 import Browser
 import Browser.Events
 import Color exposing (Color)
+import Dict exposing (Dict)
 import Game.Resources as Resources exposing (Resources)
 import Game.TwoD as GameTwoD
-import Game.TwoD.Camera as GameTwoDCamera
+import Game.TwoD.Camera as GameTwoDCamera exposing (Camera)
 import Game.TwoD.Render as GameTwoDRender
 import Html
 import Html.Attributes
@@ -36,6 +37,7 @@ type alias Model =
     , isMouseDown : Bool
     , resources : Resources
     , selectedTile : Maybe Pos
+    , map : Map
     }
 
 
@@ -56,8 +58,22 @@ type alias Key =
     String
 
 
+type alias TilePos =
+    ( Int, Int )
+
+
 type alias Pos =
     { x : Int, y : Int }
+
+
+type alias Map =
+    Dict TilePos Tile
+
+
+type Tile
+    = Grass
+    | Water
+    | Poop
 
 
 type Msg
@@ -72,20 +88,84 @@ type Msg
 
 init : Flags -> ( Model, Cmd Msg )
 init flags =
-    ( { hero =
-            { pos = Vec2.fromRecord { x = -2, y = 0 }
+    let
+        hero =
+            { pos = Vec2.fromRecord { x = 8, y = -6 }
             , vel = Vec2.vec2 0 0
             }
+    in
+    ( { hero = hero
       , bullets = []
       , keysPressed = Set.empty
       , mousePos = Vec2.vec2 0 0
       , isMouseDown = False
       , resources = Resources.init
       , selectedTile = Nothing
+      , map = initMap
       }
-    , Resources.loadTextures [ "images/grass.png", "images/selectedTile.png" ]
+    , Resources.loadTextures
+        [ "images/grass.png"
+        , "images/water.png"
+        , "images/selectedTile.png"
+        ]
         |> Cmd.map Resources
     )
+
+
+cameraOnHero : Hero -> Camera
+cameraOnHero hero =
+    GameTwoDCamera.fixedArea
+        (tilesToShowHeightwise * tilesToShowLengthwise)
+        ( Vec2.getX hero.pos, Vec2.getY hero.pos )
+
+
+initMap : Map
+initMap =
+    """
+11111111111111111111
+10000000000000000001
+10000000000000000001
+10000000000000000001
+11111100000000000001
+11111100000000000001
+10001110000000000001
+10001110000000000001
+10001110000000000001
+10001110000000000001
+10001111111111000001
+10000011111111000001
+10000011111111000001
+10000011111111000001
+10000011111111111111
+10000000000001111111
+10000000000000000001
+10000000000000000001
+10000000000000000001
+11111111111111111111
+"""
+        |> String.trim
+        |> String.lines
+        |> List.indexedMap
+            (\row line ->
+                line
+                    |> String.toList
+                    |> List.indexedMap
+                        (\col char ->
+                            ( ( col, row )
+                            , case char of
+                                '0' ->
+                                    Grass
+
+                                '1' ->
+                                    Water
+
+                                _ ->
+                                    Poop
+                            )
+                        )
+            )
+        |> List.concat
+        |> Dict.fromList
 
 
 vec2ToTuple : Vec2 -> ( Float, Float )
@@ -153,6 +233,13 @@ bulletMaxAge =
     1000
 
 
+currentCameraPos : Model -> Vec2
+currentCameraPos model =
+    cameraOnHero model.hero
+        |> GameTwoDCamera.getPosition
+        |> tupleToVec2
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -218,14 +305,23 @@ update msg model =
 
         MouseMove ( x, y ) ->
             let
+                cameraPos =
+                    currentCameraPos model
+
                 newMousePos =
                     { x = (x - (canvasWidth / 2)) / (canvasWidth / tilesToShowLengthwise)
                     , y = (y - (canvasHeight / 2)) / (-canvasHeight / tilesToShowHeightwise)
                     }
+                        |> Vec2.fromRecord
+                        |> Vec2.add cameraPos
             in
             ( { model
-                | mousePos = newMousePos |> Vec2.fromRecord
-                , selectedTile = Just { x = round newMousePos.x, y = round newMousePos.y }
+                | mousePos = newMousePos
+                , selectedTile =
+                    Just
+                        { x = -0.5 + Vec2.getX newMousePos |> round
+                        , y = -0.5 + Vec2.getY newMousePos |> round
+                        }
               }
             , Cmd.none
             )
@@ -307,33 +403,50 @@ drawRect color pos size =
 view : Model -> Browser.Document Msg
 view model =
     let
-        background =
-            GameTwoDRender.spriteWithOptions
-                { position = ( -10, -10, 0 )
-                , size = ( 20, 20 )
-                , texture = Resources.getTexture "images/grass.png" model.resources
-                , rotation = 0
-                , pivot = ( 0, 0 )
-                , tiling = ( 20, 20 )
-                }
+        map =
+            model.map
+                |> Dict.toList
+                |> List.map
+                    (\( ( col, row ), tile ) ->
+                        case tile of
+                            Grass ->
+                                GameTwoDRender.sprite
+                                    { position = ( toFloat col, toFloat -row )
+                                    , size = ( 1, 1 )
+                                    , texture = Resources.getTexture "images/grass.png" model.resources
+                                    }
+
+                            Water ->
+                                GameTwoDRender.sprite
+                                    { position = ( toFloat col, toFloat -row )
+                                    , size = ( 1, 1 )
+                                    , texture = Resources.getTexture "images/water.png" model.resources
+                                    }
+
+                            Poop ->
+                                GameTwoDRender.sprite
+                                    { position = ( toFloat col, toFloat -row )
+                                    , size = ( 1, 1 )
+                                    , texture = Nothing
+                                    }
+                    )
 
         hero =
-            drawRect
+            [ drawRect
                 Color.black
                 model.hero.pos
                 (Vec2.vec2 1 1)
-
-        lake =
-            drawRect
-                Color.lightBlue
-                (Vec2.vec2 2 2)
-                (Vec2.vec2 2 4)
+            , drawRect
+                Color.darkGray
+                model.hero.pos
+                (Vec2.vec2 0.9 0.9)
+            ]
 
         selectedTileOutline =
             case model.selectedTile of
                 Just { x, y } ->
                     [ GameTwoDRender.spriteWithOptions
-                        { position = ( toFloat x - 0.5, toFloat y - 0.5, 0 )
+                        { position = ( toFloat x, toFloat y, 0 )
                         , size = ( 1, 1 )
                         , texture = Resources.getTexture "images/selectedTile.png" model.resources
                         , rotation = 0
@@ -359,15 +472,11 @@ view model =
             [ GameTwoD.render
                 { time = 0
                 , size = ( canvasWidth, canvasHeight )
-                , camera =
-                    GameTwoDCamera.fixedArea
-                        (tilesToShowHeightwise * tilesToShowLengthwise)
-                        ( 0, 0 )
+                , camera = cameraOnHero model.hero
                 }
                 (List.concat
-                    [ [ background ]
-                    , [ lake ]
-                    , [ hero ]
+                    [ map
+                    , hero
                     , model.bullets
                         |> List.map (\bullet -> drawCircle Color.red bullet.pos 0.5)
                     , selectedTileOutline

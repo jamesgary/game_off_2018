@@ -8,3 +8,7 @@ html, body {
 body {
   background: #ffeeff;
 }
+
+canvas {
+  background: black;
+}
