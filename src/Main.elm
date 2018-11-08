@@ -277,7 +277,7 @@ update msg model =
                            )
                 , bullets =
                     (if model.isMouseDown then
-                        makeBullet model.hero.pos model.mousePos :: model.bullets
+                        makeBullet model.hero.pos (mousePosToGamePos model) :: model.bullets
 
                      else
                         model.bullets
@@ -293,6 +293,7 @@ update msg model =
                                 }
                             )
                         |> List.filter (\bullet -> bullet.age < bulletMaxAge)
+                , selectedTile = Just (mousePosToSelectedTile model)
               }
             , Cmd.none
             )
@@ -308,20 +309,12 @@ update msg model =
                 cameraPos =
                     currentCameraPos model
 
-                newMousePos =
-                    { x = (x - (canvasWidth / 2)) / (canvasWidth / tilesToShowLengthwise)
-                    , y = (y - (canvasHeight / 2)) / (-canvasHeight / tilesToShowHeightwise)
-                    }
-                        |> Vec2.fromRecord
-                        |> Vec2.add cameraPos
+                mousePos =
+                    Vec2.vec2 x y
             in
             ( { model
-                | mousePos = newMousePos
-                , selectedTile =
-                    Just
-                        { x = -0.5 + Vec2.getX newMousePos |> round
-                        , y = -0.5 + Vec2.getY newMousePos |> round
-                        }
+                | mousePos = mousePos
+                , selectedTile = Just (mousePosToSelectedTile model)
               }
             , Cmd.none
             )
@@ -342,6 +335,31 @@ update msg model =
 
         Resources resourcesMsg ->
             ( { model | resources = Resources.update resourcesMsg model.resources }, Cmd.none )
+
+
+mousePosToGamePos : Model -> Vec2
+mousePosToGamePos model =
+    model.mousePos
+        |> Vec2.toRecord
+        |> (\{ x, y } ->
+                { x = (x - (canvasWidth / 2)) / (canvasWidth / tilesToShowLengthwise)
+                , y = (y - (canvasHeight / 2)) / (-canvasHeight / tilesToShowHeightwise)
+                }
+           )
+        |> Vec2.fromRecord
+        |> Vec2.add (currentCameraPos model)
+
+
+mousePosToSelectedTile : Model -> Pos
+mousePosToSelectedTile model =
+    model
+        |> mousePosToGamePos
+        |> Vec2.toRecord
+        |> (\{ x, y } ->
+                { x = -0.5 + x |> round
+                , y = -0.5 + y |> round
+                }
+           )
 
 
 makeBullet : Vec2 -> Vec2 -> Bullet
