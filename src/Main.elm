@@ -49,6 +49,7 @@ type alias Creep =
     { pos : TilePos
     , nextPos : TilePos
     , progress : Float
+    , diagonal : Bool
 
     --, offset : Vec2
     }
@@ -127,12 +128,7 @@ init flags =
       , resources = Resources.init
       , selectedTile = Nothing
       , map = initMap
-      , creeps =
-            [ { pos = ( 9, 3 )
-              , nextPos = ( 8, 3 )
-              , progress = 0
-              }
-            ]
+      , creeps = []
       , cache =
             { heroTowerPos = ( 2, 2 )
             }
@@ -298,10 +294,15 @@ update msg model =
                         |> List.map
                             (\enemyTower ->
                                 if enemyTower.timeSinceLastSpawn + delta > 800 then
+                                    let
+                                        nextPos =
+                                            findNextTileTowards model enemyTower.pos model.cache.heroTowerPos
+                                    in
                                     ( { enemyTower | timeSinceLastSpawn = 0 }
                                     , [ { pos = enemyTower.pos
-                                        , nextPos = findNextTileTowards model enemyTower.pos model.cache.heroTowerPos
+                                        , nextPos = nextPos
                                         , progress = 0
+                                        , diagonal = isDiagonal enemyTower.pos nextPos
                                         }
                                       ]
                                     )
@@ -320,13 +321,6 @@ update msg model =
                     newEnemyTowersAndCreeps
                         |> List.map Tuple.second
                         |> List.concat
-
-                --let
-                --    newCreeps =
-                --        model.enemyTowers
-                --            |> List.filterMap
-                --                (\enemyTower ->
-                --                )
             in
             ( { model
                 | hero =
@@ -385,7 +379,11 @@ update msg model =
                             (\creep ->
                                 let
                                     newProgress =
-                                        delta * creepSpeed + creep.progress
+                                        if creep.diagonal then
+                                            delta * creepSpeed + creep.progress
+
+                                        else
+                                            sqrt 2 * delta * creepSpeed + creep.progress
 
                                     ( pos, nextPos, freshProgress ) =
                                         if newProgress > 1 then
@@ -398,6 +396,7 @@ update msg model =
                                     | pos = pos
                                     , nextPos = nextPos
                                     , progress = freshProgress
+                                    , diagonal = isDiagonal pos nextPos
                                 }
                             )
               }
@@ -454,12 +453,23 @@ findNextTileTowards model origin destination =
         |> Maybe.withDefault origin
 
 
+isDiagonal : TilePos -> TilePos -> Bool
+isDiagonal ( posCol, posRow ) ( nextPosCol, nextPosRow ) =
+    (abs (posCol - nextPosCol) + abs (posRow - nextPosRow)) == 2
+
+
 possibleMoves : Model -> TilePos -> Set TilePos
 possibleMoves model ( col, row ) =
     [ ( col - 1, row )
     , ( col + 1, row )
     , ( col, row - 1 )
     , ( col, row + 1 )
+
+    --- diagonals
+    , ( col - 1, row - 1 )
+    , ( col - 1, row + 1 )
+    , ( col + 1, row - 1 )
+    , ( col + 1, row + 1 )
     ]
         |> List.filterMap (\pos -> Dict.get pos model.map |> Maybe.map (Tuple.pair pos))
         |> List.filter
