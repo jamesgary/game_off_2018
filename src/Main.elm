@@ -38,6 +38,12 @@ type alias Model =
     , resources : Resources
     , selectedTile : Maybe Pos
     , map : Map
+    , cache : Cache
+    }
+
+
+type alias Cache =
+    { heroTowerPos : TilePos
     }
 
 
@@ -73,6 +79,7 @@ type alias Map =
 type Tile
     = Grass
     | Water
+    | Tower
     | Poop
 
 
@@ -102,11 +109,15 @@ init flags =
       , resources = Resources.init
       , selectedTile = Nothing
       , map = initMap
+      , cache =
+            { heroTowerPos = ( 2, -2 )
+            }
       }
     , Resources.loadTextures
         [ "images/grass.png"
         , "images/water.png"
         , "images/selectedTile.png"
+        , "images/tower.png"
         ]
         |> Cmd.map Resources
     )
@@ -124,7 +135,7 @@ initMap =
     """
 11111111111111111111
 10000000000000000001
-10000000000000000001
+10T00000000000000001
 10000000000000000001
 11111100000000000001
 11111100000000000001
@@ -158,6 +169,9 @@ initMap =
 
                                 '1' ->
                                     Water
+
+                                'T' ->
+                                    Tower
 
                                 _ ->
                                     Poop
@@ -439,6 +453,13 @@ view model =
                                     { position = ( toFloat col, toFloat -row )
                                     , size = ( 1, 1 )
                                     , texture = Resources.getTexture "images/water.png" model.resources
+                                    }
+
+                            Tower ->
+                                GameTwoDRender.sprite
+                                    { position = ( toFloat col, toFloat -row )
+                                    , size = ( 1, 1 )
+                                    , texture = Resources.getTexture "images/tower.png" model.resources
                                     }
 
                             Poop ->
