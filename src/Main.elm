@@ -38,6 +38,7 @@ type alias Model =
     , resources : Resources
     , selectedTile : Maybe Pos
     , map : Map
+    , enemyTowers : List EnemyTower
     , cache : Cache
     }
 
@@ -50,6 +51,11 @@ type alias Cache =
 type alias Hero =
     { pos : Vec2
     , vel : Vec2
+    }
+
+
+type alias EnemyTower =
+    { pos : TilePos
     }
 
 
@@ -112,11 +118,16 @@ init flags =
       , cache =
             { heroTowerPos = ( 2, -2 )
             }
+      , enemyTowers =
+            [ { pos = ( 2, 8 ) }
+            , { pos = ( 9, 3 ) }
+            ]
       }
     , Resources.loadTextures
         [ "images/grass.png"
         , "images/water.png"
         , "images/selectedTile.png"
+        , "images/enemyTower.png"
         , "images/tower.png"
         ]
         |> Cmd.map Resources
@@ -143,12 +154,12 @@ initMap =
 10001110000000000001
 10001110000000000001
 10001110000000000001
-10001111111111000001
+10001111111110000001
 10000011111111000001
 10000011111111000001
 10000011111111000001
-10000011111111111111
-10000000000001111111
+10000001111111001111
+10000000000000000111
 10000000000000000001
 10000000000000000001
 10000000000000000001
@@ -481,6 +492,17 @@ view model =
                 (Vec2.vec2 0.9 0.9)
             ]
 
+        enemyTowers =
+            model.enemyTowers
+                |> List.map
+                    (\{ pos } ->
+                        GameTwoDRender.sprite
+                            { position = tilePosToSpritePos pos
+                            , size = ( 1, 1 )
+                            , texture = Resources.getTexture "images/enemyTower.png" model.resources
+                            }
+                    )
+
         selectedTileOutline =
             case model.selectedTile of
                 Just { x, y } ->
@@ -515,6 +537,7 @@ view model =
                 }
                 (List.concat
                     [ map
+                    , enemyTowers
                     , hero
                     , model.bullets
                         |> List.map (\bullet -> drawCircle Color.red bullet.pos 0.5)
@@ -524,3 +547,8 @@ view model =
             ]
         ]
     }
+
+
+tilePosToSpritePos : TilePos -> ( Float, Float )
+tilePosToSpritePos ( col, row ) =
+    ( toFloat col, toFloat -row )
