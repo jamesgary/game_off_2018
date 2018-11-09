@@ -39,7 +39,16 @@ type alias Model =
     , selectedTile : Maybe Pos
     , map : Map
     , enemyTowers : List EnemyTower
+    , creeps : List Creep
     , cache : Cache
+    }
+
+
+type alias Creep =
+    { pos : TilePos
+    , nextPos : TilePos
+    , progress : Float
+    , offset : Vec2
     }
 
 
@@ -115,12 +124,19 @@ init flags =
       , resources = Resources.init
       , selectedTile = Nothing
       , map = initMap
+      , creeps =
+            [ { pos = ( 8, 3 )
+              , nextPos = ( 7, 3 )
+              , progress = 0
+              , offset = Vec2.vec2 0 0
+              }
+            ]
       , cache =
             { heroTowerPos = ( 2, -2 )
             }
       , enemyTowers =
             [ { pos = ( 2, 8 ) }
-            , { pos = ( 9, 3 ) }
+            , { pos = ( 13, 1 ) }
             ]
       }
     , Resources.loadTextures
@@ -128,6 +144,7 @@ init flags =
         , "images/water.png"
         , "images/selectedTile.png"
         , "images/enemyTower.png"
+        , "images/creep.png"
         , "images/tower.png"
         ]
         |> Cmd.map Resources
@@ -518,6 +535,17 @@ view model =
 
                 Nothing ->
                     []
+
+        creeps =
+            model.creeps
+                |> List.map
+                    (\creep ->
+                        GameTwoDRender.sprite
+                            { position = tilePosToSpritePos creep.pos
+                            , size = ( 1, 1 )
+                            , texture = Resources.getTexture "images/creep.png" model.resources
+                            }
+                    )
     in
     { title = "GAME"
     , body =
@@ -539,6 +567,7 @@ view model =
                     [ map
                     , enemyTowers
                     , hero
+                    , creeps
                     , model.bullets
                         |> List.map (\bullet -> drawCircle Color.red bullet.pos 0.5)
                     , selectedTileOutline
