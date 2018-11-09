@@ -48,7 +48,8 @@ type alias Creep =
     { pos : TilePos
     , nextPos : TilePos
     , progress : Float
-    , offset : Vec2
+
+    --, offset : Vec2
     }
 
 
@@ -126,9 +127,20 @@ init flags =
       , map = initMap
       , creeps =
             [ { pos = ( 8, 3 )
+              , nextPos = ( 7, 4 )
+              , progress = 0
+              }
+            , { pos = ( 8, 2 )
               , nextPos = ( 7, 3 )
               , progress = 0
-              , offset = Vec2.vec2 0 0
+              }
+            , { pos = ( 7, 3 )
+              , nextPos = ( 7, 3 )
+              , progress = 0
+              }
+            , { pos = ( 7, 2 )
+              , nextPos = ( 7, 3 )
+              , progress = 0
               }
             ]
       , cache =
@@ -541,7 +553,13 @@ view model =
                 |> List.map
                     (\creep ->
                         GameTwoDRender.sprite
-                            { position = tilePosToSpritePos creep.pos
+                            { position =
+                                tilePosSub creep.nextPos creep.pos
+                                    |> tilePosToSpritePos
+                                    |> tupleToVec2
+                                    |> Vec2.scale creep.progress
+                                    |> Vec2.add (creep.pos |> tilePosToSpritePos |> tupleToVec2)
+                                    |> vec2ToTuple
                             , size = ( 1, 1 )
                             , texture = Resources.getTexture "images/creep.png" model.resources
                             }
@@ -576,6 +594,11 @@ view model =
             ]
         ]
     }
+
+
+tilePosSub : TilePos -> TilePos -> TilePos
+tilePosSub ( a, b ) ( c, d ) =
+    ( a - c, b - d )
 
 
 tilePosToSpritePos : TilePos -> ( Float, Float )
