@@ -143,6 +143,10 @@ init flags =
               , nextPos = ( 7, 3 )
               , progress = 0
               }
+            , { pos = ( 2, 7 )
+              , nextPos = ( 2, 8 )
+              , progress = 0
+              }
             ]
       , cache =
             { heroTowerPos = ( 2, -2 )
@@ -428,14 +432,30 @@ update msg model =
 
 
 possibleMoves : Model -> TilePos -> Set TilePos
-possibleMoves _ ( col, row ) =
-    -- TODO figure out map stuff
-    Set.fromList
-        [ ( col - 1, row )
-        , ( col + 1, row )
-        , ( col, row - 1 )
-        , ( col, row + 1 )
-        ]
+possibleMoves model ( col, row ) =
+    [ ( col - 1, row )
+    , ( col + 1, row )
+    , ( col, row - 1 )
+    , ( col, row + 1 )
+    ]
+        |> List.filterMap (\pos -> Dict.get pos model.map |> Maybe.map (Tuple.pair pos))
+        |> List.filter
+            (\( _, tile ) ->
+                case tile of
+                    Grass ->
+                        True
+
+                    Tower ->
+                        True
+
+                    Water ->
+                        False
+
+                    Poop ->
+                        False
+            )
+        |> List.map Tuple.first
+        |> Set.fromList
 
 
 mousePosToGamePos : Model -> Vec2
