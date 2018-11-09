@@ -247,6 +247,10 @@ bulletSpeed =
     0.018
 
 
+creepSpeed =
+    0.001
+
+
 heroDirInput : Model -> Vec2
 heroDirInput model =
     { x =
@@ -348,6 +352,32 @@ update msg model =
                             )
                         |> List.filter (\bullet -> bullet.age < bulletMaxAge)
                 , selectedTile = Just (mousePosToSelectedTile model)
+                , creeps =
+                    model.creeps
+                        |> List.map
+                            (\creep ->
+                                let
+                                    newProgress =
+                                        delta * creepSpeed + creep.progress
+
+                                    findNextTileTowards : TilePos -> TilePos -> TilePos
+                                    findNextTileTowards origin destination =
+                                        -- A STAR GO HERE
+                                        ( 0, 0 )
+
+                                    ( pos, nextPos, freshProgress ) =
+                                        if newProgress > 1 then
+                                            ( creep.nextPos, findNextTileTowards ( 2, 2 ) creep.nextPos, newProgress - 1 )
+
+                                        else
+                                            ( creep.pos, creep.nextPos, newProgress )
+                                in
+                                { creep
+                                    | pos = pos
+                                    , nextPos = nextPos
+                                    , progress = freshProgress
+                                }
+                            )
               }
             , Cmd.none
             )
