@@ -1,5 +1,6 @@
 module Main exposing (main)
 
+import AStar
 import Browser
 import Browser.Events
 import Color exposing (Color)
@@ -362,12 +363,17 @@ update msg model =
 
                                     findNextTileTowards : TilePos -> TilePos -> TilePos
                                     findNextTileTowards origin destination =
-                                        -- A STAR GO HERE
-                                        ( 0, 0 )
+                                        AStar.findPath
+                                            AStar.pythagoreanCost
+                                            (possibleMoves model)
+                                            origin
+                                            destination
+                                            |> Maybe.andThen List.head
+                                            |> Maybe.withDefault origin
 
                                     ( pos, nextPos, freshProgress ) =
                                         if newProgress > 1 then
-                                            ( creep.nextPos, findNextTileTowards ( 2, 2 ) creep.nextPos, newProgress - 1 )
+                                            ( creep.nextPos, findNextTileTowards creep.nextPos ( 2, 2 ), newProgress - 1 )
 
                                         else
                                             ( creep.pos, creep.nextPos, newProgress )
@@ -419,6 +425,17 @@ update msg model =
 
         Resources resourcesMsg ->
             ( { model | resources = Resources.update resourcesMsg model.resources }, Cmd.none )
+
+
+possibleMoves : Model -> TilePos -> Set TilePos
+possibleMoves _ ( col, row ) =
+    -- TODO figure out map stuff
+    Set.fromList
+        [ ( col - 1, row )
+        , ( col + 1, row )
+        , ( col, row - 1 )
+        , ( col, row + 1 )
+        ]
 
 
 mousePosToGamePos : Model -> Vec2
