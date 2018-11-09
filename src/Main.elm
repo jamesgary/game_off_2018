@@ -67,6 +67,7 @@ type alias Hero =
 
 type alias EnemyTower =
     { pos : TilePos
+    , timeSinceLastSpawn : Float
     }
 
 
@@ -127,33 +128,17 @@ init flags =
       , selectedTile = Nothing
       , map = initMap
       , creeps =
-            [ { pos = ( 8, 3 )
-              , nextPos = ( 7, 4 )
-              , progress = 0
-              }
-            , { pos = ( 8, 2 )
-              , nextPos = ( 7, 3 )
-              , progress = 0
-              }
-            , { pos = ( 7, 3 )
-              , nextPos = ( 7, 3 )
-              , progress = 0
-              }
-            , { pos = ( 7, 2 )
-              , nextPos = ( 7, 3 )
-              , progress = 0
-              }
-            , { pos = ( 2, 7 )
-              , nextPos = ( 2, 8 )
+            [ { pos = ( 9, 3 )
+              , nextPos = ( 8, 3 )
               , progress = 0
               }
             ]
       , cache =
-            { heroTowerPos = ( 2, -2 )
+            { heroTowerPos = ( 2, 2 )
             }
       , enemyTowers =
-            [ { pos = ( 2, 8 ) }
-            , { pos = ( 13, 1 ) }
+            [ { pos = ( 2, 8 ), timeSinceLastSpawn = 0 }
+            , { pos = ( 13, 1 ), timeSinceLastSpawn = 0 }
             ]
       }
     , Resources.loadTextures
@@ -307,6 +292,42 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Tick delta ->
+            let
+                newEnemyTowersAndCreeps =
+                    model.enemyTowers
+                        |> List.map
+                            (\enemyTower ->
+                                if enemyTower.timeSinceLastSpawn + delta > 800 then
+                                    ( { enemyTower | timeSinceLastSpawn = 0 }
+                                    , [ { pos = enemyTower.pos
+                                        , nextPos = findNextTileTowards model enemyTower.pos model.cache.heroTowerPos
+                                        , progress = 0
+                                        }
+                                      ]
+                                    )
+
+                                else
+                                    ( { enemyTower | timeSinceLastSpawn = enemyTower.timeSinceLastSpawn + delta }
+                                    , []
+                                    )
+                            )
+
+                newEnemyTowers =
+                    newEnemyTowersAndCreeps
+                        |> List.map Tuple.first
+
+                newCreeps =
+                    newEnemyTowersAndCreeps
+                        |> List.map Tuple.second
+                        |> List.concat
+
+                --let
+                --    newCreeps =
+                --        model.enemyTowers
+                --            |> List.filterMap
+                --                (\enemyTower ->
+                --                )
+            in
             ( { model
                 | hero =
                     model.hero
@@ -357,27 +378,18 @@ update msg model =
                             )
                         |> List.filter (\bullet -> bullet.age < bulletMaxAge)
                 , selectedTile = Just (mousePosToSelectedTile model)
+                , enemyTowers = newEnemyTowers
                 , creeps =
-                    model.creeps
+                    List.append newCreeps model.creeps
                         |> List.map
                             (\creep ->
                                 let
                                     newProgress =
                                         delta * creepSpeed + creep.progress
 
-                                    findNextTileTowards : TilePos -> TilePos -> TilePos
-                                    findNextTileTowards origin destination =
-                                        AStar.findPath
-                                            AStar.pythagoreanCost
-                                            (possibleMoves model)
-                                            origin
-                                            destination
-                                            |> Maybe.andThen List.head
-                                            |> Maybe.withDefault origin
-
                                     ( pos, nextPos, freshProgress ) =
                                         if newProgress > 1 then
-                                            ( creep.nextPos, findNextTileTowards creep.nextPos ( 2, 2 ), newProgress - 1 )
+                                            ( creep.nextPos, findNextTileTowards model creep.nextPos model.cache.heroTowerPos, newProgress - 1 )
 
                                         else
                                             ( creep.pos, creep.nextPos, newProgress )
@@ -429,6 +441,17 @@ update msg model =
 
         Resources resourcesMsg ->
             ( { model | resources = Resources.update resourcesMsg model.resources }, Cmd.none )
+
+
+findNextTileTowards : Model -> TilePos -> TilePos -> TilePos
+findNextTileTowards model origin destination =
+    AStar.findPath
+        AStar.pythagoreanCost
+        (possibleMoves model)
+        origin
+        destination
+        |> Maybe.andThen List.head
+        |> Maybe.withDefault origin
 
 
 possibleMoves : Model -> TilePos -> Set TilePos
