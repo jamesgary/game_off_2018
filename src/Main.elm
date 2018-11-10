@@ -136,6 +136,7 @@ init flags =
             [ { pos = ( 2, 8 ), timeSinceLastSpawn = 0 }
             , { pos = ( 13, 1 ), timeSinceLastSpawn = 0 }
             ]
+                |> always []
       }
     , Resources.loadTextures
         [ "images/grass.png"
@@ -158,23 +159,45 @@ cameraOnHero hero =
 
 initMap : Map
 initMap =
+    --    """
+    --11111111111111111111
+    --10000000000000000001
+    --10T00000000000000001
+    --10000000000000000001
+    --11111100000000000001
+    --11111100000000000001
+    --10001110000000000001
+    --10001110000000000001
+    --10001110000000000001
+    --10001110000000000001
+    --10001111111110000001
+    --10000011111111000001
+    --10000011111111000001
+    --10000011111111000001
+    --10000001111111001111
+    --10000000000000000111
+    --10000000000000000001
+    --10000000000000000001
+    --10000000000000000001
+    --11111111111111111111
+    --"""
     """
 11111111111111111111
 10000000000000000001
-10T00000000000000001
+10T00100000000000001
 10000000000000000001
-11111100000000000001
-11111100000000000001
-10001110000000000001
-10001110000000000001
-10001110000000000001
-10001110000000000001
-10001111111110000001
-10000011111111000001
-10000011111111000001
-10000011111111000001
-10000001111111001111
-10000000000000000111
+10000000000010000001
+10000000000000000001
+10000000001111100001
+10000000001111100001
+10000000000000000001
+10000000000000000001
+10000000000000000001
+10000000000000000001
+10011000000000000001
+10011000000000000001
+10000000000000000001
+10000000000000000001
 10000000000000000001
 10000000000000000001
 10000000000000000001
@@ -226,7 +249,7 @@ playerAcc =
 
 
 playerMaxSpeed =
-    0.01
+    0.005
 
 
 bulletSpeed =
@@ -347,6 +370,7 @@ update msg model =
 
                                     newPos =
                                         Vec2.add model.hero.pos (Vec2.scale delta newVel)
+                                            |> snapAgainstWall model.map model.hero.pos
                                 in
                                 { hero
                                     | pos = newPos
@@ -440,6 +464,86 @@ update msg model =
 
         Resources resourcesMsg ->
             ( { model | resources = Resources.update resourcesMsg model.resources }, Cmd.none )
+
+
+snapAgainstWall : Map -> Vec2 -> Vec2 -> Vec2
+snapAgainstWall map pos nextPos =
+    let
+        -- all top left corner stuff
+        ( heroTopLeftCornerFloatX, heroTopLeftCornerFloatY ) =
+            ( Vec2.getX pos - 0.5, Vec2.getY pos - 0.5 )
+
+        ( nextHeroTopLeftCornerFloatX, nextHeroTopLeftCornerFloatY ) =
+            ( Vec2.getX nextPos - 0.5, Vec2.getY nextPos - 0.5 )
+
+        isCrossingRight =
+            floor heroTopLeftCornerFloatX - floor nextHeroTopLeftCornerFloatX == -1
+
+        isCrossingLeft =
+            floor heroTopLeftCornerFloatX - floor nextHeroTopLeftCornerFloatX == 1
+
+        newX =
+            if isCrossingRight then
+                let
+                    ( right1, right2 ) =
+                        if True then
+                            ( ( ceiling nextHeroTopLeftCornerFloatX, floor -nextHeroTopLeftCornerFloatY )
+                            , ( ceiling nextHeroTopLeftCornerFloatX, ceiling -nextHeroTopLeftCornerFloatY )
+                            )
+
+                        else
+                            ( ( ceiling nextHeroTopLeftCornerFloatX, floor -nextHeroTopLeftCornerFloatY )
+                            , ( ceiling nextHeroTopLeftCornerFloatX, ceiling -nextHeroTopLeftCornerFloatY )
+                            )
+
+                    _ =
+                        Debug.log "crossing right" ""
+                in
+                if isPassable map right1 && isPassable map right2 then
+                    nextHeroTopLeftCornerFloatX
+
+                else
+                    (floor nextHeroTopLeftCornerFloatX |> toFloat) - 0.01
+                -- float fix
+
+            else if isCrossingLeft then
+                let
+                    ( left1, left2 ) =
+                        ( ( floor nextHeroTopLeftCornerFloatX, floor -nextHeroTopLeftCornerFloatY )
+                        , ( floor nextHeroTopLeftCornerFloatX, ceiling -nextHeroTopLeftCornerFloatY )
+                        )
+                in
+                if isPassable map left1 && isPassable map left2 then
+                    nextHeroTopLeftCornerFloatX
+
+                else
+                    ceiling nextHeroTopLeftCornerFloatX
+                        |> toFloat
+
+            else
+                nextHeroTopLeftCornerFloatX
+    in
+    Vec2.vec2 (newX + 0.5) (nextHeroTopLeftCornerFloatY + 0.5)
+
+
+isPassable : Map -> TilePos -> Bool
+isPassable map pos =
+    case Dict.get pos map of
+        Just Water ->
+            False
+                |> Debug.log "water!"
+
+        Just Grass ->
+            True
+
+        Just Poop ->
+            False
+
+        Just Tower ->
+            False
+
+        Nothing ->
+            False
 
 
 findNextTileTowards : Model -> TilePos -> TilePos -> TilePos
