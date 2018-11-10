@@ -63,6 +63,8 @@ type alias Cache =
 type alias Hero =
     { pos : Vec2
     , vel : Vec2
+    , hRub : Bool
+    , vRub : Bool
     }
 
 
@@ -95,6 +97,16 @@ type alias Map =
     Dict TilePos Tile
 
 
+type HDir
+    = Left
+    | Right
+
+
+type VDir
+    = Top
+    | Down
+
+
 type Tile
     = Grass
     | Water
@@ -118,6 +130,8 @@ init flags =
         hero =
             { pos = Vec2.fromRecord { x = 8, y = -6 }
             , vel = Vec2.vec2 0 0
+            , hRub = False
+            , vRub = False
             }
     in
     ( { hero = hero
@@ -476,54 +490,106 @@ snapAgainstWall map pos nextPos =
         ( nextHeroTopLeftCornerFloatX, nextHeroTopLeftCornerFloatY ) =
             ( Vec2.getX nextPos - 0.5, Vec2.getY nextPos - 0.5 )
 
+        col =
+            floor heroTopLeftCornerFloatX + 1
+
+        row =
+            floor -heroTopLeftCornerFloatY + 1
+
+        nextCol =
+            floor nextHeroTopLeftCornerFloatX + 1
+
+        nextRow =
+            floor -nextHeroTopLeftCornerFloatY + 1
+
         isCrossingRight =
-            floor heroTopLeftCornerFloatX - floor nextHeroTopLeftCornerFloatX == -1
+            col - nextCol == -1
 
         isCrossingLeft =
-            floor heroTopLeftCornerFloatX - floor nextHeroTopLeftCornerFloatX == 1
+            col - nextCol == 1
 
-        newX =
-            if isCrossingRight then
-                let
-                    ( right1, right2 ) =
-                        if True then
-                            ( ( ceiling nextHeroTopLeftCornerFloatX, floor -nextHeroTopLeftCornerFloatY )
-                            , ( ceiling nextHeroTopLeftCornerFloatX, ceiling -nextHeroTopLeftCornerFloatY )
-                            )
+        isCrossingTop =
+            row - nextRow == 1
 
-                        else
-                            ( ( ceiling nextHeroTopLeftCornerFloatX, floor -nextHeroTopLeftCornerFloatY )
-                            , ( ceiling nextHeroTopLeftCornerFloatX, ceiling -nextHeroTopLeftCornerFloatY )
-                            )
+        isCrossingDown =
+            row - nextRow == -1
 
-                    _ =
-                        Debug.log "crossing right" ""
-                in
-                if isPassable map right1 && isPassable map right2 then
-                    nextHeroTopLeftCornerFloatX
-
-                else
-                    (floor nextHeroTopLeftCornerFloatX |> toFloat) - 0.01
+        ( newX, newY ) =
+            ( if
+                (isCrossingRight || isCrossingLeft)
+                    && ((isCrossingTop
+                            && not
+                                (List.all
+                                    (isPassable map)
+                                    [ ( col, nextRow )
+                                    , ( nextCol, row )
+                                    , ( nextCol, nextRow )
+                                    ]
+                                )
+                        )
+                            || (isCrossingDown
+                                    && not
+                                        (List.all (isPassable map)
+                                            [ ( col, nextRow )
+                                            , ( nextCol, row )
+                                            , ( nextCol, nextRow )
+                                            ]
+                                        )
+                               )
+                            || not
+                                (List.all (isPassable map)
+                                    [ ( nextCol, row )
+                                    , ( nextCol, row - 1 )
+                                    ]
+                                )
+                       )
+              then
+                (col |> toFloat)
+                    - 0.01
+                    |> Debug.log "BLOCKED H"
                 -- float fix
 
-            else if isCrossingLeft then
-                let
-                    ( left1, left2 ) =
-                        ( ( floor nextHeroTopLeftCornerFloatX, floor -nextHeroTopLeftCornerFloatY )
-                        , ( floor nextHeroTopLeftCornerFloatX, ceiling -nextHeroTopLeftCornerFloatY )
-                        )
-                in
-                if isPassable map left1 && isPassable map left2 then
-                    nextHeroTopLeftCornerFloatX
-
-                else
-                    ceiling nextHeroTopLeftCornerFloatX
-                        |> toFloat
-
-            else
+              else
                 nextHeroTopLeftCornerFloatX
+            , -- and the y
+              if
+                (isCrossingTop || isCrossingDown)
+                    && ((isCrossingLeft
+                            && not
+                                (List.all (isPassable map)
+                                    [ ( col, nextRow )
+                                    , ( nextCol, row )
+                                    , ( nextCol, nextRow )
+                                    ]
+                                )
+                        )
+                            || (isCrossingRight
+                                    && not
+                                        (List.all (isPassable map)
+                                            [ ( col, nextRow )
+                                            , ( nextCol, row )
+                                            , ( nextCol, nextRow )
+                                            ]
+                                        )
+                               )
+                            || not
+                                (List.all (isPassable map)
+                                    [ ( col, nextRow )
+                                    , ( col - 1, nextRow )
+                                    ]
+                                )
+                       )
+              then
+                (-row |> toFloat)
+                    + 0.01
+                    |> Debug.log "BLOCKED V"
+                -- float fix
+
+              else
+                nextHeroTopLeftCornerFloatY
+            )
     in
-    Vec2.vec2 (newX + 0.5) (nextHeroTopLeftCornerFloatY + 0.5)
+    Vec2.vec2 (newX + 0.5) (newY + 0.5)
 
 
 isPassable : Map -> TilePos -> Bool
@@ -531,19 +597,25 @@ isPassable map pos =
     case Dict.get pos map of
         Just Water ->
             False
-                |> Debug.log "water!"
 
+        --|> Debug.log "water!"
         Just Grass ->
             True
 
         Just Poop ->
             False
 
+        --|> Debug.log "poop!"
         Just Tower ->
             False
 
+        --|> Debug.log "tower!"
         Nothing ->
             False
+
+
+
+--|> Debug.log "NOTHING!!!!!!!!!!!!"
 
 
 findNextTileTowards : Model -> TilePos -> TilePos -> TilePos
