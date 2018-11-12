@@ -60,12 +60,33 @@ type alias Cache =
     }
 
 
+type HeroPos
+    = IntFloat Int Float
+    | IntInt Int Int
+    | FloatInt Float Int
+    | FloatFloat Float Float
+
+
 type alias Hero =
-    { pos : Vec2
+    { pos : HeroPos
     , vel : Vec2
-    , hRub : Bool
-    , vRub : Bool
     }
+
+
+heroPosToVec2 : HeroPos -> Vec2
+heroPosToVec2 pos =
+    case pos of
+        IntFloat x y ->
+            Vec2.vec2 (toFloat x) -y
+
+        IntInt x y ->
+            Vec2.vec2 (toFloat x) (toFloat -y)
+
+        FloatInt x y ->
+            Vec2.vec2 x (toFloat -y)
+
+        FloatFloat x y ->
+            Vec2.vec2 x -y
 
 
 type alias EnemyTower =
@@ -128,10 +149,8 @@ init : Flags -> ( Model, Cmd Msg )
 init flags =
     let
         hero =
-            { pos = Vec2.fromRecord { x = 8, y = -6 }
+            { pos = FloatFloat 8 6
             , vel = Vec2.vec2 0 0
-            , hRub = False
-            , vRub = False
             }
     in
     ( { hero = hero
@@ -150,7 +169,6 @@ init flags =
             [ { pos = ( 2, 8 ), timeSinceLastSpawn = 0 }
             , { pos = ( 13, 1 ), timeSinceLastSpawn = 0 }
             ]
-                |> always []
       }
     , Resources.loadTextures
         [ "images/grass.png"
@@ -168,50 +186,28 @@ cameraOnHero : Hero -> Camera
 cameraOnHero hero =
     GameTwoDCamera.fixedArea
         (tilesToShowHeightwise * tilesToShowLengthwise)
-        ( Vec2.getX hero.pos, Vec2.getY hero.pos )
+        ( Vec2.getX (heroPosToVec2 hero.pos), Vec2.getY (heroPosToVec2 hero.pos) )
 
 
 initMap : Map
 initMap =
-    --    """
-    --11111111111111111111
-    --10000000000000000001
-    --10T00000000000000001
-    --10000000000000000001
-    --11111100000000000001
-    --11111100000000000001
-    --10001110000000000001
-    --10001110000000000001
-    --10001110000000000001
-    --10001110000000000001
-    --10001111111110000001
-    --10000011111111000001
-    --10000011111111000001
-    --10000011111111000001
-    --10000001111111001111
-    --10000000000000000111
-    --10000000000000000001
-    --10000000000000000001
-    --10000000000000000001
-    --11111111111111111111
-    --"""
     """
 11111111111111111111
 10000000000000000001
-10T00100000000000001
+10T00000000000000001
 10000000000000000001
-10000000000010000001
-10000000000000000001
-10000000001111100001
-10000000001111100001
-10000000000000000001
-10000000000000000001
-10000000000000000001
-10000000000000000001
-10011000000000000001
-10011000000000000001
-10000000000000000001
-10000000000000000001
+11111100000000000001
+11111100000000000001
+10001110000000000001
+10001110000000000001
+10001110000000000001
+10001110000000000001
+10001111111110000001
+10000011111111000001
+10000011111111000001
+10000011111111000001
+10000001111111001111
+10000000000000000111
 10000000000000000001
 10000000000000000001
 10000000000000000001
@@ -383,17 +379,31 @@ update msg model =
                                             |> Vec2.scale 0.8
 
                                     newPos =
-                                        Vec2.add model.hero.pos (Vec2.scale delta newVel)
-                                            |> snapAgainstWall model.map model.hero.pos
+                                        Vec2.add (heroPosToVec2 model.hero.pos) (Vec2.scale delta newVel)
+
+                                    newestPos =
+                                        snapAgainstWall model.map newVel model.hero.pos newPos
                                 in
                                 { hero
-                                    | pos = newPos
-                                    , vel = newVel
+                                    | pos = newestPos
+                                    , vel =
+                                        case newestPos of
+                                            FloatFloat _ _ ->
+                                                newVel
+
+                                            IntFloat _ _ ->
+                                                Vec2.setX 0 newVel
+
+                                            FloatInt _ _ ->
+                                                Vec2.setY 0 newVel
+
+                                            IntInt _ _ ->
+                                                Vec2.vec2 0 0
                                 }
                            )
                 , bullets =
                     (if model.isMouseDown then
-                        makeBullet model.hero.pos (mousePosToGamePos model) :: model.bullets
+                        makeBullet (heroPosToVec2 model.hero.pos) (mousePosToGamePos model) :: model.bullets
 
                      else
                         model.bullets
@@ -480,8 +490,65 @@ update msg model =
             ( { model | resources = Resources.update resourcesMsg model.resources }, Cmd.none )
 
 
-snapAgainstWall : Map -> Vec2 -> Vec2 -> Vec2
-snapAgainstWall map pos nextPos =
+snapAgainstWall : Map -> Vec2 -> HeroPos -> Vec2 -> HeroPos
+snapAgainstWall map vel heroPos nextPos =
+    -- first, get the tiles it's got to go to
+    -- try vert movement first
+    case heroPos of
+        FloatFloat x y ->
+            -- just floating around? lets see if it crossed a line and hit anything
+            let
+                ( heroTopLeftCornerFloatX, heroTopLeftCornerFloatY ) =
+                    ( x - 0.5, y - 0.5 )
+
+                ( nextHeroTopLeftCornerFloatX, nextHeroTopLeftCornerFloatY ) =
+                    ( Vec2.getX nextPos - 0.5, Vec2.getY nextPos - 0.5 )
+
+                col =
+                    floor heroTopLeftCornerFloatX + 1
+
+                row =
+                    floor -heroTopLeftCornerFloatY
+
+                nextCol =
+                    floor nextHeroTopLeftCornerFloatX + 1
+
+                nextRow =
+                    floor -nextHeroTopLeftCornerFloatY
+
+                colDiff =
+                    nextCol - col
+
+                rowDiff =
+                    nextRow + row
+
+                _ =
+                    if colDiff == 1 then
+                        Debug.log "crossingRight" ""
+
+                    else if colDiff == -1 then
+                        Debug.log "crossingLeft" ""
+
+                    else
+                        ""
+
+                _ =
+                    if rowDiff == 1 then
+                        Debug.log "crossingBot" ""
+
+                    else if rowDiff == -1 then
+                        Debug.log "crossingTop" ""
+
+                    else
+                        ""
+            in
+            FloatFloat (Vec2.getX nextPos) -(Vec2.getY nextPos)
+
+        _ ->
+            FloatFloat 4.5 -3.5
+
+
+snapAgainstWall2 map vel pos nextPos =
     let
         -- all top left corner stuff
         ( heroTopLeftCornerFloatX, heroTopLeftCornerFloatY ) =
@@ -589,7 +656,11 @@ snapAgainstWall map pos nextPos =
                 nextHeroTopLeftCornerFloatY
             )
     in
-    Vec2.vec2 (newX + 0.5) (newY + 0.5)
+    --( Vec2.vec2 (newX + 0.5) (newY + 0.5)
+    ( FloatFloat (newX + 0.5) (newY + 0.5)
+    , False
+    , False
+    )
 
 
 isPassable : Map -> TilePos -> Bool
@@ -789,11 +860,11 @@ view model =
         hero =
             [ drawRect
                 Color.black
-                model.hero.pos
+                (heroPosToVec2 model.hero.pos)
                 (Vec2.vec2 1 1)
             , drawRect
                 Color.darkGray
-                model.hero.pos
+                (heroPosToVec2 model.hero.pos)
                 (Vec2.vec2 0.9 0.9)
             ]
 
