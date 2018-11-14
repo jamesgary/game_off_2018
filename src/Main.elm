@@ -60,33 +60,14 @@ type alias Cache =
     }
 
 
-type HeroPos
-    = IntFloat Int Float
-    | IntInt Int Int
-    | FloatInt Float Int
-    | FloatFloat Float Float
+type alias HeroPos =
+    Vec2
 
 
 type alias Hero =
     { pos : HeroPos
     , vel : Vec2
     }
-
-
-heroPosToVec2 : HeroPos -> Vec2
-heroPosToVec2 pos =
-    case pos of
-        IntFloat x y ->
-            Vec2.vec2 (toFloat x) -y
-
-        IntInt x y ->
-            Vec2.vec2 (toFloat x) (toFloat -y)
-
-        FloatInt x y ->
-            Vec2.vec2 x (toFloat -y)
-
-        FloatFloat x y ->
-            Vec2.vec2 x -y
 
 
 type alias EnemyTower =
@@ -149,7 +130,7 @@ init : Flags -> ( Model, Cmd Msg )
 init flags =
     let
         hero =
-            { pos = FloatFloat 8 6
+            { pos = Vec2.vec2 8 -6
             , vel = Vec2.vec2 0 0
             }
     in
@@ -163,12 +144,13 @@ init flags =
       , map = initMap
       , creeps = []
       , cache =
-            { heroTowerPos = ( 2, 2 )
+            { heroTowerPos = ( 2, -2 )
             }
       , enemyTowers =
-            [ { pos = ( 2, 8 ), timeSinceLastSpawn = 0 }
-            , { pos = ( 13, 1 ), timeSinceLastSpawn = 0 }
+            [ { pos = ( 2, -8 ), timeSinceLastSpawn = 0 }
+            , { pos = ( 13, -1 ), timeSinceLastSpawn = 0 }
             ]
+                |> always []
       }
     , Resources.loadTextures
         [ "images/grass.png"
@@ -186,7 +168,7 @@ cameraOnHero : Hero -> Camera
 cameraOnHero hero =
     GameTwoDCamera.fixedArea
         (tilesToShowHeightwise * tilesToShowLengthwise)
-        ( Vec2.getX (heroPosToVec2 hero.pos), Vec2.getY (heroPosToVec2 hero.pos) )
+        ( Vec2.getX hero.pos, Vec2.getY hero.pos )
 
 
 initMap : Map
@@ -194,13 +176,13 @@ initMap =
     """
 11111111111111111111
 10000000000000000001
-10T00000000000000001
-10000000000000000001
-11111100000000000001
-11111100000000000001
-10001110000000000001
-10001110000000000001
-10001110000000000001
+10T00010100000000001
+10000010100000000001
+11111110100000000001
+11111100100000000001
+10001110100000000001
+10001110100000000001
+10001110100000000001
 10001110000000000001
 10001111111110000001
 10000011111111000001
@@ -221,7 +203,7 @@ initMap =
                     |> String.toList
                     |> List.indexedMap
                         (\col char ->
-                            ( ( col, row )
+                            ( ( col, -row )
                             , case char of
                                 '0' ->
                                     Grass
@@ -379,31 +361,19 @@ update msg model =
                                             |> Vec2.scale 0.8
 
                                     newPos =
-                                        Vec2.add (heroPosToVec2 model.hero.pos) (Vec2.scale delta newVel)
+                                        Vec2.add model.hero.pos (Vec2.scale delta newVel)
 
                                     newestPos =
                                         snapAgainstWall model.map newVel model.hero.pos newPos
                                 in
                                 { hero
                                     | pos = newestPos
-                                    , vel =
-                                        case newestPos of
-                                            FloatFloat _ _ ->
-                                                newVel
-
-                                            IntFloat _ _ ->
-                                                Vec2.setX 0 newVel
-
-                                            FloatInt _ _ ->
-                                                Vec2.setY 0 newVel
-
-                                            IntInt _ _ ->
-                                                Vec2.vec2 0 0
+                                    , vel = newVel
                                 }
                            )
                 , bullets =
                     (if model.isMouseDown then
-                        makeBullet (heroPosToVec2 model.hero.pos) (mousePosToGamePos model) :: model.bullets
+                        makeBullet model.hero.pos (mousePosToGamePos model) :: model.bullets
 
                      else
                         model.bullets
@@ -492,60 +462,52 @@ update msg model =
 
 snapAgainstWall : Map -> Vec2 -> HeroPos -> Vec2 -> HeroPos
 snapAgainstWall map vel heroPos nextPos =
-    -- first, get the tiles it's got to go to
-    -- try vert movement first
-    case heroPos of
-        FloatFloat x y ->
-            -- just floating around? lets see if it crossed a line and hit anything
-            let
-                ( heroTopLeftCornerFloatX, heroTopLeftCornerFloatY ) =
-                    ( x - 0.5, y - 0.5 )
+    let
+        ( heroTopLeftCornerFloatX, heroTopLeftCornerFloatY ) =
+            ( Vec2.getX heroPos - 0.5, Vec2.getY heroPos - 0.5 )
 
-                ( nextHeroTopLeftCornerFloatX, nextHeroTopLeftCornerFloatY ) =
-                    ( Vec2.getX nextPos - 0.5, Vec2.getY nextPos - 0.5 )
+        ( nextHeroTopLeftCornerFloatX, nextHeroTopLeftCornerFloatY ) =
+            ( Vec2.getX nextPos - 0.5, Vec2.getY nextPos - 0.5 )
 
-                col =
-                    floor heroTopLeftCornerFloatX + 1
+        col =
+            floor heroTopLeftCornerFloatX + 1
 
-                row =
-                    floor -heroTopLeftCornerFloatY
+        row =
+            floor -heroTopLeftCornerFloatY
 
-                nextCol =
-                    floor nextHeroTopLeftCornerFloatX + 1
+        nextCol =
+            floor nextHeroTopLeftCornerFloatX + 1
 
-                nextRow =
-                    floor -nextHeroTopLeftCornerFloatY
+        nextRow =
+            floor -nextHeroTopLeftCornerFloatY
 
-                colDiff =
-                    nextCol - col
+        colDiff =
+            nextCol - col
 
-                rowDiff =
-                    nextRow + row
+        rowDiff =
+            nextRow + row
 
-                _ =
-                    if colDiff == 1 then
-                        Debug.log "crossingRight" ""
+        _ =
+            if colDiff == 1 then
+                Debug.log "crossingRight" ""
 
-                    else if colDiff == -1 then
-                        Debug.log "crossingLeft" ""
+            else if colDiff == -1 then
+                Debug.log "crossingLeft" ""
 
-                    else
-                        ""
+            else
+                ""
 
-                _ =
-                    if rowDiff == 1 then
-                        Debug.log "crossingBot" ""
+        _ =
+            if rowDiff == 1 then
+                Debug.log "crossingBot" ""
 
-                    else if rowDiff == -1 then
-                        Debug.log "crossingTop" ""
+            else if rowDiff == -1 then
+                Debug.log "crossingTop" ""
 
-                    else
-                        ""
-            in
-            FloatFloat (Vec2.getX nextPos) -(Vec2.getY nextPos)
-
-        _ ->
-            FloatFloat 4.5 -3.5
+            else
+                ""
+    in
+    nextPos
 
 
 snapAgainstWall2 map vel pos nextPos =
@@ -656,8 +618,7 @@ snapAgainstWall2 map vel pos nextPos =
                 nextHeroTopLeftCornerFloatY
             )
     in
-    --( Vec2.vec2 (newX + 0.5) (newY + 0.5)
-    ( FloatFloat (newX + 0.5) (newY + 0.5)
+    ( Vec2.vec2 (newX + 0.5) (newY + 0.5)
     , False
     , False
     )
@@ -822,6 +783,10 @@ drawRect color pos size =
 view : Model -> Browser.Document Msg
 view model =
     let
+        _ =
+            Debug.log "?"
+                model.hero.pos
+
         map =
             model.map
                 |> Dict.toList
@@ -830,28 +795,28 @@ view model =
                         case tile of
                             Grass ->
                                 GameTwoDRender.sprite
-                                    { position = ( toFloat col, toFloat -row )
+                                    { position = ( toFloat col, toFloat row )
                                     , size = ( 1, 1 )
                                     , texture = Resources.getTexture "images/grass.png" model.resources
                                     }
 
                             Water ->
                                 GameTwoDRender.sprite
-                                    { position = ( toFloat col, toFloat -row )
+                                    { position = ( toFloat col, toFloat row )
                                     , size = ( 1, 1 )
                                     , texture = Resources.getTexture "images/water.png" model.resources
                                     }
 
                             Tower ->
                                 GameTwoDRender.sprite
-                                    { position = ( toFloat col, toFloat -row )
+                                    { position = ( toFloat col, toFloat row )
                                     , size = ( 1, 1 )
                                     , texture = Resources.getTexture "images/tower.png" model.resources
                                     }
 
                             Poop ->
                                 GameTwoDRender.sprite
-                                    { position = ( toFloat col, toFloat -row )
+                                    { position = ( toFloat col, toFloat row )
                                     , size = ( 1, 1 )
                                     , texture = Nothing
                                     }
@@ -860,11 +825,11 @@ view model =
         hero =
             [ drawRect
                 Color.black
-                (heroPosToVec2 model.hero.pos)
+                model.hero.pos
                 (Vec2.vec2 1 1)
             , drawRect
                 Color.darkGray
-                (heroPosToVec2 model.hero.pos)
+                model.hero.pos
                 (Vec2.vec2 0.9 0.9)
             ]
 
@@ -950,4 +915,4 @@ tilePosSub ( a, b ) ( c, d ) =
 
 tilePosToSpritePos : TilePos -> ( Float, Float )
 tilePosToSpritePos ( col, row ) =
-    ( toFloat col, toFloat -row )
+    ( toFloat col, toFloat row )
