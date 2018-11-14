@@ -14,6 +14,7 @@ import Html
 import Html.Attributes
 import Html.Events.Extra.Mouse as Mouse
 import Json.Decode as Decode
+import List.Extra
 import Math.Vector2 as Vec2 exposing (Vec2)
 import Set exposing (Set)
 
@@ -85,10 +86,16 @@ type alias Turret =
 
 
 type alias Bullet =
-    { pos : Vec2
+    { kind : BulletKind
+    , pos : Vec2
     , angle : Float
     , age : Float
     }
+
+
+type BulletKind
+    = PlayerBullet
+    | PlantBullet
 
 
 type alias Key =
@@ -312,8 +319,12 @@ currentCameraPos model =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Tick delta ->
+        Tick d ->
             let
+                delta =
+                    -- set max frame at 0.25 sec
+                    min d 500
+
                 newEnemyTowersAndCreeps =
                     model.enemyTowers
                         |> List.map
@@ -397,12 +408,29 @@ update msg model =
                                 }
                            )
                 , bullets =
-                    (if model.isMouseDown then
-                        makeBullet model.hero.pos (mousePosToGamePos model) :: model.bullets
+                    List.concat
+                        [ model.bullets
+                        , if model.isMouseDown then
+                            [ makeBullet PlayerBullet model.hero.pos (mousePosToGamePos model) ]
 
-                     else
-                        model.bullets
-                    )
+                          else
+                            []
+                        , model.turrets
+                            |> List.map
+                                (\turret ->
+                                    model.creeps
+                                        |> List.Extra.minimumBy (\closestCreep -> Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurret turret))
+                                        |> Maybe.andThen
+                                            (\closestCreep ->
+                                                if Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurret turret) < 5 ^ 2 then
+                                                    Just (makeBullet PlantBullet (vec2FromTurret turret) (vec2FromCreep closestCreep))
+
+                                                else
+                                                    Nothing
+                                            )
+                                )
+                            |> List.filterMap identity
+                        ]
                         |> List.map
                             (\bullet ->
                                 { bullet
@@ -631,9 +659,10 @@ mousePosToSelectedTile model =
            )
 
 
-makeBullet : Vec2 -> Vec2 -> Bullet
-makeBullet heroPos aimPos =
-    { pos = heroPos
+makeBullet : BulletKind -> Vec2 -> Vec2 -> Bullet
+makeBullet kind heroPos aimPos =
+    { kind = kind
+    , pos = heroPos
     , angle =
         toPolar
             (Vec2.sub aimPos heroPos |> vec2ToTuple)
@@ -821,6 +850,24 @@ view model =
             ]
         ]
     }
+
+
+vec2FromTurret : Turret -> Vec2
+vec2FromTurret turret =
+    turret.pos
+        |> tilePosToSpritePos
+        |> tupleToVec2
+        |> Vec2.add (Vec2.vec2 0.5 0.5)
+
+
+vec2FromCreep : Creep -> Vec2
+vec2FromCreep creep =
+    tilePosSub creep.nextPos creep.pos
+        |> tilePosToSpritePos
+        |> tupleToVec2
+        |> Vec2.scale creep.progress
+        |> Vec2.add (creep.pos |> tilePosToSpritePos |> tupleToVec2)
+        |> Vec2.add (Vec2.vec2 0.5 0.5)
 
 
 tilePosSub : TilePos -> TilePos -> TilePos
