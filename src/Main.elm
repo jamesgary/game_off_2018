@@ -41,6 +41,7 @@ type alias Model =
     , selectedTile : Maybe Pos
     , map : Map
     , enemyTowers : List EnemyTower
+    , turrets : List Turret
     , creeps : List Creep
     , cache : Cache
     }
@@ -74,6 +75,12 @@ type alias Hero =
 type alias EnemyTower =
     { pos : TilePos
     , timeSinceLastSpawn : Float
+    }
+
+
+type alias Turret =
+    { pos : TilePos
+    , timeSinceLastFire : Float
     }
 
 
@@ -151,13 +158,16 @@ init flags =
             [ { pos = ( 2, -8 ), timeSinceLastSpawn = 0 }
             , { pos = ( 13, -1 ), timeSinceLastSpawn = 0 }
             ]
-                |> always []
+      , turrets =
+            [ { pos = ( 8, -5 ), timeSinceLastFire = 0 }
+            ]
       }
     , Resources.loadTextures
         [ "images/grass.png"
         , "images/water.png"
         , "images/selectedTile.png"
         , "images/enemyTower.png"
+        , "images/turret.png"
         , "images/creep.png"
         , "images/tower.png"
         ]
@@ -737,6 +747,17 @@ view model =
                             }
                     )
 
+        turrets =
+            model.turrets
+                |> List.map
+                    (\{ pos } ->
+                        GameTwoDRender.sprite
+                            { position = tilePosToSpritePos pos
+                            , size = ( 1, 1 )
+                            , texture = Resources.getTexture "images/turret.png" model.resources
+                            }
+                    )
+
         selectedTileOutline =
             case model.selectedTile of
                 Just { x, y } ->
@@ -789,6 +810,7 @@ view model =
                 (List.concat
                     [ map
                     , enemyTowers
+                    , turrets
                     , hero
                     , creeps
                     , model.bullets
