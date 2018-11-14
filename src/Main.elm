@@ -131,7 +131,7 @@ init : Flags -> ( Model, Cmd Msg )
 init flags =
     let
         hero =
-            { pos = Vec2.vec2 2 -2
+            { pos = Vec2.vec2 9 -3
             , vel = Vec2.vec2 0 0
             }
     in
@@ -174,31 +174,26 @@ cameraOnHero hero =
 
 initMap : Map
 initMap =
-    --    """
-    --11111111111111111111
-    --10000000000000000001
-    --10T00010100000000001
-    --11111110000000000001
-    --11111100000000000001
-    --10001110000000000001
-    --10001110000000000001
-    --10001110000000000001
-    --10001110000000000001
-    --10001111111110000001
-    --10000011111111000001
-    --10000011111111000001
-    --10000011111111000001
-    --10000001111111001111
-    --10000000000000000111
-    --10000000000000000001
-    --10000000000000000001
-    --10000000000000000001
-    --11111111111111111111
-    --"""
     """
-100
-000
-000
+11111111111111111111
+10000000000000000001
+10T00010100000000001
+11111110000000000001
+11111100000000000001
+10001110000000000001
+10001110000000000001
+10001110000000000001
+10001110000000000001
+10001111111110000001
+10000011111111000001
+10000011111111000001
+10000011111111000001
+10000001111111001111
+10000000000000000111
+10000000000000000001
+10000000000000000001
+10000000000000000001
+11111111111111111111
 """
         |> String.trim
         |> String.lines
@@ -369,11 +364,22 @@ update msg model =
                                         Vec2.add model.hero.pos (Vec2.scale delta newVel)
 
                                     ( newestPos, newestVel ) =
-                                        if isHeroColliding model.map newPos then
-                                            ( hero.pos, Vec2.vec2 0 0 )
+                                        if not <| isHeroColliding model.map newPos then
+                                            ( newPos, newVel )
+                                            -- also check common x/y slides
+
+                                        else if not <| isHeroColliding model.map (Vec2.vec2 (Vec2.getX newPos) (Vec2.getY hero.pos)) then
+                                            ( Vec2.vec2 (Vec2.getX newPos) (Vec2.getY hero.pos)
+                                            , Vec2.vec2 (Vec2.getX newVel) 0
+                                            )
+
+                                        else if not <| isHeroColliding model.map (Vec2.vec2 (Vec2.getX hero.pos) (Vec2.getY newPos)) then
+                                            ( Vec2.vec2 (Vec2.getX hero.pos) (Vec2.getY newPos)
+                                            , Vec2.vec2 0 (Vec2.getY newVel)
+                                            )
 
                                         else
-                                            ( newPos, newVel )
+                                            ( hero.pos, Vec2.vec2 0 0 )
                                 in
                                 { hero
                                     | pos = newestPos
