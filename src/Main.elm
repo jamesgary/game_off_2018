@@ -3,6 +3,7 @@ module Main exposing (main)
 import AStar
 import Browser
 import Browser.Events
+import Collision
 import Color exposing (Color)
 import Dict exposing (Dict)
 import Game.Resources as Resources exposing (Resources)
@@ -130,7 +131,7 @@ init : Flags -> ( Model, Cmd Msg )
 init flags =
     let
         hero =
-            { pos = Vec2.vec2 8 -6
+            { pos = Vec2.vec2 2 -2
             , vel = Vec2.vec2 0 0
             }
     in
@@ -173,27 +174,31 @@ cameraOnHero hero =
 
 initMap : Map
 initMap =
+    --    """
+    --11111111111111111111
+    --10000000000000000001
+    --10T00010100000000001
+    --11111110000000000001
+    --11111100000000000001
+    --10001110000000000001
+    --10001110000000000001
+    --10001110000000000001
+    --10001110000000000001
+    --10001111111110000001
+    --10000011111111000001
+    --10000011111111000001
+    --10000011111111000001
+    --10000001111111001111
+    --10000000000000000111
+    --10000000000000000001
+    --10000000000000000001
+    --10000000000000000001
+    --11111111111111111111
+    --"""
     """
-11111111111111111111
-10000000000000000001
-10T00010100000000001
-10000010100000000001
-11111110100000000001
-11111100100000000001
-10001110100000000001
-10001110100000000001
-10001110100000000001
-10001110000000000001
-10001111111110000001
-10000011111111000001
-10000011111111000001
-10000011111111000001
-10000001111111001111
-10000000000000000111
-10000000000000000001
-10000000000000000001
-10000000000000000001
-11111111111111111111
+100
+000
+000
 """
         |> String.trim
         |> String.lines
@@ -363,12 +368,16 @@ update msg model =
                                     newPos =
                                         Vec2.add model.hero.pos (Vec2.scale delta newVel)
 
-                                    newestPos =
-                                        snapAgainstWall model.map newVel model.hero.pos newPos
+                                    ( newestPos, newestVel ) =
+                                        if isHeroColliding model.map newPos then
+                                            ( hero.pos, Vec2.vec2 0 0 )
+
+                                        else
+                                            ( newPos, newVel )
                                 in
                                 { hero
                                     | pos = newestPos
-                                    , vel = newVel
+                                    , vel = newestVel
                                 }
                            )
                 , bullets =
@@ -460,194 +469,76 @@ update msg model =
             ( { model | resources = Resources.update resourcesMsg model.resources }, Cmd.none )
 
 
-snapAgainstWall : Map -> Vec2 -> HeroPos -> Vec2 -> HeroPos
-snapAgainstWall map vel heroPos nextPos =
+isHeroColliding : Map -> Vec2 -> Bool
+isHeroColliding map heroPos =
     let
-        ( heroTopLeftCornerFloatX, heroTopLeftCornerFloatY ) =
-            ( Vec2.getX heroPos - 0.5, Vec2.getY heroPos - 0.5 )
-
-        ( nextHeroTopLeftCornerFloatX, nextHeroTopLeftCornerFloatY ) =
-            ( Vec2.getX nextPos - 0.5, Vec2.getY nextPos - 0.5 )
-
-        col =
-            floor heroTopLeftCornerFloatX + 1
-
-        row =
-            floor -heroTopLeftCornerFloatY
-
-        nextCol =
-            floor nextHeroTopLeftCornerFloatX + 1
-
-        nextRow =
-            floor -nextHeroTopLeftCornerFloatY
-
-        colDiff =
-            nextCol - col
-
-        rowDiff =
-            nextRow + row
-
-        _ =
-            if colDiff == 1 then
-                Debug.log "crossingRight" ""
-
-            else if colDiff == -1 then
-                Debug.log "crossingLeft" ""
-
-            else
-                ""
-
-        _ =
-            if rowDiff == 1 then
-                Debug.log "crossingBot" ""
-
-            else if rowDiff == -1 then
-                Debug.log "crossingTop" ""
-
-            else
-                ""
+        heroPoly =
+            polyFromSquare heroPos 0.45
     in
-    nextPos
-
-
-snapAgainstWall2 map vel pos nextPos =
-    let
-        -- all top left corner stuff
-        ( heroTopLeftCornerFloatX, heroTopLeftCornerFloatY ) =
-            ( Vec2.getX pos - 0.5, Vec2.getY pos - 0.5 )
-
-        ( nextHeroTopLeftCornerFloatX, nextHeroTopLeftCornerFloatY ) =
-            ( Vec2.getX nextPos - 0.5, Vec2.getY nextPos - 0.5 )
-
-        col =
-            floor heroTopLeftCornerFloatX + 1
-
-        row =
-            floor -heroTopLeftCornerFloatY + 1
-
-        nextCol =
-            floor nextHeroTopLeftCornerFloatX + 1
-
-        nextRow =
-            floor -nextHeroTopLeftCornerFloatY + 1
-
-        isCrossingRight =
-            col - nextCol == -1
-
-        isCrossingLeft =
-            col - nextCol == 1
-
-        isCrossingTop =
-            row - nextRow == 1
-
-        isCrossingDown =
-            row - nextRow == -1
-
-        ( newX, newY ) =
-            ( if
-                (isCrossingRight || isCrossingLeft)
-                    && ((isCrossingTop
-                            && not
-                                (List.all
-                                    (isPassable map)
-                                    [ ( col, nextRow )
-                                    , ( nextCol, row )
-                                    , ( nextCol, nextRow )
-                                    ]
-                                )
-                        )
-                            || (isCrossingDown
-                                    && not
-                                        (List.all (isPassable map)
-                                            [ ( col, nextRow )
-                                            , ( nextCol, row )
-                                            , ( nextCol, nextRow )
-                                            ]
-                                        )
-                               )
-                            || not
-                                (List.all (isPassable map)
-                                    [ ( nextCol, row )
-                                    , ( nextCol, row - 1 )
-                                    ]
-                                )
-                       )
-              then
-                (col |> toFloat)
-                    - 0.01
-                    |> Debug.log "BLOCKED H"
-                -- float fix
-
-              else
-                nextHeroTopLeftCornerFloatX
-            , -- and the y
-              if
-                (isCrossingTop || isCrossingDown)
-                    && ((isCrossingLeft
-                            && not
-                                (List.all (isPassable map)
-                                    [ ( col, nextRow )
-                                    , ( nextCol, row )
-                                    , ( nextCol, nextRow )
-                                    ]
-                                )
-                        )
-                            || (isCrossingRight
-                                    && not
-                                        (List.all (isPassable map)
-                                            [ ( col, nextRow )
-                                            , ( nextCol, row )
-                                            , ( nextCol, nextRow )
-                                            ]
-                                        )
-                               )
-                            || not
-                                (List.all (isPassable map)
-                                    [ ( col, nextRow )
-                                    , ( col - 1, nextRow )
-                                    ]
-                                )
-                       )
-              then
-                (-row |> toFloat)
-                    + 0.01
-                    |> Debug.log "BLOCKED V"
-                -- float fix
-
-              else
-                nextHeroTopLeftCornerFloatY
+    map
+        |> Dict.filter (\_ tile -> not (isPassable tile))
+        |> Dict.map
+            (\( x, y ) tile ->
+                Collision.collision 10 ( heroPoly, polySupport ) ( polyFromSquare (Vec2.vec2 (0.5 + toFloat x) (0.5 + toFloat y)) 0.5, polySupport )
+                    |> Maybe.withDefault False
             )
-    in
-    ( Vec2.vec2 (newX + 0.5) (newY + 0.5)
-    , False
-    , False
-    )
+        |> Dict.values
+        |> List.filter identity
+        |> (not << List.isEmpty)
 
 
-isPassable : Map -> TilePos -> Bool
-isPassable map pos =
-    case Dict.get pos map of
-        Just Water ->
+polyFromSquare : Vec2 -> Float -> List Collision.Pt
+polyFromSquare center halfLength =
+    center
+        |> Vec2.toRecord
+        |> (\{ x, y } ->
+                [ ( x + halfLength, y - halfLength )
+                , ( x + halfLength, y + halfLength )
+                , ( x - halfLength, y + halfLength )
+                , ( x - halfLength, y - halfLength )
+                ]
+           )
+
+
+isPassable : Tile -> Bool
+isPassable tile =
+    case tile of
+        Water ->
             False
 
-        --|> Debug.log "water!"
-        Just Grass ->
+        Grass ->
             True
 
-        Just Poop ->
+        Poop ->
             False
 
-        --|> Debug.log "poop!"
-        Just Tower ->
-            False
-
-        --|> Debug.log "tower!"
-        Nothing ->
+        Tower ->
             False
 
 
+dot : Collision.Pt -> Collision.Pt -> Float
+dot ( x1, y1 ) ( x2, y2 ) =
+    (x1 * x2) + (y1 * y2)
 
---|> Debug.log "NOTHING!!!!!!!!!!!!"
+
+polySupport : List Collision.Pt -> Collision.Pt -> Maybe Collision.Pt
+polySupport list d =
+    let
+        dotList =
+            List.map (dot d) list
+
+        decorated =
+            List.map2 Tuple.pair dotList list
+
+        max =
+            List.maximum decorated
+    in
+    case max of
+        Just ( m, p ) ->
+            Just p
+
+        _ ->
+            Nothing
 
 
 findNextTileTowards : Model -> TilePos -> TilePos -> TilePos
@@ -783,10 +674,6 @@ drawRect color pos size =
 view : Model -> Browser.Document Msg
 view model =
     let
-        _ =
-            Debug.log "?"
-                model.hero.pos
-
         map =
             model.map
                 |> Dict.toList
