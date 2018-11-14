@@ -44,6 +44,7 @@ type alias Model =
     , enemyTowers : List EnemyTower
     , turrets : List Turret
     , creeps : List Creep
+    , timeSinceLastFire : Float
     , cache : Cache
     }
 
@@ -168,6 +169,7 @@ init flags =
       , turrets =
             [ { pos = ( 8, -5 ), timeSinceLastFire = 0 }
             ]
+      , timeSinceLastFire = 0
       }
     , Resources.loadTextures
         [ "images/grass.png"
@@ -324,153 +326,15 @@ update msg model =
                 delta =
                     -- set max frame at 0.25 sec
                     min d 500
-
-                newEnemyTowersAndCreeps =
-                    model.enemyTowers
-                        |> List.map
-                            (\enemyTower ->
-                                if enemyTower.timeSinceLastSpawn + delta > 800 then
-                                    let
-                                        nextPos =
-                                            findNextTileTowards model enemyTower.pos model.cache.heroTowerPos
-                                    in
-                                    ( { enemyTower | timeSinceLastSpawn = 0 }
-                                    , [ { pos = enemyTower.pos
-                                        , nextPos = nextPos
-                                        , progress = 0
-                                        , diagonal = isDiagonal enemyTower.pos nextPos
-                                        }
-                                      ]
-                                    )
-
-                                else
-                                    ( { enemyTower | timeSinceLastSpawn = enemyTower.timeSinceLastSpawn + delta }
-                                    , []
-                                    )
-                            )
-
-                newEnemyTowers =
-                    newEnemyTowersAndCreeps
-                        |> List.map Tuple.first
-
-                newCreeps =
-                    newEnemyTowersAndCreeps
-                        |> List.map Tuple.second
-                        |> List.concat
             in
-            ( { model
-                | hero =
-                    model.hero
-                        |> (\hero ->
-                                let
-                                    newAcc =
-                                        Vec2.scale playerAcc (heroDirInput model)
-
-                                    newVelUncapped =
-                                        Vec2.add model.hero.vel (Vec2.scale delta newAcc)
-
-                                    percentBeyondCap =
-                                        Vec2.length newVelUncapped / playerMaxSpeed
-
-                                    newVel =
-                                        (if percentBeyondCap > 1.0 then
-                                            Vec2.scale (1 / percentBeyondCap) newVelUncapped
-
-                                         else
-                                            newVelUncapped
-                                        )
-                                            |> Vec2.scale 0.8
-
-                                    newPos =
-                                        Vec2.add model.hero.pos (Vec2.scale delta newVel)
-
-                                    ( newestPos, newestVel ) =
-                                        if not <| isHeroColliding model.map newPos then
-                                            ( newPos, newVel )
-                                            -- also check common x/y slides
-
-                                        else if not <| isHeroColliding model.map (Vec2.vec2 (Vec2.getX newPos) (Vec2.getY hero.pos)) then
-                                            ( Vec2.vec2 (Vec2.getX newPos) (Vec2.getY hero.pos)
-                                            , Vec2.vec2 (Vec2.getX newVel) 0
-                                            )
-
-                                        else if not <| isHeroColliding model.map (Vec2.vec2 (Vec2.getX hero.pos) (Vec2.getY newPos)) then
-                                            ( Vec2.vec2 (Vec2.getX hero.pos) (Vec2.getY newPos)
-                                            , Vec2.vec2 0 (Vec2.getY newVel)
-                                            )
-
-                                        else
-                                            ( hero.pos, Vec2.vec2 0 0 )
-                                in
-                                { hero
-                                    | pos = newestPos
-                                    , vel = newestVel
-                                }
-                           )
-                , bullets =
-                    List.concat
-                        [ model.bullets
-                        , if model.isMouseDown then
-                            [ makeBullet PlayerBullet model.hero.pos (mousePosToGamePos model) ]
-
-                          else
-                            []
-                        , model.turrets
-                            |> List.map
-                                (\turret ->
-                                    model.creeps
-                                        |> List.Extra.minimumBy (\closestCreep -> Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurret turret))
-                                        |> Maybe.andThen
-                                            (\closestCreep ->
-                                                if Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurret turret) < 5 ^ 2 then
-                                                    Just (makeBullet PlantBullet (vec2FromTurret turret) (vec2FromCreep closestCreep))
-
-                                                else
-                                                    Nothing
-                                            )
-                                )
-                            |> List.filterMap identity
-                        ]
-                        |> List.map
-                            (\bullet ->
-                                { bullet
-                                    | pos =
-                                        Vec2.add
-                                            (tupleToVec2 (fromPolar ( bulletSpeed * delta, bullet.angle )))
-                                            bullet.pos
-                                    , age = bullet.age + delta
-                                }
-                            )
-                        |> List.filter (\bullet -> bullet.age < bulletMaxAge)
-                , selectedTile = Just (mousePosToSelectedTile model)
-                , enemyTowers = newEnemyTowers
-                , creeps =
-                    List.append newCreeps model.creeps
-                        |> List.map
-                            (\creep ->
-                                let
-                                    newProgress =
-                                        if creep.diagonal then
-                                            delta * creepSpeed + creep.progress
-
-                                        else
-                                            sqrt 2 * delta * creepSpeed + creep.progress
-
-                                    ( pos, nextPos, freshProgress ) =
-                                        if newProgress > 1 then
-                                            ( creep.nextPos, findNextTileTowards model creep.nextPos model.cache.heroTowerPos, newProgress - 1 )
-
-                                        else
-                                            ( creep.pos, creep.nextPos, newProgress )
-                                in
-                                { creep
-                                    | pos = pos
-                                    , nextPos = nextPos
-                                    , progress = freshProgress
-                                    , diagonal = isDiagonal pos nextPos
-                                }
-                            )
-              }
+            ( model
+                |> moveHero delta
+                |> makeTurretBullets delta
+                |> makePlayerBullets delta
+                |> moveBullets delta
+                |> spawnCreeps delta
+                |> moveCreeps delta
+                |> updateSelectedTile delta
             , Cmd.none
             )
 
@@ -511,6 +375,213 @@ update msg model =
 
         Resources resourcesMsg ->
             ( { model | resources = Resources.update resourcesMsg model.resources }, Cmd.none )
+
+
+makePlayerBullets : Float -> Model -> Model
+makePlayerBullets delta model =
+    if model.isMouseDown then
+        if model.timeSinceLastFire > 150 then
+            { model
+                | timeSinceLastFire = 0
+                , bullets = makeBullet PlayerBullet model.hero.pos (mousePosToGamePos model) :: model.bullets
+            }
+
+        else
+            { model | timeSinceLastFire = model.timeSinceLastFire + delta }
+
+    else
+        { model | timeSinceLastFire = model.timeSinceLastFire + delta }
+
+
+makeTurretBullets : Float -> Model -> Model
+makeTurretBullets delta model =
+    let
+        ( maybeBullets, turrets ) =
+            model.turrets
+                |> List.map
+                    (\turret ->
+                        let
+                            shotBullet =
+                                if turret.timeSinceLastFire > 500 then
+                                    model.creeps
+                                        |> List.Extra.minimumBy (\closestCreep -> Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurret turret))
+                                        |> Maybe.andThen
+                                            (\closestCreep ->
+                                                if Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurret turret) < 5 ^ 2 then
+                                                    Just (makeBullet PlantBullet (vec2FromTurret turret) (vec2FromCreep closestCreep))
+
+                                                else
+                                                    Nothing
+                                            )
+
+                                else
+                                    Nothing
+                        in
+                        case shotBullet of
+                            Just bullet ->
+                                ( shotBullet, { turret | timeSinceLastFire = 0 } )
+
+                            Nothing ->
+                                ( shotBullet, { turret | timeSinceLastFire = turret.timeSinceLastFire + delta } )
+                    )
+                |> List.unzip
+    in
+    { model
+        | turrets = turrets
+        , bullets = (maybeBullets |> List.filterMap identity) ++ model.bullets
+    }
+
+
+moveCreeps : Float -> Model -> Model
+moveCreeps delta model =
+    { model
+        | creeps =
+            model.creeps
+                |> List.map
+                    (\creep ->
+                        let
+                            newProgress =
+                                if creep.diagonal then
+                                    delta * creepSpeed + creep.progress
+
+                                else
+                                    sqrt 2 * delta * creepSpeed + creep.progress
+
+                            ( pos, nextPos, freshProgress ) =
+                                if newProgress > 1 then
+                                    ( creep.nextPos, findNextTileTowards model creep.nextPos model.cache.heroTowerPos, newProgress - 1 )
+
+                                else
+                                    ( creep.pos, creep.nextPos, newProgress )
+                        in
+                        { creep
+                            | pos = pos
+                            , nextPos = nextPos
+                            , progress = freshProgress
+                            , diagonal = isDiagonal pos nextPos
+                        }
+                    )
+    }
+
+
+moveBullets : Float -> Model -> Model
+moveBullets delta model =
+    { model
+        | bullets =
+            model.bullets
+                |> List.map
+                    (\bullet ->
+                        { bullet
+                            | pos =
+                                Vec2.add
+                                    (tupleToVec2 (fromPolar ( bulletSpeed * delta, bullet.angle )))
+                                    bullet.pos
+                            , age = bullet.age + delta
+                        }
+                    )
+                |> List.filter (\bullet -> bullet.age < bulletMaxAge)
+    }
+
+
+updateSelectedTile : Float -> Model -> Model
+updateSelectedTile delta model =
+    { model | selectedTile = Just (mousePosToSelectedTile model) }
+
+
+spawnCreeps : Float -> Model -> Model
+spawnCreeps delta model =
+    let
+        newEnemyTowersAndCreeps =
+            model.enemyTowers
+                |> List.map
+                    (\enemyTower ->
+                        if enemyTower.timeSinceLastSpawn + delta > 1800 then
+                            let
+                                nextPos =
+                                    findNextTileTowards model enemyTower.pos model.cache.heroTowerPos
+                            in
+                            ( { enemyTower | timeSinceLastSpawn = 0 }
+                            , [ { pos = enemyTower.pos
+                                , nextPos = nextPos
+                                , progress = 0
+                                , diagonal = isDiagonal enemyTower.pos nextPos
+                                }
+                              ]
+                            )
+
+                        else
+                            ( { enemyTower | timeSinceLastSpawn = enemyTower.timeSinceLastSpawn + delta }
+                            , []
+                            )
+                    )
+
+        newEnemyTowers =
+            newEnemyTowersAndCreeps
+                |> List.map Tuple.first
+
+        newCreeps =
+            newEnemyTowersAndCreeps
+                |> List.map Tuple.second
+                |> List.concat
+    in
+    { model
+        | enemyTowers = newEnemyTowers
+        , creeps = List.append newCreeps model.creeps
+    }
+
+
+moveHero : Float -> Model -> Model
+moveHero delta model =
+    let
+        hero =
+            model.hero
+
+        newAcc =
+            Vec2.scale playerAcc (heroDirInput model)
+
+        newVelUncapped =
+            Vec2.add model.hero.vel (Vec2.scale delta newAcc)
+
+        percentBeyondCap =
+            Vec2.length newVelUncapped / playerMaxSpeed
+
+        newVel =
+            (if percentBeyondCap > 1.0 then
+                Vec2.scale (1 / percentBeyondCap) newVelUncapped
+
+             else
+                newVelUncapped
+            )
+                |> Vec2.scale 0.8
+
+        newPos =
+            Vec2.add model.hero.pos (Vec2.scale delta newVel)
+
+        ( newestPos, newestVel ) =
+            if not <| isHeroColliding model.map newPos then
+                ( newPos, newVel )
+                -- also check common x/y slides
+
+            else if not <| isHeroColliding model.map (Vec2.vec2 (Vec2.getX newPos) (Vec2.getY hero.pos)) then
+                ( Vec2.vec2 (Vec2.getX newPos) (Vec2.getY hero.pos)
+                , Vec2.vec2 (Vec2.getX newVel) 0
+                )
+
+            else if not <| isHeroColliding model.map (Vec2.vec2 (Vec2.getX hero.pos) (Vec2.getY newPos)) then
+                ( Vec2.vec2 (Vec2.getX hero.pos) (Vec2.getY newPos)
+                , Vec2.vec2 0 (Vec2.getY newVel)
+                )
+
+            else
+                ( hero.pos, Vec2.vec2 0 0 )
+
+        newHero =
+            { hero
+                | pos = newestPos
+                , vel = newestVel
+            }
+    in
+    { model | hero = newHero }
 
 
 isHeroColliding : Map -> Vec2 -> Bool
