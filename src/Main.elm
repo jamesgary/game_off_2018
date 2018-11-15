@@ -39,14 +39,20 @@ type alias Model =
     , mousePos : Vec2
     , isMouseDown : Bool
     , resources : Resources
-    , selectedTile : Maybe Pos
+    , selectedTile : Maybe TilePos
     , map : Map
     , enemyTowers : List EnemyTower
-    , turrets : List Turret
+    , turrets : Dict TilePos Turret
     , creeps : List Creep
     , timeSinceLastFire : Float
     , cache : Cache
+    , equipped : Equippable
     }
+
+
+type Equippable
+    = Gun
+    | TurretSeed
 
 
 type alias Creep =
@@ -81,8 +87,7 @@ type alias EnemyTower =
 
 
 type alias Turret =
-    { pos : TilePos
-    , timeSinceLastFire : Float
+    { timeSinceLastFire : Float
     }
 
 
@@ -105,10 +110,6 @@ type alias Key =
 
 type alias TilePos =
     ( Int, Int )
-
-
-type alias Pos =
-    { x : Int, y : Int }
 
 
 type alias Map =
@@ -170,6 +171,7 @@ init flags =
             [ { pos = ( 8, -5 ), timeSinceLastFire = 0 }
             ]
       , timeSinceLastFire = 0
+      , equipped = Gun
       }
     , Resources.loadTextures
         [ "images/grass.png"
@@ -342,7 +344,10 @@ update msg model =
             ( { model | keysPressed = Set.remove str model.keysPressed }, Cmd.none )
 
         KeyDown str ->
-            ( { model | keysPressed = Set.insert str model.keysPressed }, Cmd.none )
+            ( { model | keysPressed = Set.insert str model.keysPressed }
+                |> applyKeyDown str
+            , Cmd.none
+            )
 
         MouseMove ( x, y ) ->
             let
@@ -362,6 +367,10 @@ update msg model =
         MouseDown ->
             ( { model
                 | isMouseDown = True
+                , turrets =
+                    case Dict.get (mousePosToSelectedTile model) model.map of
+                        Just Grass ->
+                            Dict.insert (mousePosToSelectedTile model) { timeSinceLastFire = 0 } model.turrets
               }
             , Cmd.none
             )
@@ -375,6 +384,19 @@ update msg model =
 
         Resources resourcesMsg ->
             ( { model | resources = Resources.update resourcesMsg model.resources }, Cmd.none )
+
+
+applyKeyDown : String -> Model -> Model
+applyKeyDown str model =
+    case str of
+        "1" ->
+            { model | equipped = Gun }
+
+        "2" ->
+            { model | equipped = TurretSeed }
+
+        _ ->
+            model
 
 
 makePlayerBullets : Float -> Model -> Model
@@ -396,19 +418,19 @@ makePlayerBullets delta model =
 makeTurretBullets : Float -> Model -> Model
 makeTurretBullets delta model =
     let
-        ( maybeBullets, turrets ) =
+        ( newBullets, newTurrets ) =
             model.turrets
-                |> List.map
-                    (\turret ->
+                |> Dict.foldl
+                    (\pos turret ( bullets, turrets ) ->
                         let
                             shotBullet =
                                 if turret.timeSinceLastFire > 500 then
                                     model.creeps
-                                        |> List.Extra.minimumBy (\closestCreep -> Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurret turret))
+                                        |> List.Extra.minimumBy (\closestCreep -> Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurretPos pos))
                                         |> Maybe.andThen
                                             (\closestCreep ->
-                                                if Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurret turret) < 5 ^ 2 then
-                                                    Just (makeBullet PlantBullet (vec2FromTurret turret) (vec2FromCreep closestCreep))
+                                                if Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurretPos pos) < 5 ^ 2 then
+                                                    Just (makeBullet PlantBullet (vec2FromTurretPos pos) (vec2FromCreep closestCreep))
 
                                                 else
                                                     Nothing
@@ -419,16 +441,16 @@ makeTurretBullets delta model =
                         in
                         case shotBullet of
                             Just bullet ->
-                                ( shotBullet, { turret | timeSinceLastFire = 0 } )
+                                ( bullet :: bullets, Dict.insert pos { turret | timeSinceLastFire = 0 } turrets )
 
                             Nothing ->
-                                ( shotBullet, { turret | timeSinceLastFire = turret.timeSinceLastFire + delta } )
+                                ( bullets, Dict.insert pos { turret | timeSinceLastFire = turret.timeSinceLastFire + delta } turrets )
                     )
-                |> List.unzip
+                    ( model.bullets, Dict.empty )
     in
     { model
-        | turrets = turrets
-        , bullets = (maybeBullets |> List.filterMap identity) ++ model.bullets
+        | turrets = newTurrets
+        , bullets = newBullets
     }
 
 
@@ -718,15 +740,15 @@ mousePosToGamePos model =
         |> Vec2.add (currentCameraPos model)
 
 
-mousePosToSelectedTile : Model -> Pos
+mousePosToSelectedTile : Model -> TilePos
 mousePosToSelectedTile model =
     model
         |> mousePosToGamePos
         |> Vec2.toRecord
         |> (\{ x, y } ->
-                { x = -0.5 + x |> round
-                , y = -0.5 + y |> round
-                }
+                ( -0.5 + x |> round
+                , -0.5 + y |> round
+                )
            )
 
 
@@ -849,8 +871,8 @@ view model =
 
         turrets =
             model.turrets
-                |> List.map
-                    (\{ pos } ->
+                |> Dict.map
+                    (\pos turret ->
                         GameTwoDRender.sprite
                             { position = tilePosToSpritePos pos
                             , size = ( 1, 1 )
@@ -860,7 +882,7 @@ view model =
 
         selectedTileOutline =
             case model.selectedTile of
-                Just { x, y } ->
+                Just ( x, y ) ->
                     [ GameTwoDRender.spriteWithOptions
                         { position = ( toFloat x, toFloat y, 0 )
                         , size = ( 1, 1 )
@@ -894,6 +916,12 @@ view model =
     { title = "GAME"
     , body =
         [ Html.div
+            [ Html.Attributes.style "margin" "5px 20px 0"
+            ]
+            [ Html.text "Currently equipped: "
+            , Html.strong [] [ Html.text (equippableStr model.equipped) ]
+            ]
+        , Html.div
             [ Html.Attributes.style "border" "1px solid black"
             , Html.Attributes.style "display" "inline-block"
             , Html.Attributes.style "margin" "20px"
@@ -923,9 +951,19 @@ view model =
     }
 
 
-vec2FromTurret : Turret -> Vec2
-vec2FromTurret turret =
-    turret.pos
+equippableStr : Equippable -> String
+equippableStr equippable =
+    case equippable of
+        Gun ->
+            "Gun"
+
+        TurretSeed ->
+            "Turret Seed"
+
+
+vec2FromTurretPos : TilePos -> Vec2
+vec2FromTurretPos tilePos =
+    tilePos
         |> tilePosToSpritePos
         |> tupleToVec2
         |> Vec2.add (Vec2.vec2 0.5 0.5)
