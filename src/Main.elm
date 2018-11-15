@@ -168,8 +168,9 @@ init flags =
             , { pos = ( 13, -1 ), timeSinceLastSpawn = 0 }
             ]
       , turrets =
-            [ { pos = ( 8, -5 ), timeSinceLastFire = 0 }
+            [ ( ( 8, -5 ), { timeSinceLastFire = 0 } )
             ]
+                |> Dict.fromList
       , timeSinceLastFire = 0
       , equipped = Gun
       }
@@ -365,13 +366,20 @@ update msg model =
             )
 
         MouseDown ->
-            ( { model
-                | isMouseDown = True
-                , turrets =
-                    case Dict.get (mousePosToSelectedTile model) model.map of
-                        Just Grass ->
-                            Dict.insert (mousePosToSelectedTile model) { timeSinceLastFire = 0 } model.turrets
-              }
+            ( { model | isMouseDown = True }
+                |> (\m ->
+                        case m.equipped of
+                            TurretSeed ->
+                                case Dict.get (mousePosToSelectedTile m) m.map of
+                                    Just Grass ->
+                                        { m | turrets = Dict.insert (mousePosToSelectedTile m) { timeSinceLastFire = 0 } m.turrets }
+
+                                    _ ->
+                                        m
+
+                            _ ->
+                                m
+                   )
             , Cmd.none
             )
 
@@ -879,6 +887,7 @@ view model =
                             , texture = Resources.getTexture "images/turret.png" model.resources
                             }
                     )
+                |> Dict.values
 
         selectedTileOutline =
             case model.selectedTile of
