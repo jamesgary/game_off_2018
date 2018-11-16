@@ -522,7 +522,7 @@ updateSelectedTile delta model =
             if
                 (model.equipped == TurretSeed)
                     && Vec2.distance
-                        (mousePosToSelectedTile model |> tilePosToSpritePos |> tupleToVec2)
+                        (mousePosToSelectedTile model |> tilePosToFloats |> tupleToVec2)
                         model.hero.pos
                     < 2
             then
@@ -886,7 +886,7 @@ view model =
                 |> List.map
                     (\{ pos } ->
                         GameTwoDRender.sprite
-                            { position = tilePosToSpritePos pos
+                            { position = tilePosToFloats pos
                             , size = ( 1, 1 )
                             , texture = Resources.getTexture "images/enemyTower.png" model.resources
                             }
@@ -897,7 +897,7 @@ view model =
                 |> Dict.map
                     (\pos turret ->
                         GameTwoDRender.sprite
-                            { position = tilePosToSpritePos pos
+                            { position = tilePosToFloats pos
                             , size = ( 1, 1 )
                             , texture = Resources.getTexture "images/turret.png" model.resources
                             }
@@ -927,10 +927,10 @@ view model =
                         GameTwoDRender.sprite
                             { position =
                                 tilePosSub creep.nextPos creep.pos
-                                    |> tilePosToSpritePos
+                                    |> tilePosToFloats
                                     |> tupleToVec2
                                     |> Vec2.scale creep.progress
-                                    |> Vec2.add (creep.pos |> tilePosToSpritePos |> tupleToVec2)
+                                    |> Vec2.add (creep.pos |> tilePosToFloats |> tupleToVec2)
                                     |> vec2ToTuple
                             , size = ( 1, 1 )
                             , texture = Resources.getTexture "images/creep.png" model.resources
@@ -988,7 +988,7 @@ equippableStr equippable =
 vec2FromTurretPos : TilePos -> Vec2
 vec2FromTurretPos tilePos =
     tilePos
-        |> tilePosToSpritePos
+        |> tilePosToFloats
         |> tupleToVec2
         |> Vec2.add (Vec2.vec2 0.5 0.5)
 
@@ -996,10 +996,10 @@ vec2FromTurretPos tilePos =
 vec2FromCreep : Creep -> Vec2
 vec2FromCreep creep =
     tilePosSub creep.nextPos creep.pos
-        |> tilePosToSpritePos
+        |> tilePosToFloats
         |> tupleToVec2
         |> Vec2.scale creep.progress
-        |> Vec2.add (creep.pos |> tilePosToSpritePos |> tupleToVec2)
+        |> Vec2.add (creep.pos |> tilePosToFloats |> tupleToVec2)
         |> Vec2.add (Vec2.vec2 0.5 0.5)
 
 
@@ -1008,6 +1008,6 @@ tilePosSub ( a, b ) ( c, d ) =
     ( a - c, b - d )
 
 
-tilePosToSpritePos : TilePos -> ( Float, Float )
-tilePosToSpritePos ( col, row ) =
+tilePosToFloats : TilePos -> ( Float, Float )
+tilePosToFloats ( col, row ) =
     ( toFloat col, toFloat row )
