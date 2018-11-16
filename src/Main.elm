@@ -519,18 +519,27 @@ updateSelectedTile : Float -> Model -> Model
 updateSelectedTile delta model =
     { model
         | selectedTile =
-            if
-                (model.equipped == TurretSeed)
-                    && Vec2.distance
-                        (mousePosToSelectedTile model |> tilePosToFloats |> tupleToVec2)
-                        model.hero.pos
-                    < 2
-            then
-                Just (mousePosToSelectedTile model)
+            if model.equipped == TurretSeed then
+                if canPhysicallyPlaceTurretOnMap model then
+                    -- active
+                    Just (mousePosToSelectedTile model)
+
+                else
+                    -- faded
+                    Just (mousePosToSelectedTile model)
 
             else
                 Nothing
     }
+
+
+canPhysicallyPlaceTurretOnMap : Model -> Bool
+canPhysicallyPlaceTurretOnMap model =
+    (model.equipped == TurretSeed)
+        && Vec2.distance
+            (mousePosToSelectedTile model |> tilePosToFloats |> tupleToVec2)
+            model.hero.pos
+        < 2
 
 
 spawnCreeps : Float -> Model -> Model
