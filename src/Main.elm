@@ -351,17 +351,26 @@ update msg model =
             , Cmd.none
             )
 
-        MouseMove ( x, y ) ->
+        MouseMove ( mouseX, mouseY ) ->
             let
                 cameraPos =
                     currentCameraPos model
 
                 mousePos =
-                    Vec2.vec2 x y
+                    Vec2.vec2 mouseX mouseY
             in
             ( { model
-                | mousePos = mousePos
-                , selectedTile = Just (mousePosToSelectedTile model)
+                | mousePos =
+                    mousePos
+                        |> Vec2.toRecord
+                        |> (\{ x, y } ->
+                                { x = (x - (canvasWidth / 2)) / (canvasWidth / tilesToShowLengthwise)
+                                , y = (y - (canvasHeight / 2)) / (-canvasHeight / tilesToShowHeightwise)
+                                }
+                           )
+                        |> Vec2.fromRecord
+                        |> Vec2.add (currentCameraPos model)
+                , selectedTile = Just (selectedTile model)
               }
             , Cmd.none
             )
@@ -371,13 +380,17 @@ update msg model =
                 |> (\m ->
                         case m.equipped of
                             TurretSeed ->
-                                case Dict.get (mousePosToSelectedTile m) m.map of
-                                    -- TODO check if close enough
-                                    Just Grass ->
-                                        { m | turrets = Dict.insert (mousePosToSelectedTile m) { timeSinceLastFire = 0 } m.turrets }
+                                if not (canPhysicallyPlaceTurretOnMap model) then
+                                    m
 
-                                    _ ->
-                                        m
+                                else
+                                    case Dict.get (selectedTile m) m.map of
+                                        -- TODO check if close enough
+                                        Just Grass ->
+                                            { m | turrets = Dict.insert (selectedTile m) { timeSinceLastFire = 0 } m.turrets }
+
+                                        _ ->
+                                            m
 
                             _ ->
                                 m
@@ -415,7 +428,7 @@ makePlayerBullets delta model =
         if model.timeSinceLastFire > 150 then
             { model
                 | timeSinceLastFire = 0
-                , bullets = makeBullet PlayerBullet model.hero.pos (mousePosToGamePos model) :: model.bullets
+                , bullets = makeBullet PlayerBullet model.hero.pos model.mousePos :: model.bullets
             }
 
         else
@@ -522,11 +535,11 @@ updateSelectedTile delta model =
             if model.equipped == TurretSeed then
                 if canPhysicallyPlaceTurretOnMap model then
                     -- active
-                    Just (mousePosToSelectedTile model)
+                    Just (selectedTile model)
 
                 else
                     -- faded
-                    Just (mousePosToSelectedTile model)
+                    Just (selectedTile model)
 
             else
                 Nothing
@@ -537,7 +550,7 @@ canPhysicallyPlaceTurretOnMap : Model -> Bool
 canPhysicallyPlaceTurretOnMap model =
     (model.equipped == TurretSeed)
         && Vec2.distance
-            (mousePosToSelectedTile model |> tilePosToFloats |> tupleToVec2)
+            (selectedTile model |> tilePosToFloats |> tupleToVec2)
             model.hero.pos
         < 2
 
@@ -759,23 +772,9 @@ possibleMoves model ( col, row ) =
         |> Set.fromList
 
 
-mousePosToGamePos : Model -> Vec2
-mousePosToGamePos model =
+selectedTile : Model -> TilePos
+selectedTile model =
     model.mousePos
-        |> Vec2.toRecord
-        |> (\{ x, y } ->
-                { x = (x - (canvasWidth / 2)) / (canvasWidth / tilesToShowLengthwise)
-                , y = (y - (canvasHeight / 2)) / (-canvasHeight / tilesToShowHeightwise)
-                }
-           )
-        |> Vec2.fromRecord
-        |> Vec2.add (currentCameraPos model)
-
-
-mousePosToSelectedTile : Model -> TilePos
-mousePosToSelectedTile model =
-    model
-        |> mousePosToGamePos
         |> Vec2.toRecord
         |> (\{ x, y } ->
                 ( -0.5 + x |> round
@@ -915,6 +914,7 @@ view model =
 
         selectedTileOutline =
             case model.selectedTile of
+                -- TODO
                 Just ( x, y ) ->
                     [ GameTwoDRender.spriteWithOptions
                         { position = ( toFloat x, toFloat y, 0 )
