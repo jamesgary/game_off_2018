@@ -163,7 +163,7 @@ init flags =
             }
       , enemyTowers =
             [ { pos = ( 2, -8 ), timeSinceLastSpawn = 0 }
-            , { pos = ( 13, -1 ), timeSinceLastSpawn = 0 }
+            , { pos = ( 13, -4 ), timeSinceLastSpawn = 0 }
             ]
       , turrets =
             [ ( ( 8, -5 ), { timeSinceLastFire = 0 } )
@@ -199,9 +199,9 @@ initMap =
     """
 11111111111111111111
 10000000000000000001
-10T00010100000000001
+10T00010000000000001
 11111110000000000001
-11111100000000000001
+11111100000001000001
 10001110000000000001
 10001110000000000001
 10001110000000000001
@@ -735,12 +735,26 @@ polySupport list d =
 findNextTileTowards : Model -> TilePos -> TilePos -> TilePos
 findNextTileTowards model origin destination =
     AStar.findPath
-        AStar.pythagoreanCost
+        pythagoreanCost
         (possibleMoves model)
         origin
         destination
         |> Maybe.andThen List.head
         |> Maybe.withDefault origin
+
+
+pythagoreanCost : AStar.Position -> AStar.Position -> Float
+pythagoreanCost ( x1, y1 ) ( x2, y2 ) =
+    -- TODO randomize a bit to fix weird diagnoal-prioritizing bug
+    let
+        dx =
+            toFloat <| abs (x1 - x2)
+
+        dy =
+            toFloat <| abs (y1 - y2)
+    in
+    --abs <| (sqrt 2 * min dx dy) + abs (dy - dx)
+    sqrt ((dx ^ 2) + (dy ^ 2))
 
 
 isDiagonal : TilePos -> TilePos -> Bool
