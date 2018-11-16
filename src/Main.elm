@@ -263,7 +263,7 @@ playerAcc =
 
 
 playerMaxSpeed =
-    0.001
+    0.005
 
 
 bulletSpeed =
@@ -557,7 +557,7 @@ canPhysicallyPlaceTurretOnMap model =
                             |> Vec2.add (Vec2.vec2 0.5 0.5)
                         )
                         model.hero.pos
-                        < 2
+                        < (3 ^ 2)
 
                 Nothing ->
                     False
