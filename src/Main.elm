@@ -171,6 +171,7 @@ init flags =
             [ ( ( 8, -5 ), { timeSinceLastFire = 0 } )
             ]
                 |> Dict.fromList
+                |> always Dict.empty
       , timeSinceLastFire = 0
       , equipped = Gun
       }
@@ -371,6 +372,7 @@ update msg model =
                         case m.equipped of
                             TurretSeed ->
                                 case Dict.get (mousePosToSelectedTile m) m.map of
+                                    -- TODO check if close enough
                                     Just Grass ->
                                         { m | turrets = Dict.insert (mousePosToSelectedTile m) { timeSinceLastFire = 0 } m.turrets }
 
@@ -409,7 +411,7 @@ applyKeyDown str model =
 
 makePlayerBullets : Float -> Model -> Model
 makePlayerBullets delta model =
-    if model.isMouseDown then
+    if model.isMouseDown && model.equipped == Gun then
         if model.timeSinceLastFire > 150 then
             { model
                 | timeSinceLastFire = 0
@@ -515,7 +517,20 @@ moveBullets delta model =
 
 updateSelectedTile : Float -> Model -> Model
 updateSelectedTile delta model =
-    { model | selectedTile = Just (mousePosToSelectedTile model) }
+    { model
+        | selectedTile =
+            if
+                (model.equipped == TurretSeed)
+                    && Vec2.distance
+                        (mousePosToSelectedTile model |> tilePosToSpritePos |> tupleToVec2)
+                        model.hero.pos
+                    < 2
+            then
+                Just (mousePosToSelectedTile model)
+
+            else
+                Nothing
+    }
 
 
 spawnCreeps : Float -> Model -> Model
