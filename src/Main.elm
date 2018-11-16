@@ -973,6 +973,16 @@ view model =
     , body =
         [ Html.div
             [ Html.Attributes.style "margin" "5px 20px 0"
+            , Html.Attributes.style "font-family" "sans-serif"
+            , Html.Attributes.style "font-size" "14px"
+            ]
+            [ Html.text "WASD to move. 1 to switch to Gun, 2 to switch to Turret Seeds."
+            , Html.hr [] []
+            ]
+        , Html.div
+            [ Html.Attributes.style "margin" "5px 20px 0"
+            , Html.Attributes.style "font-family" "monospace"
+            , Html.Attributes.style "font-size" "14px"
             ]
             [ Html.text "Currently equipped: "
             , Html.strong [] [ Html.text (equippableStr model.equipped) ]
