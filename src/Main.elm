@@ -39,7 +39,6 @@ type alias Model =
     , mousePos : Vec2
     , isMouseDown : Bool
     , resources : Resources
-    , selectedTile : Maybe TilePos
     , map : Map
     , enemyTowers : List EnemyTower
     , turrets : Dict TilePos Turret
@@ -157,7 +156,6 @@ init flags =
       , mousePos = Vec2.vec2 0 0
       , isMouseDown = False
       , resources = Resources.init
-      , selectedTile = Nothing
       , map = initMap
       , creeps = []
       , cache =
@@ -179,6 +177,7 @@ init flags =
         [ "images/grass.png"
         , "images/water.png"
         , "images/selectedTile.png"
+        , "images/selectedTile-inactive.png"
         , "images/enemyTower.png"
         , "images/turret.png"
         , "images/creep.png"
@@ -264,7 +263,7 @@ playerAcc =
 
 
 playerMaxSpeed =
-    0.005
+    0.001
 
 
 bulletSpeed =
@@ -338,7 +337,6 @@ update msg model =
                 |> moveBullets delta
                 |> spawnCreeps delta
                 |> moveCreeps delta
-                |> updateSelectedTile delta
             , Cmd.none
             )
 
@@ -370,7 +368,6 @@ update msg model =
                            )
                         |> Vec2.fromRecord
                         |> Vec2.add (currentCameraPos model)
-                , selectedTile = Just (selectedTile model)
               }
             , Cmd.none
             )
@@ -384,10 +381,9 @@ update msg model =
                                     m
 
                                 else
-                                    case Dict.get (selectedTile m) m.map of
-                                        -- TODO check if close enough
-                                        Just Grass ->
-                                            { m | turrets = Dict.insert (selectedTile m) { timeSinceLastFire = 0 } m.turrets }
+                                    case hoveringTileAndPos m of
+                                        Just ( Grass, tilePos ) ->
+                                            { m | turrets = Dict.insert tilePos { timeSinceLastFire = 0 } m.turrets }
 
                                         _ ->
                                             m
@@ -407,6 +403,27 @@ update msg model =
 
         Resources resourcesMsg ->
             ( { model | resources = Resources.update resourcesMsg model.resources }, Cmd.none )
+
+
+hoveringTileAndPos : Model -> Maybe ( Tile, TilePos )
+hoveringTileAndPos model =
+    case hoveringTilePos model of
+        Just tilePos ->
+            Dict.get tilePos model.map
+                |> Maybe.map (\tile -> ( tile, tilePos ))
+
+        Nothing ->
+            Nothing
+
+
+hoveringTile : Model -> Maybe Tile
+hoveringTile model =
+    case hoveringTilePos model of
+        Just tile ->
+            Dict.get tile model.map
+
+        Nothing ->
+            Nothing
 
 
 applyKeyDown : String -> Model -> Model
@@ -528,31 +545,23 @@ moveBullets delta model =
     }
 
 
-updateSelectedTile : Float -> Model -> Model
-updateSelectedTile delta model =
-    { model
-        | selectedTile =
-            if model.equipped == TurretSeed then
-                if canPhysicallyPlaceTurretOnMap model then
-                    -- active
-                    Just (selectedTile model)
-
-                else
-                    -- faded
-                    Just (selectedTile model)
-
-            else
-                Nothing
-    }
-
-
 canPhysicallyPlaceTurretOnMap : Model -> Bool
 canPhysicallyPlaceTurretOnMap model =
     (model.equipped == TurretSeed)
-        && Vec2.distance
-            (selectedTile model |> tilePosToFloats |> tupleToVec2)
-            model.hero.pos
-        < 2
+        && (case hoveringTilePos model of
+                Just tilePos ->
+                    Vec2.distanceSquared
+                        (tilePos
+                            |> tilePosToFloats
+                            |> tupleToVec2
+                            |> Vec2.add (Vec2.vec2 0.5 0.5)
+                        )
+                        model.hero.pos
+                        < 2
+
+                Nothing ->
+                    False
+           )
 
 
 spawnCreeps : Float -> Model -> Model
@@ -772,14 +781,17 @@ possibleMoves model ( col, row ) =
         |> Set.fromList
 
 
-selectedTile : Model -> TilePos
-selectedTile model =
+hoveringTilePos : Model -> Maybe TilePos
+hoveringTilePos model =
     model.mousePos
         |> Vec2.toRecord
         |> (\{ x, y } ->
-                ( -0.5 + x |> round
-                , -0.5 + y |> round
-                )
+                -- always return tilepos for now
+                -- return nothing once we have actually ui
+                Just
+                    ( -0.5 + x |> round
+                    , -0.5 + y |> round
+                    )
            )
 
 
@@ -913,20 +925,31 @@ view model =
                 |> Dict.values
 
         selectedTileOutline =
-            case model.selectedTile of
-                -- TODO
-                Just ( x, y ) ->
-                    [ GameTwoDRender.spriteWithOptions
-                        { position = ( toFloat x, toFloat y, 0 )
-                        , size = ( 1, 1 )
-                        , texture = Resources.getTexture "images/selectedTile.png" model.resources
-                        , rotation = 0
-                        , pivot = ( 0, 0 )
-                        , tiling = ( 1, 1 )
-                        }
-                    ]
+            case ( model.equipped, hoveringTilePos model ) of
+                ( TurretSeed, Just ( x, y ) ) ->
+                    if canPhysicallyPlaceTurretOnMap model then
+                        [ GameTwoDRender.spriteWithOptions
+                            { position = ( toFloat x, toFloat y, 0 )
+                            , size = ( 1, 1 )
+                            , texture = Resources.getTexture "images/selectedTile.png" model.resources
+                            , rotation = 0
+                            , pivot = ( 0, 0 )
+                            , tiling = ( 1, 1 )
+                            }
+                        ]
 
-                Nothing ->
+                    else
+                        [ GameTwoDRender.spriteWithOptions
+                            { position = ( toFloat x, toFloat y, 0 )
+                            , size = ( 1, 1 )
+                            , texture = Resources.getTexture "images/selectedTile-inactive.png" model.resources
+                            , rotation = 0
+                            , pivot = ( 0, 0 )
+                            , tiling = ( 1, 1 )
+                            }
+                        ]
+
+                _ ->
                     []
 
         creeps =
