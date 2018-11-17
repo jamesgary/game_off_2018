@@ -21,7 +21,7 @@ import Round
 import Set exposing (Set)
 
 
-port saveConfig : Flags -> Cmd msg
+port saveFlags : Flags -> Cmd msg
 
 
 main =
@@ -34,7 +34,9 @@ main =
 
 
 type alias Flags =
-    List ( String, ConfigVal )
+    { isConfigOpen : Bool
+    , config : List ( String, ConfigVal )
+    }
 
 
 type alias Model =
@@ -53,6 +55,7 @@ type alias Model =
     , equipped : Equippable
     , config : Dict String ConfigVal
     , c : Config
+    , isConfigOpen : Bool
     }
 
 
@@ -153,6 +156,7 @@ type Msg
     | Tick Float
     | Resources Resources.Msg
     | ChangeConfig String String
+    | ToggleConfig Bool
 
 
 makeC : Dict String ConfigVal -> Config
@@ -169,9 +173,10 @@ makeC config =
 init : Flags -> ( Model, Cmd Msg )
 init flags =
     let
-        config =
-            flags
-                |> Dict.fromList
+        ( config, isConfigOpen ) =
+            ( Dict.fromList flags.config
+            , flags.isConfigOpen
+            )
     in
     ( { hero =
             { pos = Vec2.vec2 9 -3
@@ -199,6 +204,7 @@ init flags =
       , timeSinceLastFire = 0
       , equipped = Gun
       , config = config
+      , isConfigOpen = isConfigOpen
       , c = makeC config
       }
     , Resources.loadTextures
@@ -442,7 +448,21 @@ update msg model =
                         , c = makeC newConfig
                     }
             in
-            ( newModel, saveConfig (Dict.toList newConfig) )
+            ( newModel, saveFlags (modelToFlags newModel) )
+
+        ToggleConfig shouldOpen ->
+            let
+                newModel =
+                    { model | isConfigOpen = shouldOpen }
+            in
+            ( newModel, saveFlags (modelToFlags newModel) )
+
+
+modelToFlags : Model -> Flags
+modelToFlags model =
+    { isConfigOpen = model.isConfigOpen
+    , config = Dict.toList model.config
+    }
 
 
 hoveringTileAndPos : Model -> Maybe ( Tile, TilePos )
@@ -1067,44 +1087,56 @@ view model =
             , Html.Attributes.style "padding" "8px"
             ]
             [ Html.div []
-                (model.config
-                    |> Dict.toList
-                    |> List.map
-                        (\( name, { val, min, max } ) ->
-                            Html.div
-                                [ Html.Attributes.style "display" "flex"
-                                , Html.Attributes.style "justify-content" "space-between"
-                                , Html.Attributes.style "margin" "10px 10px"
-                                ]
-                                [ Html.div
-                                    []
-                                    [ Html.text name
-                                    ]
-                                , Html.div
-                                    []
-                                    [ Html.span [ Html.Attributes.style "margin" "0 10px" ] [ Html.text (formatConfigFloat val) ]
-                                    , Html.input
-                                        [ Html.Attributes.style "width" "40px"
-                                        , Html.Attributes.value (formatConfigFloat min)
-                                        ]
-                                        []
-                                    , Html.input
-                                        [ Html.Attributes.type_ "range"
-                                        , Html.Attributes.value (formatConfigFloat val)
-                                        , Html.Attributes.min (formatConfigFloat min)
-                                        , Html.Attributes.max (formatConfigFloat max)
-                                        , Html.Attributes.step "any"
-                                        , Html.Events.onInput (ChangeConfig name)
-                                        ]
-                                        []
-                                    , Html.input
-                                        [ Html.Attributes.style "width" "40px"
-                                        , Html.Attributes.value (formatConfigFloat max)
-                                        ]
-                                        []
-                                    ]
-                                ]
-                        )
+                (if model.isConfigOpen then
+                    Html.a
+                        [ Html.Events.onClick (ToggleConfig False)
+                        , Html.Attributes.style "text-align" "right"
+                        , Html.Attributes.style "display" "inline-block"
+                        , Html.Attributes.style "width" "100%"
+                        ]
+                        [ Html.text "Collapse Config" ]
+                        :: (model.config
+                                |> Dict.toList
+                                |> List.map
+                                    (\( name, { val, min, max } ) ->
+                                        Html.div
+                                            [ Html.Attributes.style "display" "flex"
+                                            , Html.Attributes.style "justify-content" "space-between"
+                                            , Html.Attributes.style "margin" "10px 10px"
+                                            ]
+                                            [ Html.div
+                                                []
+                                                [ Html.text name
+                                                ]
+                                            , Html.div
+                                                []
+                                                [ Html.span [ Html.Attributes.style "margin" "0 10px" ] [ Html.text (formatConfigFloat val) ]
+                                                , Html.input
+                                                    [ Html.Attributes.style "width" "40px"
+                                                    , Html.Attributes.value (formatConfigFloat min)
+                                                    ]
+                                                    []
+                                                , Html.input
+                                                    [ Html.Attributes.type_ "range"
+                                                    , Html.Attributes.value (formatConfigFloat val)
+                                                    , Html.Attributes.min (formatConfigFloat min)
+                                                    , Html.Attributes.max (formatConfigFloat max)
+                                                    , Html.Attributes.step "any"
+                                                    , Html.Events.onInput (ChangeConfig name)
+                                                    ]
+                                                    []
+                                                , Html.input
+                                                    [ Html.Attributes.style "width" "40px"
+                                                    , Html.Attributes.value (formatConfigFloat max)
+                                                    ]
+                                                    []
+                                                ]
+                                            ]
+                                    )
+                           )
+
+                 else
+                    [ Html.a [ Html.Events.onClick (ToggleConfig True) ] [ Html.text "Expand Config" ] ]
                 )
             ]
         ]

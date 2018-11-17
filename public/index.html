@@ -12,27 +12,33 @@
       var config;
 
       try {
-        config = JSON.parse(localStorage.getItem("config"));
+        flags = JSON.parse(localStorage.getItem("flags"));
+
+        if (!flags) { fail() }
       } catch(e) {
-        config = [
-          ["bulletMaxAge",          { val: 2,   min:   0, max:    5 }],
-          ["bulletSpeed",           { val: 10,  min:   5, max:   50 }],
-          ["canvasHeight",          { val: 600, min: 300, max: 1200 }],
-          ["canvasWidth",           { val: 800, min: 400, max: 1600 }],
-          ["creepSpeed",            { val: 1,   min:   0, max:    2 }],
-          ["heroAcc",               { val: 70,  min:  10, max:  200 }],
-          ["heroMaxSpeed",          { val: 20,  min:  10, max:  100 }],
-          ["tilesToShowLengthwise", { val: 20,  min:  10, max:  200 }],
-        ];
+        flags = {
+          isConfigOpen: false,
+          config: [
+            ["bulletMaxAge",          { val: 2,   min:   0, max:    5 }],
+            ["bulletSpeed",           { val: 10,  min:   5, max:   50 }],
+            ["canvasHeight",          { val: 600, min: 300, max: 1200 }],
+            ["canvasWidth",           { val: 800, min: 400, max: 1600 }],
+            ["creepSpeed",            { val: 1,   min:   0, max:    2 }],
+            ["heroAcc",               { val: 70,  min:  10, max:  200 }],
+            ["heroMaxSpeed",          { val: 20,  min:  10, max:  100 }],
+            ["tilesToShowLengthwise", { val: 20,  min:  10, max:  200 }],
+          ],
+        };
       }
 
       var app = Elm.Main.init({
         node: document.getElementById('elm'),
-        flags: config,
+        flags: flags,
       });
 
-      app.ports.saveConfig.subscribe(function(config) {
-        localStorage.setItem("config", JSON.stringify(config));
+      app.ports.saveFlags.subscribe(function(flags) {
+        console.log(flags);
+        localStorage.setItem("flags", JSON.stringify(flags));
       });
 
       //(function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.body.appendChild(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='//rawgit.com/mrdoob/stats.js/master/build/stats.min.js';document.head.appendChild(script);})()
