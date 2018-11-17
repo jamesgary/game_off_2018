@@ -46,23 +46,13 @@ type alias Model =
     , timeSinceLastFire : Float
     , cache : Cache
     , equipped : Equippable
-    , config : Config
+    , c : Config
     }
 
 
 type alias Config =
-    Dict String Float
-
-
-getFloat : String -> Config -> Float
-getFloat name config =
-    case Dict.get name config of
-        Just val ->
-            val
-
-        Nothing ->
-            -1
-                |> Debug.log ("Cannot find " ++ name)
+    { getFloat : String -> Float
+    }
 
 
 type Equippable
@@ -188,17 +178,22 @@ init flags =
                 |> always Dict.empty
       , timeSinceLastFire = 0
       , equipped = Gun
-      , config =
-            Dict.fromList
-                [ ( "heroAcc", 2 )
-                , ( "heroMaxSpeed", 0.005 )
-                , ( "creepSpeed", 0.001 )
-                , ( "bulletSpeed", 0.018 )
-                , ( "bulletMaxAge", 1000 )
-                , ( "canvasWidth", 800 )
-                , ( "canvasHeight", 600 )
-                , ( "tilesToShowLengthwise", 20 )
-                ]
+      , c =
+            { getFloat =
+                \name ->
+                    Dict.fromList
+                        [ ( "heroAcc", 2 )
+                        , ( "heroMaxSpeed", 0.005 )
+                        , ( "creepSpeed", 0.001 )
+                        , ( "bulletSpeed", 0.018 )
+                        , ( "bulletMaxAge", 1000 )
+                        , ( "canvasWidth", 800 )
+                        , ( "canvasHeight", 600 )
+                        , ( "tilesToShowLengthwise", 20 )
+                        ]
+                        |> Dict.get name
+                        |> Maybe.withDefault -1
+            }
       }
     , Resources.loadTextures
         [ "images/grass.png"
@@ -214,11 +209,11 @@ init flags =
     )
 
 
-cameraOnHero : Config -> Hero -> Camera
-cameraOnHero config hero =
+cameraOnHero : Model -> Camera
+cameraOnHero model =
     GameTwoDCamera.fixedArea
-        (tilesToShowHeightwise config * getFloat "tilesToShowLengthwise" config)
-        ( Vec2.getX hero.pos, Vec2.getY hero.pos )
+        (tilesToShowHeightwise model.c * model.c.getFloat "tilesToShowLengthwise")
+        ( Vec2.getX model.hero.pos, Vec2.getY model.hero.pos )
 
 
 initMap : Map
@@ -323,7 +318,7 @@ heroDirInput model =
 
 currentCameraPos : Model -> Vec2
 currentCameraPos model =
-    cameraOnHero model.config model.hero
+    cameraOnHero model
         |> GameTwoDCamera.getPosition
         |> tupleToVec2
 
@@ -370,11 +365,11 @@ update msg model =
                         |> Vec2.toRecord
                         |> (\{ x, y } ->
                                 { x =
-                                    (x - (getFloat "canvasWidth" model.config / 2))
-                                        / (getFloat "canvasWidth" model.config / getFloat "tilesToShowLengthwise" model.config)
+                                    (x - (model.c.getFloat "canvasWidth" / 2))
+                                        / (model.c.getFloat "canvasWidth" / model.c.getFloat "tilesToShowLengthwise")
                                 , y =
-                                    (y - (getFloat "canvasHeight" model.config / 2))
-                                        / (-(getFloat "canvasHeight" model.config) / tilesToShowHeightwise model.config)
+                                    (y - (model.c.getFloat "canvasHeight" / 2))
+                                        / (-(model.c.getFloat "canvasHeight") / tilesToShowHeightwise model.c)
                                 }
                            )
                         |> Vec2.fromRecord
@@ -515,10 +510,10 @@ moveCreeps delta model =
                         let
                             newProgress =
                                 if creep.diagonal then
-                                    delta * getFloat "creepSpeed" model.config + creep.progress
+                                    delta * model.c.getFloat "creepSpeed" + creep.progress
 
                                 else
-                                    sqrt 2 * delta * getFloat "creepSpeed" model.config + creep.progress
+                                    sqrt 2 * delta * model.c.getFloat "creepSpeed" + creep.progress
 
                             ( pos, nextPos, freshProgress ) =
                                 if newProgress > 1 then
@@ -547,12 +542,12 @@ moveBullets delta model =
                         { bullet
                             | pos =
                                 Vec2.add
-                                    (tupleToVec2 (fromPolar ( getFloat "bulletSpeed" model.config * delta, bullet.angle )))
+                                    (tupleToVec2 (fromPolar ( model.c.getFloat "bulletSpeed" * delta, bullet.angle )))
                                     bullet.pos
                             , age = bullet.age + delta
                         }
                     )
-                |> List.filter (\bullet -> bullet.age < getFloat "bulletMaxAge" model.config)
+                |> List.filter (\bullet -> bullet.age < model.c.getFloat "bulletMaxAge")
     }
 
 
@@ -624,13 +619,13 @@ moveHero delta model =
             model.hero
 
         newAcc =
-            Vec2.scale (getFloat "heroAcc" model.config) (heroDirInput model)
+            Vec2.scale (model.c.getFloat "heroAcc") (heroDirInput model)
 
         newVelUncapped =
             Vec2.add model.hero.vel (Vec2.scale delta newAcc)
 
         percentBeyondCap =
-            Vec2.length newVelUncapped / getFloat "heroMaxSpeed" model.config
+            Vec2.length newVelUncapped / model.c.getFloat "heroMaxSpeed"
 
         newVel =
             (if percentBeyondCap > 1.0 then
@@ -842,8 +837,8 @@ subscriptions model =
 
 
 tilesToShowHeightwise : Config -> Float
-tilesToShowHeightwise config =
-    getFloat "tilesToShowLengthwise" config * (getFloat "canvasHeight" config / getFloat "canvasWidth" config)
+tilesToShowHeightwise c =
+    c.getFloat "tilesToShowLengthwise" * (c.getFloat "canvasHeight" / c.getFloat "canvasWidth")
 
 
 drawCircle : Color -> Vec2 -> Float -> GameTwoDRender.Renderable
@@ -1012,8 +1007,8 @@ view model =
             ]
             [ GameTwoD.render
                 { time = 0
-                , size = ( round (getFloat "canvasWidth" model.config), round (getFloat "canvasHeight" model.config) )
-                , camera = cameraOnHero model.config model.hero
+                , size = ( round (model.c.getFloat "canvasWidth"), round (model.c.getFloat "canvasHeight") )
+                , camera = cameraOnHero model
                 }
                 (List.concat
                     [ map
