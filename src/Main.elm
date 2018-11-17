@@ -12,10 +12,12 @@ import Game.TwoD.Camera as GameTwoDCamera exposing (Camera)
 import Game.TwoD.Render as GameTwoDRender
 import Html
 import Html.Attributes
+import Html.Events
 import Html.Events.Extra.Mouse as Mouse
 import Json.Decode as Decode
 import List.Extra
 import Math.Vector2 as Vec2 exposing (Vec2)
+import Round
 import Set exposing (Set)
 
 
@@ -46,6 +48,7 @@ type alias Model =
     , timeSinceLastFire : Float
     , cache : Cache
     , equipped : Equippable
+    , config : Dict String ConfigVal
     , c : Config
     }
 
@@ -146,6 +149,7 @@ type Msg
     | MouseMove ( Float, Float )
     | Tick Float
     | Resources Resources.Msg
+    | ChangeConfig String String
 
 
 init : Flags -> ( Model, Cmd Msg )
@@ -178,14 +182,25 @@ init flags =
                 |> always Dict.empty
       , timeSinceLastFire = 0
       , equipped = Gun
+      , config =
+            Dict.fromList
+                [ ( "bulletMaxAge", { val = 2, min = 0, max = 5 } )
+                , ( "bulletSpeed", { val = 10, min = 5, max = 50 } )
+                , ( "canvasHeight", { val = 600, min = 300, max = 1200 } )
+                , ( "canvasWidth", { val = 800, min = 400, max = 1600 } )
+                , ( "creepSpeed", { val = 1, min = 0, max = 2 } )
+                , ( "heroAcc", { val = 70, min = 10, max = 200 } )
+                , ( "heroMaxSpeed", { val = 20, min = 10, max = 100 } )
+                , ( "tilesToShowLengthwise", { val = 20, min = 10, max = 200 } )
+                ]
       , c =
             { getFloat =
                 \name ->
                     Dict.fromList
-                        [ ( "heroAcc", 2 )
-                        , ( "heroMaxSpeed", 0.005 )
-                        , ( "creepSpeed", 0.001 )
-                        , ( "bulletSpeed", 0.018 )
+                        [ ( "heroAcc", 70 )
+                        , ( "heroMaxSpeed", 20 )
+                        , ( "creepSpeed", 1 )
+                        , ( "bulletSpeed", 10 )
                         , ( "bulletMaxAge", 1000 )
                         , ( "canvasWidth", 800 )
                         , ( "canvasHeight", 600 )
@@ -207,6 +222,13 @@ init flags =
         ]
         |> Cmd.map Resources
     )
+
+
+type alias ConfigVal =
+    { val : Float
+    , min : Float
+    , max : Float
+    }
 
 
 cameraOnHero : Model -> Camera
@@ -330,7 +352,7 @@ update msg model =
             let
                 delta =
                     -- set max frame at 0.25 sec
-                    min d 500
+                    min (d / 1000) 0.25
             in
             ( model
                 |> moveHero delta
@@ -410,6 +432,34 @@ update msg model =
         Resources resourcesMsg ->
             ( { model | resources = Resources.update resourcesMsg model.resources }, Cmd.none )
 
+        ChangeConfig name inputStr ->
+            let
+                newConfig =
+                    model.config
+                        |> (\config ->
+                                case String.toFloat inputStr of
+                                    Just val ->
+                                        Dict.update name (Maybe.map (\cv -> { cv | val = val })) config
+
+                                    Nothing ->
+                                        config
+                           )
+
+                newModel =
+                    { model
+                        | config = newConfig
+                        , c =
+                            { getFloat =
+                                \n ->
+                                    newConfig
+                                        |> Dict.get n
+                                        |> Maybe.map .val
+                                        |> Maybe.withDefault -1
+                            }
+                    }
+            in
+            ( newModel, Cmd.none )
+
 
 hoveringTileAndPos : Model -> Maybe ( Tile, TilePos )
 hoveringTileAndPos model =
@@ -448,7 +498,7 @@ applyKeyDown str model =
 makePlayerBullets : Float -> Model -> Model
 makePlayerBullets delta model =
     if model.isMouseDown && model.equipped == Gun then
-        if model.timeSinceLastFire > 150 then
+        if model.timeSinceLastFire > 0.15 then
             { model
                 | timeSinceLastFire = 0
                 , bullets = makeBullet PlayerBullet model.hero.pos model.mousePos :: model.bullets
@@ -470,7 +520,7 @@ makeTurretBullets delta model =
                     (\pos turret ( bullets, turrets ) ->
                         let
                             shotBullet =
-                                if turret.timeSinceLastFire > 500 then
+                                if turret.timeSinceLastFire > 0.5 then
                                     model.creeps
                                         |> List.Extra.minimumBy (\closestCreep -> Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurretPos pos))
                                         |> Maybe.andThen
@@ -577,7 +627,7 @@ spawnCreeps delta model =
             model.enemyTowers
                 |> List.map
                     (\enemyTower ->
-                        if enemyTower.timeSinceLastSpawn + delta > 1800 then
+                        if enemyTower.timeSinceLastSpawn + delta > 1.8 then
                             let
                                 nextPos =
                                     findNextTileTowards model enemyTower.pos model.cache.heroTowerPos
@@ -1022,8 +1072,64 @@ view model =
                     ]
                 )
             ]
+        , Html.div
+            [ Html.Attributes.style "position" "absolute"
+            , Html.Attributes.style "top" "10px"
+            , Html.Attributes.style "right" "10px"
+            , Html.Attributes.style "background" "#eee"
+            , Html.Attributes.style "border" "1px solid #333"
+            , Html.Attributes.style "font-family" "sans-serif"
+            , Html.Attributes.style "font-size" "18px"
+            , Html.Attributes.style "padding" "8px"
+            ]
+            [ Html.div []
+                (model.config
+                    |> Dict.toList
+                    |> List.map
+                        (\( name, { val, min, max } ) ->
+                            Html.div
+                                [ Html.Attributes.style "display" "flex"
+                                , Html.Attributes.style "justify-content" "space-between"
+                                , Html.Attributes.style "margin" "10px 10px"
+                                ]
+                                [ Html.div
+                                    []
+                                    [ Html.text name
+                                    ]
+                                , Html.div
+                                    []
+                                    [ Html.span [ Html.Attributes.style "margin" "0 10px" ] [ Html.text (formatConfigFloat val) ]
+                                    , Html.input
+                                        [ Html.Attributes.style "width" "40px"
+                                        , Html.Attributes.value (formatConfigFloat min)
+                                        ]
+                                        []
+                                    , Html.input
+                                        [ Html.Attributes.type_ "range"
+                                        , Html.Attributes.value (formatConfigFloat val)
+                                        , Html.Attributes.min (formatConfigFloat min)
+                                        , Html.Attributes.max (formatConfigFloat max)
+                                        , Html.Attributes.step "any"
+                                        , Html.Events.onInput (ChangeConfig name)
+                                        ]
+                                        []
+                                    , Html.input
+                                        [ Html.Attributes.style "width" "40px"
+                                        , Html.Attributes.value (formatConfigFloat max)
+                                        ]
+                                        []
+                                    ]
+                                ]
+                        )
+                )
+            ]
         ]
     }
+
+
+formatConfigFloat : Float -> String
+formatConfigFloat val =
+    Round.round 2 val
 
 
 equippableStr : Equippable -> String
