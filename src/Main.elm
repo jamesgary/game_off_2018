@@ -51,17 +51,18 @@ type alias Model =
 
 
 type alias Config =
-    { heroAcc : Float
-    , heroMaxSpeed : Float
-    , creepSpeed : Float
-    , bulletSpeed : Float
-    , bulletMaxAge : Float
+    Dict String Float
 
-    -- should be floats, but oh well
-    , canvasWidth : Float
-    , canvasHeight : Float
-    , tilesToShowLengthwise : Float
-    }
+
+getFloat : String -> Config -> Float
+getFloat name config =
+    case Dict.get name config of
+        Just val ->
+            val
+
+        Nothing ->
+            -1
+                |> Debug.log ("Cannot find " ++ name)
 
 
 type Equippable
@@ -188,15 +189,16 @@ init flags =
       , timeSinceLastFire = 0
       , equipped = Gun
       , config =
-            { heroAcc = 2
-            , heroMaxSpeed = 0.005
-            , creepSpeed = 0.001
-            , bulletSpeed = 0.018
-            , bulletMaxAge = 1000
-            , canvasWidth = 800
-            , canvasHeight = 600
-            , tilesToShowLengthwise = 20
-            }
+            Dict.fromList
+                [ ( "heroAcc", 2 )
+                , ( "heroMaxSpeed", 0.005 )
+                , ( "creepSpeed", 0.001 )
+                , ( "bulletSpeed", 0.018 )
+                , ( "bulletMaxAge", 1000 )
+                , ( "canvasWidth", 800 )
+                , ( "canvasHeight", 600 )
+                , ( "tilesToShowLengthwise", 20 )
+                ]
       }
     , Resources.loadTextures
         [ "images/grass.png"
@@ -215,7 +217,7 @@ init flags =
 cameraOnHero : Config -> Hero -> Camera
 cameraOnHero config hero =
     GameTwoDCamera.fixedArea
-        (tilesToShowHeightwise config * config.tilesToShowLengthwise)
+        (tilesToShowHeightwise config * getFloat "tilesToShowLengthwise" config)
         ( Vec2.getX hero.pos, Vec2.getY hero.pos )
 
 
@@ -367,8 +369,12 @@ update msg model =
                     mousePos
                         |> Vec2.toRecord
                         |> (\{ x, y } ->
-                                { x = (x - (model.config.canvasWidth / 2)) / (model.config.canvasWidth / model.config.tilesToShowLengthwise)
-                                , y = (y - (model.config.canvasHeight / 2)) / (-model.config.canvasHeight / tilesToShowHeightwise model.config)
+                                { x =
+                                    (x - (getFloat "canvasWidth" model.config / 2))
+                                        / (getFloat "canvasWidth" model.config / getFloat "tilesToShowLengthwise" model.config)
+                                , y =
+                                    (y - (getFloat "canvasHeight" model.config / 2))
+                                        / (-(getFloat "canvasHeight" model.config) / tilesToShowHeightwise model.config)
                                 }
                            )
                         |> Vec2.fromRecord
@@ -509,10 +515,10 @@ moveCreeps delta model =
                         let
                             newProgress =
                                 if creep.diagonal then
-                                    delta * model.config.creepSpeed + creep.progress
+                                    delta * getFloat "creepSpeed" model.config + creep.progress
 
                                 else
-                                    sqrt 2 * delta * model.config.creepSpeed + creep.progress
+                                    sqrt 2 * delta * getFloat "creepSpeed" model.config + creep.progress
 
                             ( pos, nextPos, freshProgress ) =
                                 if newProgress > 1 then
@@ -541,12 +547,12 @@ moveBullets delta model =
                         { bullet
                             | pos =
                                 Vec2.add
-                                    (tupleToVec2 (fromPolar ( model.config.bulletSpeed * delta, bullet.angle )))
+                                    (tupleToVec2 (fromPolar ( getFloat "bulletSpeed" model.config * delta, bullet.angle )))
                                     bullet.pos
                             , age = bullet.age + delta
                         }
                     )
-                |> List.filter (\bullet -> bullet.age < model.config.bulletMaxAge)
+                |> List.filter (\bullet -> bullet.age < getFloat "bulletMaxAge" model.config)
     }
 
 
@@ -618,13 +624,13 @@ moveHero delta model =
             model.hero
 
         newAcc =
-            Vec2.scale model.config.heroAcc (heroDirInput model)
+            Vec2.scale (getFloat "heroAcc" model.config) (heroDirInput model)
 
         newVelUncapped =
             Vec2.add model.hero.vel (Vec2.scale delta newAcc)
 
         percentBeyondCap =
-            Vec2.length newVelUncapped / model.config.heroMaxSpeed
+            Vec2.length newVelUncapped / getFloat "heroMaxSpeed" model.config
 
         newVel =
             (if percentBeyondCap > 1.0 then
@@ -837,7 +843,7 @@ subscriptions model =
 
 tilesToShowHeightwise : Config -> Float
 tilesToShowHeightwise config =
-    config.tilesToShowLengthwise * (config.canvasHeight / config.canvasWidth)
+    getFloat "tilesToShowLengthwise" config * (getFloat "canvasHeight" config / getFloat "canvasWidth" config)
 
 
 drawCircle : Color -> Vec2 -> Float -> GameTwoDRender.Renderable
@@ -1006,7 +1012,7 @@ view model =
             ]
             [ GameTwoD.render
                 { time = 0
-                , size = ( round model.config.canvasWidth, round model.config.canvasHeight )
+                , size = ( round (getFloat "canvasWidth" model.config), round (getFloat "canvasHeight" model.config) )
                 , camera = cameraOnHero model.config model.hero
                 }
                 (List.concat
