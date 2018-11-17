@@ -46,6 +46,21 @@ type alias Model =
     , timeSinceLastFire : Float
     , cache : Cache
     , equipped : Equippable
+    , config : Config
+    }
+
+
+type alias Config =
+    { heroAcc : Float
+    , heroMaxSpeed : Float
+    , creepSpeed : Float
+    , bulletSpeed : Float
+    , bulletMaxAge : Float
+
+    -- should be floats, but oh well
+    , canvasWidth : Float
+    , canvasHeight : Float
+    , tilesToShowLengthwise : Float
     }
 
 
@@ -172,6 +187,16 @@ init flags =
                 |> always Dict.empty
       , timeSinceLastFire = 0
       , equipped = Gun
+      , config =
+            { heroAcc = 2
+            , heroMaxSpeed = 0.005
+            , creepSpeed = 0.001
+            , bulletSpeed = 0.018
+            , bulletMaxAge = 1000
+            , canvasWidth = 800
+            , canvasHeight = 600
+            , tilesToShowLengthwise = 20
+            }
       }
     , Resources.loadTextures
         [ "images/grass.png"
@@ -187,10 +212,10 @@ init flags =
     )
 
 
-cameraOnHero : Hero -> Camera
-cameraOnHero hero =
+cameraOnHero : Config -> Hero -> Camera
+cameraOnHero config hero =
     GameTwoDCamera.fixedArea
-        (tilesToShowHeightwise * tilesToShowLengthwise)
+        (tilesToShowHeightwise config * config.tilesToShowLengthwise)
         ( Vec2.getX hero.pos, Vec2.getY hero.pos )
 
 
@@ -258,22 +283,6 @@ tupleToVec2 ( x, y ) =
         |> Vec2.fromRecord
 
 
-playerAcc =
-    2
-
-
-playerMaxSpeed =
-    0.005
-
-
-bulletSpeed =
-    0.018
-
-
-creepSpeed =
-    0.001
-
-
 heroDirInput : Model -> Vec2
 heroDirInput model =
     { x =
@@ -310,13 +319,9 @@ heroDirInput model =
         |> Vec2.fromRecord
 
 
-bulletMaxAge =
-    1000
-
-
 currentCameraPos : Model -> Vec2
 currentCameraPos model =
-    cameraOnHero model.hero
+    cameraOnHero model.config model.hero
         |> GameTwoDCamera.getPosition
         |> tupleToVec2
 
@@ -362,8 +367,8 @@ update msg model =
                     mousePos
                         |> Vec2.toRecord
                         |> (\{ x, y } ->
-                                { x = (x - (canvasWidth / 2)) / (canvasWidth / tilesToShowLengthwise)
-                                , y = (y - (canvasHeight / 2)) / (-canvasHeight / tilesToShowHeightwise)
+                                { x = (x - (model.config.canvasWidth / 2)) / (model.config.canvasWidth / model.config.tilesToShowLengthwise)
+                                , y = (y - (model.config.canvasHeight / 2)) / (-model.config.canvasHeight / tilesToShowHeightwise model.config)
                                 }
                            )
                         |> Vec2.fromRecord
@@ -504,10 +509,10 @@ moveCreeps delta model =
                         let
                             newProgress =
                                 if creep.diagonal then
-                                    delta * creepSpeed + creep.progress
+                                    delta * model.config.creepSpeed + creep.progress
 
                                 else
-                                    sqrt 2 * delta * creepSpeed + creep.progress
+                                    sqrt 2 * delta * model.config.creepSpeed + creep.progress
 
                             ( pos, nextPos, freshProgress ) =
                                 if newProgress > 1 then
@@ -536,12 +541,12 @@ moveBullets delta model =
                         { bullet
                             | pos =
                                 Vec2.add
-                                    (tupleToVec2 (fromPolar ( bulletSpeed * delta, bullet.angle )))
+                                    (tupleToVec2 (fromPolar ( model.config.bulletSpeed * delta, bullet.angle )))
                                     bullet.pos
                             , age = bullet.age + delta
                         }
                     )
-                |> List.filter (\bullet -> bullet.age < bulletMaxAge)
+                |> List.filter (\bullet -> bullet.age < model.config.bulletMaxAge)
     }
 
 
@@ -613,13 +618,13 @@ moveHero delta model =
             model.hero
 
         newAcc =
-            Vec2.scale playerAcc (heroDirInput model)
+            Vec2.scale model.config.heroAcc (heroDirInput model)
 
         newVelUncapped =
             Vec2.add model.hero.vel (Vec2.scale delta newAcc)
 
         percentBeyondCap =
-            Vec2.length newVelUncapped / playerMaxSpeed
+            Vec2.length newVelUncapped / model.config.heroMaxSpeed
 
         newVel =
             (if percentBeyondCap > 1.0 then
@@ -830,20 +835,9 @@ subscriptions model =
         ]
 
 
-canvasWidth =
-    800
-
-
-canvasHeight =
-    600
-
-
-tilesToShowLengthwise =
-    20
-
-
-tilesToShowHeightwise =
-    tilesToShowLengthwise * (canvasHeight / canvasWidth)
+tilesToShowHeightwise : Config -> Float
+tilesToShowHeightwise config =
+    config.tilesToShowLengthwise * (config.canvasHeight / config.canvasWidth)
 
 
 drawCircle : Color -> Vec2 -> Float -> GameTwoDRender.Renderable
@@ -1012,8 +1006,8 @@ view model =
             ]
             [ GameTwoD.render
                 { time = 0
-                , size = ( canvasWidth, canvasHeight )
-                , camera = cameraOnHero model.hero
+                , size = ( round model.config.canvasWidth, round model.config.canvasHeight )
+                , camera = cameraOnHero model.config model.hero
                 }
                 (List.concat
                     [ map
