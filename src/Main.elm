@@ -1,4 +1,4 @@
-module Main exposing (main)
+port module Main exposing (main)
 
 import AStar
 import Browser
@@ -21,6 +21,9 @@ import Round
 import Set exposing (Set)
 
 
+port saveConfig : Flags -> Cmd msg
+
+
 main =
     Browser.document
         { init = init
@@ -31,7 +34,7 @@ main =
 
 
 type alias Flags =
-    ()
+    List ( String, ConfigVal )
 
 
 type alias Model =
@@ -152,15 +155,28 @@ type Msg
     | ChangeConfig String String
 
 
+makeC : Dict String ConfigVal -> Config
+makeC config =
+    { getFloat =
+        \n ->
+            config
+                |> Dict.get n
+                |> Maybe.map .val
+                |> Maybe.withDefault -1
+    }
+
+
 init : Flags -> ( Model, Cmd Msg )
 init flags =
     let
-        hero =
+        config =
+            flags
+                |> Dict.fromList
+    in
+    ( { hero =
             { pos = Vec2.vec2 9 -3
             , vel = Vec2.vec2 0 0
             }
-    in
-    ( { hero = hero
       , bullets = []
       , keysPressed = Set.empty
       , mousePos = Vec2.vec2 0 0
@@ -182,33 +198,8 @@ init flags =
                 |> always Dict.empty
       , timeSinceLastFire = 0
       , equipped = Gun
-      , config =
-            Dict.fromList
-                [ ( "bulletMaxAge", { val = 2, min = 0, max = 5 } )
-                , ( "bulletSpeed", { val = 10, min = 5, max = 50 } )
-                , ( "canvasHeight", { val = 600, min = 300, max = 1200 } )
-                , ( "canvasWidth", { val = 800, min = 400, max = 1600 } )
-                , ( "creepSpeed", { val = 1, min = 0, max = 2 } )
-                , ( "heroAcc", { val = 70, min = 10, max = 200 } )
-                , ( "heroMaxSpeed", { val = 20, min = 10, max = 100 } )
-                , ( "tilesToShowLengthwise", { val = 20, min = 10, max = 200 } )
-                ]
-      , c =
-            { getFloat =
-                \name ->
-                    Dict.fromList
-                        [ ( "heroAcc", 70 )
-                        , ( "heroMaxSpeed", 20 )
-                        , ( "creepSpeed", 1 )
-                        , ( "bulletSpeed", 10 )
-                        , ( "bulletMaxAge", 1000 )
-                        , ( "canvasWidth", 800 )
-                        , ( "canvasHeight", 600 )
-                        , ( "tilesToShowLengthwise", 20 )
-                        ]
-                        |> Dict.get name
-                        |> Maybe.withDefault -1
-            }
+      , config = config
+      , c = makeC config
       }
     , Resources.loadTextures
         [ "images/grass.png"
@@ -448,17 +439,10 @@ update msg model =
                 newModel =
                     { model
                         | config = newConfig
-                        , c =
-                            { getFloat =
-                                \n ->
-                                    newConfig
-                                        |> Dict.get n
-                                        |> Maybe.map .val
-                                        |> Maybe.withDefault -1
-                            }
+                        , c = makeC newConfig
                     }
             in
-            ( newModel, Cmd.none )
+            ( newModel, saveConfig (Dict.toList newConfig) )
 
 
 hoveringTileAndPos : Model -> Maybe ( Tile, TilePos )
