@@ -41,6 +41,7 @@ defaultFlags =
         , ( "tilesToShowLengthwise", { val = 20, min = 10, max = 200 } )
         , ( "meterWidth", { val = 450, min = 10, max = 800 } )
         , ( "refillRate", { val = 10, min = 0, max = 1000 } )
+        , ( "waterBulletCost", { val = 5, min = 0, max = 100 } )
         ]
     }
 
@@ -552,11 +553,12 @@ applyKeyDown str model =
 
 makePlayerBullets : Float -> Model -> Model
 makePlayerBullets delta model =
-    if model.isMouseDown && model.equipped == Gun then
+    if model.isMouseDown && model.equipped == Gun && model.waterAmt > model.c.getFloat "waterBulletCost" then
         if model.timeSinceLastFire > 0.15 then
             { model
                 | timeSinceLastFire = 0
                 , bullets = makeBullet PlayerBullet model.hero.pos model.mousePos :: model.bullets
+                , waterAmt = model.waterAmt - model.c.getFloat "waterBulletCost"
             }
 
         else
