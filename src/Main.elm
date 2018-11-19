@@ -36,12 +36,13 @@ defaultFlags =
         , ( "canvasHeight", { val = 600, min = 300, max = 1200 } )
         , ( "canvasWidth", { val = 800, min = 400, max = 1600 } )
         , ( "creepSpeed", { val = 1, min = 0, max = 2 } )
+        , ( "creepHealth", { val = 100, min = 1, max = 200 } )
         , ( "heroAcc", { val = 70, min = 10, max = 200 } )
         , ( "heroMaxSpeed", { val = 20, min = 10, max = 100 } )
         , ( "tilesToShowLengthwise", { val = 20, min = 10, max = 200 } )
         , ( "meterWidth", { val = 450, min = 10, max = 800 } )
         , ( "refillRate", { val = 10, min = 0, max = 1000 } )
-        , ( "waterBulletCost", { val = 5, min = 0, max = 100 } )
+        , ( "waterBulletCost", { val = 5, min = 0, max = 25 } )
         ]
     }
 
@@ -98,6 +99,8 @@ type alias Creep =
     , nextPos : TilePos
     , progress : Float
     , diagonal : Bool
+    , healthAmt : Float
+    , healthMax : Float
 
     --, offset : Vec2
     }
@@ -734,6 +737,8 @@ spawnCreeps delta model =
                                 , nextPos = nextPos
                                 , progress = 0
                                 , diagonal = isDiagonal enemyTower.pos nextPos
+                                , healthAmt = model.c.getFloat "creepHealth"
+                                , healthMax = model.c.getFloat "creepHealth"
                                 }
                               ]
                             )
@@ -1109,21 +1114,39 @@ view model =
                     []
 
         creeps =
-            model.creeps
-                |> List.map
-                    (\creep ->
-                        GameTwoDRender.sprite
-                            { position =
-                                tilePosSub creep.nextPos creep.pos
-                                    |> tilePosToFloats
-                                    |> tupleToVec2
-                                    |> Vec2.scale creep.progress
-                                    |> Vec2.add (creep.pos |> tilePosToFloats |> tupleToVec2)
-                                    |> vec2ToTuple
-                            , size = ( 1, 1 )
-                            , texture = Resources.getTexture "images/creep.png" model.resources
-                            }
-                    )
+            List.concat
+                [ model.creeps
+                    |> List.map
+                        (\creep ->
+                            GameTwoDRender.sprite
+                                { position =
+                                    tilePosSub creep.nextPos creep.pos
+                                        |> tilePosToFloats
+                                        |> tupleToVec2
+                                        |> Vec2.scale creep.progress
+                                        |> Vec2.add (creep.pos |> tilePosToFloats |> tupleToVec2)
+                                        |> vec2ToTuple
+                                , size = ( 1, 1 )
+                                , texture = Resources.getTexture "images/creep.png" model.resources
+                                }
+                        )
+                , model.creeps
+                    |> List.map
+                        (\creep ->
+                            [ drawRect
+                                Color.black
+                                (vec2FromCreep creep |> Vec2.add (Vec2.vec2 0 -0.25))
+                                (Vec2.vec2 0.9 0.2)
+                            , drawRect
+                                Color.green
+                                (vec2FromCreep creep
+                                    |> Vec2.add (Vec2.vec2 (-0.5 * (1 - (creep.healthAmt / creep.healthMax))) -0.25)
+                                )
+                                (Vec2.vec2 (0.8 * (creep.healthAmt / creep.healthMax)) 0.1)
+                            ]
+                        )
+                    |> List.concat
+                ]
     in
     { title = "GAME"
     , body =
@@ -1245,14 +1268,19 @@ view model =
     }
 
 
+viewHealthMeter : Float -> Float -> Html Msg
+viewHealthMeter amt max =
+    viewMeter amt max 1
+
+
 viewMeter : Float -> Float -> Float -> Html Msg
-viewMeter waterAmt waterMax meterWidth =
+viewMeter amt max meterWidth =
     let
         padding =
             meterWidth * 0.005
 
         ratio =
-            waterAmt / waterMax
+            amt / max
     in
     Html.div
         [ Html.Attributes.style "display" "inline-block"
@@ -1276,7 +1304,7 @@ viewMeter waterAmt waterMax meterWidth =
                       , Html.Attributes.style "height" "100%"
                       , Html.Attributes.style "border-radius" (px (4 * padding))
                       ]
-                    , if waterAmt >= (0.98 * waterMax) then
+                    , if amt >= (0.98 * max) then
                         [ Html.Attributes.style "border-radius" (px (4 * padding)) ]
 
                       else
@@ -1304,7 +1332,7 @@ pct length =
 
 formatConfigFloat : Float -> String
 formatConfigFloat val =
-    Round.round 2 val
+    Round.round 1 val
 
 
 equippableStr : Equippable -> String
