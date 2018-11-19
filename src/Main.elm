@@ -33,6 +33,7 @@ defaultFlags =
     , config =
         [ ( "bulletMaxAge", { val = 2, min = 0, max = 5 } )
         , ( "bulletSpeed", { val = 10, min = 5, max = 50 } )
+        , ( "bulletDmg", { val = 15, min = 0, max = 20 } )
         , ( "canvasHeight", { val = 600, min = 300, max = 1200 } )
         , ( "canvasWidth", { val = 800, min = 400, max = 1600 } )
         , ( "creepSpeed", { val = 1, min = 0, max = 2 } )
@@ -41,7 +42,7 @@ defaultFlags =
         , ( "heroMaxSpeed", { val = 20, min = 10, max = 100 } )
         , ( "tilesToShowLengthwise", { val = 20, min = 10, max = 200 } )
         , ( "meterWidth", { val = 450, min = 10, max = 800 } )
-        , ( "refillRate", { val = 10, min = 0, max = 1000 } )
+        , ( "refillRate", { val = 20, min = 0, max = 1000 } )
         , ( "waterBulletCost", { val = 5, min = 0, max = 25 } )
         ]
     }
@@ -235,8 +236,8 @@ init flags =
             { heroTowerPos = ( 2, -2 )
             }
       , enemyTowers =
-            [ { pos = ( 2, -8 ), timeSinceLastSpawn = 0 }
-            , { pos = ( 13, -4 ), timeSinceLastSpawn = 0 }
+            [ { pos = ( 2, -8 ), timeSinceLastSpawn = 9999 }
+            , { pos = ( 13, -4 ), timeSinceLastSpawn = 9999 }
             ]
       , turrets =
             [ ( ( 8, -5 ), { timeSinceLastFire = 0 } )
@@ -403,6 +404,7 @@ update msg model =
                 |> moveBullets delta
                 |> spawnCreeps delta
                 |> moveCreeps delta
+                |> collideBulletsWithCreeps delta
             , Cmd.none
             )
 
@@ -680,6 +682,45 @@ moveCreeps delta model =
                         }
                     )
     }
+
+
+collideBulletsWithCreeps : Float -> Model -> Model
+collideBulletsWithCreeps delta model =
+    let
+        ( newBullets, newCreeps ) =
+            model.bullets
+                |> List.foldl
+                    (\bullet ( shotBullets, creepsRemaining ) ->
+                        case List.Extra.splitWhen (\creep -> collidesWith ( bullet.pos, 0.2 ) ( vec2FromCreep creep, 0.5 )) creepsRemaining of
+                            Just ( firstHalf, foundCreep :: secondHalf ) ->
+                                let
+                                    newCreep =
+                                        { foundCreep | healthAmt = foundCreep.healthAmt - model.c.getFloat "bulletDmg" }
+                                in
+                                ( shotBullets
+                                , if newCreep.healthAmt > 0 then
+                                    firstHalf ++ (newCreep :: secondHalf)
+
+                                  else
+                                    firstHalf ++ secondHalf
+                                )
+
+                            _ ->
+                                ( bullet :: shotBullets
+                                , creepsRemaining
+                                )
+                    )
+                    ( [], model.creeps )
+    in
+    { model
+        | creeps = newCreeps
+        , bullets = newBullets
+    }
+
+
+collidesWith : ( Vec2, Float ) -> ( Vec2, Float ) -> Bool
+collidesWith ( v1, rad1 ) ( v2, rad2 ) =
+    Vec2.distance v1 v2 <= rad1 + rad2
 
 
 moveBullets : Float -> Model -> Model
@@ -1140,7 +1181,7 @@ view model =
                             , drawRect
                                 Color.green
                                 (vec2FromCreep creep
-                                    |> Vec2.add (Vec2.vec2 (-0.5 * (1 - (creep.healthAmt / creep.healthMax))) -0.25)
+                                    |> Vec2.add (Vec2.vec2 (0.8 * -0.5 * (1 - (creep.healthAmt / creep.healthMax))) -0.25)
                                 )
                                 (Vec2.vec2 (0.8 * (creep.healthAmt / creep.healthMax)) 0.1)
                             ]
