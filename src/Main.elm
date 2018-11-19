@@ -1049,6 +1049,12 @@ view model =
             ]
             [ Html.text "Currently equipped: "
             , Html.strong [] [ Html.text (equippableStr model.equipped) ]
+            , Html.br [] []
+            , Html.br [] []
+            , Html.span [] [ Html.text "Water: " ]
+            , Html.span [] [ Html.text "60" ]
+            , Html.span [] [ Html.text "/" ]
+            , Html.span [] [ Html.text "100" ]
             ]
         , Html.div
             [ Html.Attributes.style "border" "1px solid black"
