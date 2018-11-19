@@ -10,7 +10,7 @@ import Game.Resources as Resources exposing (Resources)
 import Game.TwoD as GameTwoD
 import Game.TwoD.Camera as GameTwoDCamera exposing (Camera)
 import Game.TwoD.Render as GameTwoDRender
-import Html
+import Html exposing (Html)
 import Html.Attributes
 import Html.Events
 import Html.Events.Extra.Mouse as Mouse
@@ -165,10 +165,16 @@ makeC : Dict String ConfigVal -> Config
 makeC config =
     { getFloat =
         \n ->
-            config
-                |> Dict.get n
-                |> Maybe.map .val
-                |> Maybe.withDefault -1
+            case
+                config
+                    |> Dict.get n
+                    |> Maybe.map .val
+            of
+                Just val ->
+                    val
+
+                Nothing ->
+                    Debug.todo n
     }
 
 
@@ -1056,9 +1062,7 @@ view model =
             , Html.br [] []
             , Html.br [] []
             , Html.span [] [ Html.text "Water: " ]
-            , Html.span [] [ Html.text (String.fromFloat model.waterAmt) ]
-            , Html.span [] [ Html.text "/" ]
-            , Html.span [] [ Html.text (String.fromFloat model.waterMax) ]
+            , viewMeter model.waterAmt model.waterMax (model.c.getFloat "meterWidth")
             ]
         , Html.div
             [ Html.Attributes.style "border" "1px solid black"
@@ -1151,6 +1155,63 @@ view model =
             ]
         ]
     }
+
+
+viewMeter : Float -> Float -> Float -> Html Msg
+viewMeter waterAmt waterMax meterWidth =
+    let
+        padding =
+            meterWidth * 0.005
+
+        ratio =
+            waterAmt / waterMax
+    in
+    Html.div
+        [ Html.Attributes.style "display" "inline-block"
+        , Html.Attributes.style "background" "#111"
+        , Html.Attributes.style "padding" (String.fromFloat (4 * padding) ++ "px")
+        , Html.Attributes.style "font-size" "0"
+        ]
+        [ Html.div
+            [ Html.Attributes.style "display" "inline-block"
+            , Html.Attributes.style "width" (px meterWidth)
+            , Html.Attributes.style "background" "#eee"
+            , Html.Attributes.style "height" (px (0.1 * meterWidth))
+            , Html.Attributes.style "border" (px (2 * padding) ++ " solid #eee")
+            , Html.Attributes.style "border-radius" (px (4 * padding))
+            ]
+            [ Html.div
+                (List.concat
+                    [ [ Html.Attributes.style "background" "#5fcde4"
+                      , Html.Attributes.style "border" "#5fcde4"
+                      , Html.Attributes.style "width" (pct (100 * ratio))
+                      , Html.Attributes.style "height" "100%"
+                      , Html.Attributes.style "border-radius" (px (4 * padding))
+                      ]
+                    , if waterAmt >= (0.98 * waterMax) then
+                        [ Html.Attributes.style "border-radius" (px (4 * padding)) ]
+
+                      else
+                        [ Html.Attributes.style "border-radius-right" "0" ]
+                    ]
+                )
+                []
+            ]
+
+        --, Html.span [] [ Html.text (String.fromFloat waterAmt) ]
+        --, Html.span [] [ Html.text "/" ]
+        --, Html.span [] [ Html.text (String.fromFloat waterMax) ]
+        ]
+
+
+px : Float -> String
+px length =
+    String.fromFloat length ++ "px"
+
+
+pct : Float -> String
+pct length =
+    String.fromFloat length ++ "%"
 
 
 formatConfigFloat : Float -> String
