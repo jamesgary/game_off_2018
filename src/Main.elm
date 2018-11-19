@@ -40,6 +40,7 @@ defaultFlags =
         , ( "heroMaxSpeed", { val = 20, min = 10, max = 100 } )
         , ( "tilesToShowLengthwise", { val = 20, min = 10, max = 200 } )
         , ( "meterWidth", { val = 450, min = 10, max = 800 } )
+        , ( "refillRate", { val = 10, min = 0, max = 1000 } )
         ]
     }
 
@@ -195,7 +196,8 @@ makeC config =
                     val
 
                 Nothing ->
-                    Debug.todo n
+                    -1
+                        |> Debug.log ("YOU FOOOOL: " ++ n)
     }
 
 
@@ -566,8 +568,42 @@ makePlayerBullets delta model =
 
 refillWater : Float -> Model -> Model
 refillWater delta model =
-    --TODO
-    model
+    { model
+        | waterAmt =
+            if nearbyWater model then
+                min (model.waterAmt + (delta * model.c.getFloat "refillRate")) model.waterMax
+
+            else
+                model.waterAmt
+    }
+
+
+nearbyWater : Model -> Bool
+nearbyWater model =
+    model.hero.pos
+        |> getTilesSurroundingVec2 model
+        |> List.any (\tile -> tile == Water)
+
+
+getTilesSurroundingVec2 : Model -> Vec2 -> List Tile
+getTilesSurroundingVec2 model pos =
+    pos
+        |> Vec2.add (Vec2.vec2 -0.5 -0.5)
+        |> vec2ToTuple
+        |> Tuple.mapBoth round round
+        |> (\( x, y ) ->
+                [ ( x - 1, y - 1 )
+                , ( x - 1, y )
+                , ( x - 1, y + 1 )
+                , ( x, y - 1 )
+                , ( x, y )
+                , ( x, y + 1 )
+                , ( x + 1, y - 1 )
+                , ( x + 1, y )
+                , ( x + 1, y + 1 )
+                ]
+           )
+        |> List.filterMap (\neighborPos -> Dict.get neighborPos model.map)
 
 
 makeTurretBullets : Float -> Model -> Model

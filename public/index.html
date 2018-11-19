@@ -16,20 +16,8 @@
 
         if (!flags) { fail() }
       } catch(e) {
-        flags = {
-          isConfigOpen: false,
-          config: [
-            ["bulletMaxAge",          { val: 2,   min:   0, max:    5 }],
-            ["bulletSpeed",           { val: 10,  min:   5, max:   50 }],
-            ["canvasHeight",          { val: 600, min: 300, max: 1200 }],
-            ["canvasWidth",           { val: 800, min: 400, max: 1600 }],
-            ["creepSpeed",            { val: 1,   min:   0, max:    2 }],
-            ["heroAcc",               { val: 70,  min:  10, max:  200 }],
-            ["heroMaxSpeed",          { val: 20,  min:  10, max:  100 }],
-            ["tilesToShowLengthwise", { val: 20,  min:  10, max:  200 }],
-            ["meterWidth",            { val: 450, min:  10, max:  800 }],
-          ],
-        };
+        flags = null;
+        localStorage.removeItem("flags");
       }
 
       var app = Elm.Main.init({
