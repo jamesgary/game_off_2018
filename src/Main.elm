@@ -56,6 +56,8 @@ type alias Model =
     , config : Dict String ConfigVal
     , c : Config
     , isConfigOpen : Bool
+    , waterAmt : Float
+    , waterMax : Float
     }
 
 
@@ -204,6 +206,8 @@ init flags =
       , timeSinceLastFire = 0
       , equipped = Gun
       , config = config
+      , waterAmt = 75
+      , waterMax = 100
       , isConfigOpen = isConfigOpen
       , c = makeC config
       }
@@ -1052,9 +1056,9 @@ view model =
             , Html.br [] []
             , Html.br [] []
             , Html.span [] [ Html.text "Water: " ]
-            , Html.span [] [ Html.text "60" ]
+            , Html.span [] [ Html.text (String.fromFloat model.waterAmt) ]
             , Html.span [] [ Html.text "/" ]
-            , Html.span [] [ Html.text "100" ]
+            , Html.span [] [ Html.text (String.fromFloat model.waterMax) ]
             ]
         , Html.div
             [ Html.Attributes.style "border" "1px solid black"
