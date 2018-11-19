@@ -21,7 +21,27 @@ import Round
 import Set exposing (Set)
 
 
-port saveFlags : Flags -> Cmd msg
+port saveFlags : Maybe Flags -> Cmd msg
+
+
+port hardReset : () -> Cmd msg
+
+
+defaultFlags : Flags
+defaultFlags =
+    { isConfigOpen = False
+    , config =
+        [ ( "bulletMaxAge", { val = 2, min = 0, max = 5 } )
+        , ( "bulletSpeed", { val = 10, min = 5, max = 50 } )
+        , ( "canvasHeight", { val = 600, min = 300, max = 1200 } )
+        , ( "canvasWidth", { val = 800, min = 400, max = 1600 } )
+        , ( "creepSpeed", { val = 1, min = 0, max = 2 } )
+        , ( "heroAcc", { val = 70, min = 10, max = 200 } )
+        , ( "heroMaxSpeed", { val = 20, min = 10, max = 100 } )
+        , ( "tilesToShowLengthwise", { val = 20, min = 10, max = 200 } )
+        , ( "meterWidth", { val = 450, min = 10, max = 800 } )
+        ]
+    }
 
 
 main =
@@ -159,6 +179,7 @@ type Msg
     | Resources Resources.Msg
     | ChangeConfig String String
     | ToggleConfig Bool
+    | HardReset
 
 
 makeC : Dict String ConfigVal -> Config
@@ -178,13 +199,20 @@ makeC config =
     }
 
 
-init : Flags -> ( Model, Cmd Msg )
+init : Maybe Flags -> ( Model, Cmd Msg )
 init flags =
     let
         ( config, isConfigOpen ) =
-            ( Dict.fromList flags.config
-            , flags.isConfigOpen
-            )
+            case flags of
+                Just f ->
+                    ( Dict.fromList f.config
+                    , f.isConfigOpen
+                    )
+
+                Nothing ->
+                    ( Dict.fromList defaultFlags.config
+                    , defaultFlags.isConfigOpen
+                    )
     in
     ( { hero =
             { pos = Vec2.vec2 9 -3
@@ -363,6 +391,7 @@ update msg model =
             in
             ( model
                 |> moveHero delta
+                |> refillWater delta
                 |> makeTurretBullets delta
                 |> makePlayerBullets delta
                 |> moveBullets delta
@@ -467,12 +496,22 @@ update msg model =
             in
             ( newModel, saveFlags (modelToFlags newModel) )
 
+        HardReset ->
+            ( { model
+                | isConfigOpen = True
+                , config = Dict.fromList defaultFlags.config
+                , c = makeC (Dict.fromList defaultFlags.config)
+              }
+            , hardReset ()
+            )
 
-modelToFlags : Model -> Flags
+
+modelToFlags : Model -> Maybe Flags
 modelToFlags model =
-    { isConfigOpen = model.isConfigOpen
-    , config = Dict.toList model.config
-    }
+    Just
+        { isConfigOpen = model.isConfigOpen
+        , config = Dict.toList model.config
+        }
 
 
 hoveringTileAndPos : Model -> Maybe ( Tile, TilePos )
@@ -523,6 +562,12 @@ makePlayerBullets delta model =
 
     else
         { model | timeSinceLastFire = model.timeSinceLastFire + delta }
+
+
+refillWater : Float -> Model -> Model
+refillWater delta model =
+    --TODO
+    model
 
 
 makeTurretBullets : Float -> Model -> Model
@@ -1102,13 +1147,18 @@ view model =
             ]
             [ Html.div []
                 (if model.isConfigOpen then
-                    Html.a
-                        [ Html.Events.onClick (ToggleConfig False)
-                        , Html.Attributes.style "text-align" "right"
-                        , Html.Attributes.style "display" "inline-block"
-                        , Html.Attributes.style "width" "100%"
+                    Html.button
+                        [ Html.Attributes.style "float" "left"
+                        , Html.Events.onClick HardReset
                         ]
-                        [ Html.text "Collapse Config" ]
+                        [ Html.text "Hard Reset" ]
+                        :: Html.a
+                            [ Html.Events.onClick (ToggleConfig False)
+                            , Html.Attributes.style "float" "right"
+                            , Html.Attributes.style "display" "inline-block"
+                            ]
+                            [ Html.text "Collapse Config" ]
+                        :: Html.br [] []
                         :: (model.config
                                 |> Dict.toList
                                 |> List.map
