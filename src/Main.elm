@@ -55,7 +55,7 @@ defaultPesistence =
 
 
 main =
-    Browser.document
+    Browser.element
         { init = init
         , view = view
         , update = update
@@ -1325,7 +1325,7 @@ drawRect color pos size =
         }
 
 
-view : Model -> Browser.Document Msg
+view : Model -> Html Msg
 view model =
     let
         map =
@@ -1533,8 +1533,7 @@ view model =
                                 render
                     )
     in
-    { title = "GAME"
-    , body =
+    Html.div []
         [ Html.div
             [ Html.Attributes.style "margin" "5px 20px 0"
             , Html.Attributes.style "font-family" "sans-serif"
@@ -1678,7 +1677,6 @@ view model =
                 )
             ]
         ]
-    }
 
 
 bulletHitFrag : WebGL.Shader a { b | age : Float, angle : Float } { vcoord : Vec2 }
