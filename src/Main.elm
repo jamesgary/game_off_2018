@@ -96,12 +96,18 @@ type alias Model =
     , waterMax : Float
     , seed : Random.Seed
     , base : Base
-    , isGameOver : Bool
+    , gameState : GameState
     , particles : List Particle
     , age : Float
     , composts : List Compost
     , inv : Inv
     }
+
+
+type GameState
+    = Playing
+    | GameOver
+    | Win
 
 
 type alias Inv =
@@ -312,7 +318,7 @@ init flags =
       , isConfigOpen = isConfigOpen
       , c = makeC config
       , seed = Random.initialSeed (round flags.timestamp)
-      , isGameOver = False
+      , gameState = Playing
       , particles = []
       , composts = []
       , inv =
@@ -477,6 +483,7 @@ update msg model =
                 |> applyCreepDamageToBase delta
                 |> applyCreepDamageToHero delta
                 |> collideBulletsWithCreeps delta
+                |> collideBulletsWithEnemyTowers delta
                 |> heroPickUpCompost delta
                 |> checkGameOver delta
             , Cmd.none
@@ -934,6 +941,65 @@ collideBulletsWithCreeps delta model =
     }
 
 
+collideBulletsWithEnemyTowers : Float -> Model -> Model
+collideBulletsWithEnemyTowers delta model =
+    let
+        { particles, bullets, enemyTowers, composts, seed } =
+            model.bullets
+                |> List.foldl
+                    (\bullet tmp ->
+                        case List.Extra.splitWhen (\enemyTower -> collidesWith ( bullet.pos, 0.1 ) ( vec2FromTurretPos enemyTower.pos, 0.5 )) tmp.enemyTowers of
+                            Just ( firstHalf, foundEnemyTower :: secondHalf ) ->
+                                let
+                                    newEnemyTower =
+                                        { foundEnemyTower | healthAmt = foundEnemyTower.healthAmt - model.c.getFloat "bulletDmg" }
+
+                                    ( angle, newSeed ) =
+                                        Random.step
+                                            (Random.float 0 (2 * pi))
+                                            tmp.seed
+                                in
+                                { particles = BulletHitCreep bullet.pos angle 0 :: tmp.particles
+                                , bullets = tmp.bullets
+                                , enemyTowers =
+                                    if newEnemyTower.healthAmt > 0 then
+                                        firstHalf ++ (newEnemyTower :: secondHalf)
+
+                                    else
+                                        firstHalf ++ secondHalf
+                                , composts =
+                                    if newEnemyTower.healthAmt > 0 then
+                                        tmp.composts
+
+                                    else
+                                        { pos = vec2FromTurretPos foundEnemyTower.pos, age = 0 } :: tmp.composts
+                                , seed = newSeed
+                                }
+
+                            _ ->
+                                { particles = tmp.particles
+                                , bullets = bullet :: tmp.bullets
+                                , enemyTowers = tmp.enemyTowers
+                                , composts = tmp.composts
+                                , seed = tmp.seed
+                                }
+                    )
+                    { particles = model.particles
+                    , bullets = []
+                    , enemyTowers = model.enemyTowers
+                    , composts = model.composts
+                    , seed = model.seed
+                    }
+    in
+    { model
+        | enemyTowers = enemyTowers
+        , bullets = bullets
+        , particles = particles
+        , composts = composts
+        , seed = seed
+    }
+
+
 heroPickUpCompost : Float -> Model -> Model
 heroPickUpCompost delta ({ inv } as model) =
     let
@@ -959,8 +1025,15 @@ heroPickUpCompost delta ({ inv } as model) =
 checkGameOver : Float -> Model -> Model
 checkGameOver tick model =
     { model
-        | isGameOver =
-            (model.hero.healthAmt <= 0) || (model.base.healthAmt <= 0)
+        | gameState =
+            if (model.hero.healthAmt <= 0) || (model.base.healthAmt <= 0) then
+                GameOver
+
+            else if List.length model.enemyTowers == 0 then
+                Win
+
+            else
+                Playing
     }
 
 
@@ -1290,12 +1363,16 @@ subscriptions model =
         [ Browser.Events.onKeyDown (Decode.map KeyDown (Decode.field "key" Decode.string))
         , Browser.Events.onKeyUp (Decode.map KeyUp (Decode.field "key" Decode.string))
         , Sub.batch
-            (if model.isGameOver then
-                []
+            (case model.gameState of
+                Playing ->
+                    [ Browser.Events.onAnimationFrameDelta Tick
+                    ]
 
-             else
-                [ Browser.Events.onAnimationFrameDelta Tick
-                ]
+                GameOver ->
+                    []
+
+                Win ->
+                    []
             )
         ]
 
@@ -1586,27 +1663,47 @@ view model =
                     , selectedTileOutline
                     ]
                 )
-            , if model.isGameOver then
-                Html.div
-                    [ Html.Attributes.style "position" "absolute"
-                    , Html.Attributes.style "top" "0"
-                    , Html.Attributes.style "left" "0"
-                    , Html.Attributes.style "width" "100%"
-                    , Html.Attributes.style "height" "100%"
-                    , Html.Attributes.style "background" "rgba(0,0,0,0.5)"
-                    ]
-                    [ Html.div
-                        [ Html.Attributes.style "font-size" "48px"
-                        , Html.Attributes.style "color" "white"
-                        , Html.Attributes.style "text-align" "center"
-                        , Html.Attributes.style "margin-top" "30%"
-                        , Html.Attributes.style "cursor" "default"
+            , case model.gameState of
+                GameOver ->
+                    Html.div
+                        [ Html.Attributes.style "position" "absolute"
+                        , Html.Attributes.style "top" "0"
+                        , Html.Attributes.style "left" "0"
+                        , Html.Attributes.style "width" "100%"
+                        , Html.Attributes.style "height" "100%"
+                        , Html.Attributes.style "background" "rgba(0,0,0,0.5)"
                         ]
-                        [ Html.text "GAME OVER" ]
-                    ]
+                        [ Html.div
+                            [ Html.Attributes.style "font-size" "48px"
+                            , Html.Attributes.style "color" "white"
+                            , Html.Attributes.style "text-align" "center"
+                            , Html.Attributes.style "margin-top" "30%"
+                            , Html.Attributes.style "cursor" "default"
+                            ]
+                            [ Html.text "GAME OVER" ]
+                        ]
 
-              else
-                Html.text ""
+                Win ->
+                    Html.div
+                        [ Html.Attributes.style "position" "absolute"
+                        , Html.Attributes.style "top" "0"
+                        , Html.Attributes.style "left" "0"
+                        , Html.Attributes.style "width" "100%"
+                        , Html.Attributes.style "height" "100%"
+                        , Html.Attributes.style "background" "rgba(0,0,0,0.5)"
+                        ]
+                        [ Html.div
+                            [ Html.Attributes.style "font-size" "48px"
+                            , Html.Attributes.style "color" "white"
+                            , Html.Attributes.style "text-align" "center"
+                            , Html.Attributes.style "margin-top" "30%"
+                            , Html.Attributes.style "cursor" "default"
+                            ]
+                            [ Html.text "A WINNER IS YOU" ]
+                        ]
+
+                Playing ->
+                    Html.text ""
             ]
         , Html.div
             [ Html.Attributes.style "position" "absolute"
