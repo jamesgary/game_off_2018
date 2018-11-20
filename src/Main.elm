@@ -88,6 +88,7 @@ type alias Model =
     -- bldgs
     , enemyTowers : List EnemyTower
     , turrets : List Turret
+    , moneyCrops : List MoneyCrop
     , base : Base
 
     -- hero things
@@ -155,6 +156,7 @@ type alias Base =
 type Equippable
     = Gun
     | TurretSeed
+    | MoneyCropSeed
 
 
 type alias Creep =
@@ -195,6 +197,15 @@ type alias EnemyTower =
 type alias Turret =
     { pos : TilePos
     , timeSinceLastFire : Float
+    , age : Float
+    , healthAmt : Float
+    , healthMax : Float
+    }
+
+
+type alias MoneyCrop =
+    { pos : TilePos
+    , timeSinceLastGenerate : Float
     , age : Float
     , healthAmt : Float
     , healthMax : Float
@@ -316,6 +327,7 @@ init flags =
               }
             ]
       , turrets = []
+      , moneyCrops = []
       , base =
             { pos = ( 3, -3 )
             , healthAmt = (makeC config).getFloat "towerHealthMax"
@@ -348,6 +360,7 @@ init flags =
         , "images/selectedTile-inactive.png"
         , "images/enemyTower.png"
         , "images/turret.png"
+        , "images/moneyCrop.png"
         , "images/creep.png"
         , "images/tower.png"
         , "images/seedling.png"
@@ -491,7 +504,7 @@ update msg model =
                 |> refillWater delta
                 |> makeTurretBullets delta
                 |> makePlayerBullets delta
-                |> ageTurrets delta
+                |> ageCrops delta
                 |> moveBullets delta
                 |> spawnCreeps delta
                 |> moveCreeps delta
@@ -543,30 +556,51 @@ update msg model =
         MouseDown ->
             ( { model | isMouseDown = True }
                 |> (\m ->
-                        case m.equipped of
-                            TurretSeed ->
-                                if not (canPhysicallyPlaceTurretOnMap model) then
-                                    m
-
-                                else
-                                    case hoveringTileAndPos m of
-                                        Just ( Grass, tilePos ) ->
-                                            { m
-                                                | turrets =
-                                                    { pos = tilePos
-                                                    , timeSinceLastFire = 0
-                                                    , healthAmt = model.c.getFloat "baseHealthMax"
-                                                    , healthMax = model.c.getFloat "baseHealthMax"
-                                                    , age = 0
-                                                    }
-                                                        :: m.turrets
-                                            }
-
-                                        _ ->
-                                            m
-
-                            _ ->
+                        case canPlace model of
+                            Shouldnt ->
                                 m
+
+                            Cant ->
+                                m
+
+                            Can ->
+                                case m.equipped of
+                                    MoneyCropSeed ->
+                                        case hoveringTilePos m of
+                                            Just tilePos ->
+                                                { m
+                                                    | moneyCrops =
+                                                        { pos = tilePos
+                                                        , timeSinceLastGenerate = 0
+                                                        , healthAmt = model.c.getFloat "baseHealthMax"
+                                                        , healthMax = model.c.getFloat "baseHealthMax"
+                                                        , age = 0
+                                                        }
+                                                            :: m.moneyCrops
+                                                }
+
+                                            Nothing ->
+                                                m
+
+                                    TurretSeed ->
+                                        case hoveringTilePos m of
+                                            Just tilePos ->
+                                                { m
+                                                    | turrets =
+                                                        { pos = tilePos
+                                                        , timeSinceLastFire = 0
+                                                        , healthAmt = model.c.getFloat "baseHealthMax"
+                                                        , healthMax = model.c.getFloat "baseHealthMax"
+                                                        , age = 0
+                                                        }
+                                                            :: m.turrets
+                                                }
+
+                                            Nothing ->
+                                                m
+
+                                    Gun ->
+                                        m
                    )
             , Cmd.none
             )
@@ -659,6 +693,9 @@ applyKeyDown str model =
             { model | equipped = Gun }
 
         "2" ->
+            { model | equipped = MoneyCropSeed }
+
+        "3" ->
             { model | equipped = TurretSeed }
 
         _ ->
@@ -682,19 +719,26 @@ makePlayerBullets delta model =
         { model | timeSinceLastFire = model.timeSinceLastFire + delta }
 
 
-ageTurrets : Float -> Model -> Model
-ageTurrets delta ({ turrets } as model) =
-    let
-        newTurrets =
-            turrets
+ageCrops : Float -> Model -> Model
+ageCrops delta model =
+    { model
+        | turrets =
+            model.turrets
                 |> List.map
                     (\turret ->
                         { turret
                             | age = turret.age + delta
                         }
                     )
-    in
-    { model | turrets = newTurrets }
+        , moneyCrops =
+            model.moneyCrops
+                |> List.map
+                    (\crop ->
+                        { crop
+                            | age = crop.age + delta
+                        }
+                    )
+    }
 
 
 refillWater : Float -> Model -> Model
@@ -1076,11 +1120,28 @@ moveBullets delta model =
     }
 
 
-canPhysicallyPlaceTurretOnMap : Model -> Bool
-canPhysicallyPlaceTurretOnMap model =
-    (model.equipped == TurretSeed)
-        && (case hoveringTilePos model of
-                Just tilePos ->
+type PlacementAvailability
+    = Shouldnt
+    | Cant
+    | Can
+
+
+canPlace : Model -> PlacementAvailability
+canPlace model =
+    if
+        case model.equipped of
+            TurretSeed ->
+                True
+
+            MoneyCropSeed ->
+                True
+
+            Gun ->
+                False
+    then
+        case hoveringTilePos model of
+            Just tilePos ->
+                if
                     Vec2.distanceSquared
                         (tilePos
                             |> tilePosToFloats
@@ -1089,10 +1150,17 @@ canPhysicallyPlaceTurretOnMap model =
                         )
                         model.hero.pos
                         < (3 ^ 2)
+                then
+                    Can
 
-                Nothing ->
-                    False
-           )
+                else
+                    Shouldnt
+
+            Nothing ->
+                Cant
+
+    else
+        Shouldnt
 
 
 spawnCreeps : Float -> Model -> Model
@@ -1529,32 +1597,65 @@ view model =
                     )
                 |> List.concat
 
+        moneyCrops =
+            model.moneyCrops
+                |> List.map
+                    (\crop ->
+                        if crop.age >= model.c.getFloat "turretTimeToSprout" then
+                            [ GameTwoDRender.sprite
+                                { position = tilePosToFloats crop.pos
+                                , size = ( 1, 1 )
+                                , texture = Resources.getTexture "images/moneyCrop.png" model.resources
+                                }
+                            ]
+
+                        else
+                            GameTwoDRender.sprite
+                                { position = tilePosToFloats crop.pos
+                                , size = ( 1, 1 )
+                                , texture = Resources.getTexture "images/seedling.png" model.resources
+                                }
+                                :: viewHealthMeter
+                                    1
+                                    (tilePosToFloats crop.pos
+                                        |> tupleToVec2
+                                        |> Vec2.add (Vec2.vec2 0.5 0.2)
+                                    )
+                                    crop.age
+                                    (model.c.getFloat "turretTimeToSprout")
+                    )
+                |> List.concat
+
         selectedTileOutline =
-            case ( model.equipped, hoveringTilePos model ) of
-                ( TurretSeed, Just ( x, y ) ) ->
-                    if canPhysicallyPlaceTurretOnMap model then
-                        [ GameTwoDRender.spriteWithOptions
-                            { position = ( toFloat x, toFloat y, 0 )
-                            , size = ( 1, 1 )
-                            , texture = Resources.getTexture "images/selectedTile.png" model.resources
-                            , rotation = 0
-                            , pivot = ( 0, 0 )
-                            , tiling = ( 1, 1 )
-                            }
-                        ]
+            case hoveringTilePos model of
+                Just ( x, y ) ->
+                    case canPlace model of
+                        Can ->
+                            [ GameTwoDRender.spriteWithOptions
+                                { position = ( toFloat x, toFloat y, 0 )
+                                , size = ( 1, 1 )
+                                , texture = Resources.getTexture "images/selectedTile.png" model.resources
+                                , rotation = 0
+                                , pivot = ( 0, 0 )
+                                , tiling = ( 1, 1 )
+                                }
+                            ]
 
-                    else
-                        [ GameTwoDRender.spriteWithOptions
-                            { position = ( toFloat x, toFloat y, 0 )
-                            , size = ( 1, 1 )
-                            , texture = Resources.getTexture "images/selectedTile-inactive.png" model.resources
-                            , rotation = 0
-                            , pivot = ( 0, 0 )
-                            , tiling = ( 1, 1 )
-                            }
-                        ]
+                        Cant ->
+                            [ GameTwoDRender.spriteWithOptions
+                                { position = ( toFloat x, toFloat y, 0 )
+                                , size = ( 1, 1 )
+                                , texture = Resources.getTexture "images/selectedTile-inactive.png" model.resources
+                                , rotation = 0
+                                , pivot = ( 0, 0 )
+                                , tiling = ( 1, 1 )
+                                }
+                            ]
 
-                _ ->
+                        Shouldnt ->
+                            []
+
+                Nothing ->
                     []
 
         creeps =
@@ -1630,7 +1731,7 @@ view model =
             , Html.Attributes.style "font-family" "sans-serif"
             , Html.Attributes.style "font-size" "14px"
             ]
-            [ Html.text "WASD to move. 1 to switch to Gun, 2 to switch to Turret Seeds."
+            [ Html.text "WASD to move. 1 to switch to Gun, 2 to switch to MoneyCrop Seeds, 3 to switch to Turret Seeds."
             , Html.hr [] []
             ]
         , Html.div
@@ -1663,19 +1764,29 @@ view model =
                 , size = ( round (model.c.getFloat "canvasWidth"), round (model.c.getFloat "canvasHeight") )
                 , camera = cameraOnHero model
                 }
-                (List.concat
-                    [ map
-                    , base
-                    , enemyTowers
-                    , turrets
-                    , composts
-                    , hero
-                    , creeps
-                    , particles
-                    , model.bullets
-                        |> List.map (\bullet -> drawCircle Color.darkBlue bullet.pos 0.3)
-                    , selectedTileOutline
-                    ]
+                ([ -- effects
+                   selectedTileOutline
+                 , particles
+
+                 -- bullets
+                 , model.bullets |> List.map (\bullet -> drawCircle Color.darkBlue bullet.pos 0.3)
+
+                 -- movers
+                 , hero
+                 , creeps
+
+                 -- bldgs
+                 , enemyTowers
+                 , turrets
+                 , moneyCrops
+                 , composts
+                 , base
+
+                 -- map tiles
+                 , map
+                 ]
+                    |> List.reverse
+                    |> List.concat
                 )
             , case model.gameState of
                 GameOver ->
@@ -1916,6 +2027,9 @@ equippableStr equippable =
     case equippable of
         Gun ->
             "Gun"
+
+        MoneyCropSeed ->
+            "MoneyCrop Seed"
 
         TurretSeed ->
             "Turret Seed"
