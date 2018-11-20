@@ -753,7 +753,7 @@ applyCreepDamageToBase delta ({ base } as model) =
             model.c.getFloat "creepDps"
 
         dmg =
-            creepDps * (1000 * delta)
+            creepDps * delta
 
         tilesToCheck =
             base.pos
@@ -772,7 +772,7 @@ applyCreepDamageToBase delta ({ base } as model) =
         newBase =
             { base
                 | healthAmt =
-                    base.healthAmt - ((1000 * delta) * toFloat numCreeps)
+                    base.healthAmt - (dmg * toFloat numCreeps)
             }
     in
     { model | base = newBase }
@@ -785,7 +785,7 @@ applyCreepDamageToHero delta ({ hero } as model) =
             model.c.getFloat "creepDps"
 
         dmg =
-            creepDps * (1000 * delta)
+            creepDps * delta
 
         numCreeps =
             model.creeps
@@ -802,7 +802,7 @@ applyCreepDamageToHero delta ({ hero } as model) =
         newHero =
             { hero
                 | healthAmt =
-                    model.hero.healthAmt - ((1000 * delta) * toFloat numCreeps)
+                    model.hero.healthAmt - (dmg * toFloat numCreeps)
             }
     in
     { model | hero = newHero }
