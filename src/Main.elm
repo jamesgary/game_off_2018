@@ -37,10 +37,12 @@ defaultPesistence =
         , ( "bulletDmg", { val = 15, min = 0, max = 20 } )
         , ( "canvasHeight", { val = 600, min = 300, max = 1200 } )
         , ( "canvasWidth", { val = 800, min = 400, max = 1600 } )
+        , ( "creepDps", { val = 2, min = 0, max = 200 } )
         , ( "creepSpeed", { val = 1, min = 0, max = 2 } )
         , ( "creepHealth", { val = 100, min = 1, max = 200 } )
         , ( "towerHealthMax", { val = 1000, min = 100, max = 5000 } )
         , ( "heroAcc", { val = 70, min = 10, max = 200 } )
+        , ( "heroHealthMax", { val = 100, min = 1, max = 10000 } )
         , ( "heroMaxSpeed", { val = 20, min = 10, max = 100 } )
         , ( "tilesToShowLengthwise", { val = 20, min = 10, max = 200 } )
         , ( "meterWidth", { val = 450, min = 10, max = 800 } )
@@ -134,6 +136,8 @@ type alias HeroPos =
 type alias Hero =
     { pos : HeroPos
     , vel : Vec2
+    , healthAmt : Float
+    , healthMax : Float
     }
 
 
@@ -242,6 +246,8 @@ init flags =
     ( { hero =
             { pos = Vec2.vec2 9 -3
             , vel = Vec2.vec2 0 0
+            , healthAmt = (makeC config).getFloat "heroHealthMax"
+            , healthMax = (makeC config).getFloat "heroHealthMax"
             }
       , bullets = []
       , keysPressed = Set.empty
@@ -429,6 +435,7 @@ update msg model =
                 |> spawnCreeps delta
                 |> moveCreeps delta
                 |> applyCreepDamageToBase delta
+                |> applyCreepDamageToHero delta
                 |> collideBulletsWithCreeps delta
             , Cmd.none
             )
@@ -740,7 +747,7 @@ applyCreepDamageToBase : Float -> Model -> Model
 applyCreepDamageToBase delta ({ base } as model) =
     let
         creepDps =
-            100
+            model.c.getFloat "creepDps"
 
         dmg =
             creepDps * (1000 * delta)
@@ -766,6 +773,36 @@ applyCreepDamageToBase delta ({ base } as model) =
             }
     in
     { model | base = newBase }
+
+
+applyCreepDamageToHero : Float -> Model -> Model
+applyCreepDamageToHero delta ({ hero } as model) =
+    let
+        creepDps =
+            model.c.getFloat "creepDps"
+
+        dmg =
+            creepDps * (1000 * delta)
+
+        numCreeps =
+            model.creeps
+                |> List.filter
+                    (\creep ->
+                        (creep
+                            |> vec2FromCreep
+                            |> Vec2.distance model.hero.pos
+                        )
+                            < 2
+                    )
+                |> List.length
+
+        newHero =
+            { hero
+                | healthAmt =
+                    model.hero.healthAmt - ((1000 * delta) * toFloat numCreeps)
+            }
+    in
+    { model | hero = newHero }
 
 
 collideBulletsWithCreeps : Float -> Model -> Model
@@ -1169,15 +1206,21 @@ view model =
                     )
 
         hero =
-            [ drawRect
+            drawRect
                 Color.black
                 model.hero.pos
                 (Vec2.vec2 1 1)
-            , drawRect
-                Color.darkGray
-                model.hero.pos
-                (Vec2.vec2 0.9 0.9)
-            ]
+                :: drawRect
+                    Color.darkGray
+                    model.hero.pos
+                    (Vec2.vec2 0.9 0.9)
+                :: viewHealthMeter
+                    0.9
+                    (model.hero.pos
+                        |> Vec2.add (Vec2.vec2 0 -0.04)
+                    )
+                    model.hero.healthAmt
+                    model.hero.healthMax
 
         base =
             GameTwoDRender.sprite
