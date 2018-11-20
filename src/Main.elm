@@ -37,7 +37,7 @@ defaultPesistence =
         , ( "bulletDmg", { val = 15, min = 0, max = 20 } )
         , ( "canvasHeight", { val = 600, min = 300, max = 1200 } )
         , ( "canvasWidth", { val = 800, min = 400, max = 1600 } )
-        , ( "creepDps", { val = 2, min = 0, max = 200 } )
+        , ( "creepDps", { val = 10, min = 0, max = 200 } )
         , ( "creepSpeed", { val = 1, min = 0, max = 2 } )
         , ( "creepHealth", { val = 100, min = 1, max = 200 } )
         , ( "towerHealthMax", { val = 1000, min = 100, max = 5000 } )
@@ -258,7 +258,7 @@ init flags =
       , map = initMap
       , creeps = []
       , base =
-            { pos = ( 2, -2 )
+            { pos = ( 3, -3 )
             , healthAmt = (makeC config).getFloat "towerHealthMax"
             , healthMax = (makeC config).getFloat "towerHealthMax"
             }
@@ -270,7 +270,12 @@ init flags =
               , healthAmt = (makeC config).getFloat "towerHealthMax"
               , healthMax = (makeC config).getFloat "towerHealthMax"
               }
-            , { pos = ( 13, -4 )
+            , { pos = ( 11, -5 )
+              , timeSinceLastSpawn = 9999
+              , healthAmt = (makeC config).getFloat "towerHealthMax"
+              , healthMax = (makeC config).getFloat "towerHealthMax"
+              }
+            , { pos = ( 14, -1 )
               , timeSinceLastSpawn = 9999
               , healthAmt = (makeC config).getFloat "towerHealthMax"
               , healthMax = (makeC config).getFloat "towerHealthMax"
@@ -320,22 +325,22 @@ initMap =
     """
 11111111111111111111
 10000000000000000001
+10000000000000000001
+10000000000000000001
 10000010000000000001
-11111110000000000001
-11111100000001000001
+10000010000000000001
+11111111111111111101
+11111100000000000001
 10001110000000000001
-10001110000000000001
+10001110011111111111
 10001110000000000001
 10001110000000000001
 10001111111110000001
-10000011111111000001
+10000011111111111001
 10000011111111000001
 10000011111111000001
 10000001111111001111
 10000000000000000111
-10000000000000000001
-10000000000000000001
-10000000000000000001
 11111111111111111111
 """
         |> String.trim
@@ -736,14 +741,28 @@ moveCreeps delta model =
                                 else
                                     ( creep.pos, creep.nextPos, newProgress )
                         in
-                        { creep
-                            | pos = pos
-                            , nextPos = nextPos
-                            , progress = freshProgress
-                            , diagonal = isDiagonal pos nextPos
-                        }
+                        if isCreepOnHero model.hero creep then
+                            creep
+
+                        else
+                            { creep
+                                | pos = pos
+                                , nextPos = nextPos
+                                , progress = freshProgress
+                                , diagonal = isDiagonal pos nextPos
+                            }
                     )
     }
+
+
+isCreepOnHero : Hero -> Creep -> Bool
+isCreepOnHero hero creep =
+    (creep
+        |> vec2FromCreep
+        |> Vec2.add (Vec2.vec2 0 -0.0)
+        |> Vec2.distanceSquared hero.pos
+    )
+        < (0.8 ^ 2)
 
 
 applyCreepDamageToBase : Float -> Model -> Model
@@ -789,14 +808,7 @@ applyCreepDamageToHero delta ({ hero } as model) =
 
         numCreeps =
             model.creeps
-                |> List.filter
-                    (\creep ->
-                        (creep
-                            |> vec2FromCreep
-                            |> Vec2.distance model.hero.pos
-                        )
-                            < 2
-                    )
+                |> List.filter (isCreepOnHero model.hero)
                 |> List.length
 
         newHero =
