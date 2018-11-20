@@ -96,7 +96,20 @@ type alias Model =
     , seed : Random.Seed
     , base : Base
     , isGameOver : Bool
+    , particles : List Particle
+    , age : Float
+    , composts : List Compost
     }
+
+
+type alias Compost =
+    { pos : Vec2
+    , age : Float
+    }
+
+
+type Particle
+    = BulletHitCreep Vec2 Float
 
 
 type alias Config =
@@ -293,6 +306,9 @@ init flags =
       , c = makeC config
       , seed = Random.initialSeed (round flags.timestamp)
       , isGameOver = False
+      , particles = []
+      , composts = []
+      , age = 0
       }
     , Resources.loadTextures
         [ "images/grass.png"
@@ -304,6 +320,7 @@ init flags =
         , "images/creep.png"
         , "images/tower.png"
         , "images/seedling.png"
+        , "images/compost.png"
         ]
         |> Cmd.map Resources
     )
@@ -437,6 +454,8 @@ update msg model =
                     min (d / 1000) 0.25
             in
             ( model
+                |> ageSelf delta
+                |> ageParticles delta
                 |> moveHero delta
                 |> refillWater delta
                 |> makeTurretBullets delta
@@ -565,6 +584,11 @@ update msg model =
               }
             , hardReset ()
             )
+
+
+ageSelf : Float -> Model -> Model
+ageSelf delta model =
+    { model | age = delta + model.age }
 
 
 modelToPersistence : Model -> Persistence
@@ -843,34 +867,50 @@ applyCreepDamageToHero delta ({ hero } as model) =
 collideBulletsWithCreeps : Float -> Model -> Model
 collideBulletsWithCreeps delta model =
     let
-        ( newBullets, newCreeps ) =
+        { particles, bullets, creeps, composts } =
             model.bullets
                 |> List.foldl
-                    (\bullet ( shotBullets, creepsRemaining ) ->
-                        case List.Extra.splitWhen (\creep -> collidesWith ( bullet.pos, 0.1 ) ( vec2FromCreep creep, 0.5 )) creepsRemaining of
+                    (\bullet tmp ->
+                        case List.Extra.splitWhen (\creep -> collidesWith ( bullet.pos, 0.1 ) ( vec2FromCreep creep, 0.5 )) tmp.creeps of
                             Just ( firstHalf, foundCreep :: secondHalf ) ->
                                 let
                                     newCreep =
                                         { foundCreep | healthAmt = foundCreep.healthAmt - model.c.getFloat "bulletDmg" }
                                 in
-                                ( shotBullets
-                                , if newCreep.healthAmt > 0 then
-                                    firstHalf ++ (newCreep :: secondHalf)
+                                { particles = BulletHitCreep bullet.pos 0 :: tmp.particles
+                                , bullets = tmp.bullets
+                                , creeps =
+                                    if newCreep.healthAmt > 0 then
+                                        firstHalf ++ (newCreep :: secondHalf)
 
-                                  else
-                                    firstHalf ++ secondHalf
-                                )
+                                    else
+                                        firstHalf ++ secondHalf
+                                , composts =
+                                    if newCreep.healthAmt > 0 then
+                                        tmp.composts
+
+                                    else
+                                        { pos = vec2FromCreep foundCreep, age = 0 } :: tmp.composts
+                                }
 
                             _ ->
-                                ( bullet :: shotBullets
-                                , creepsRemaining
-                                )
+                                { particles = tmp.particles
+                                , bullets = bullet :: tmp.bullets
+                                , creeps = tmp.creeps
+                                , composts = tmp.composts
+                                }
                     )
-                    ( [], model.creeps )
+                    { particles = model.particles
+                    , bullets = []
+                    , creeps = model.creeps
+                    , composts = model.composts
+                    }
     in
     { model
-        | creeps = newCreeps
-        , bullets = newBullets
+        | creeps = creeps
+        , bullets = bullets
+        , particles = particles
+        , composts = composts
     }
 
 
@@ -972,6 +1012,25 @@ vec2OffsetGenerator : Float -> Float -> Random.Generator Vec2
 vec2OffsetGenerator min max =
     Random.pair (Random.float min max) (Random.float min max)
         |> Random.map tupleToVec2
+
+
+ageParticles : Float -> Model -> Model
+ageParticles delta model =
+    let
+        newParticles =
+            model.particles
+                |> List.filterMap
+                    (\particle ->
+                        case particle of
+                            BulletHitCreep pos age ->
+                                if age + delta < 1 then
+                                    Just (BulletHitCreep pos (age + delta))
+
+                                else
+                                    Nothing
+                    )
+    in
+    { model | particles = newParticles }
 
 
 moveHero : Float -> Model -> Model
@@ -1387,6 +1446,74 @@ view model =
                         )
                     |> List.concat
                 ]
+
+        composts =
+            model.composts
+                |> List.map
+                    (\compost ->
+                        GameTwoDRender.sprite
+                            { position =
+                                compost.pos
+                                    |> Vec2.add (Vec2.vec2 -0.5 -0.5)
+                                    |> vec2ToTuple
+                            , size = ( 1, 1 )
+                            , texture = Resources.getTexture "images/compost.png" model.resources
+                            }
+                    )
+
+        particles =
+            model.particles
+                |> List.map
+                    (\particle ->
+                        case particle of
+                            BulletHitCreep pos age ->
+                                let
+                                    makeUniforms { cameraProj, transform, time } =
+                                        { cameraProj = cameraProj
+                                        , transform = transform
+                                        , time = time
+                                        , age = age
+                                        }
+
+                                    size =
+                                        5
+
+                                    render =
+                                        GameTwoDRender.customFragment makeUniforms
+                                            { fragmentShader = frag
+                                            , position = ( Vec2.getX pos - (0.5 * size), Vec2.getY pos - (0.5 * size), 0 )
+                                            , size = ( size, size )
+                                            , rotation = 0
+                                            , pivot = ( 0, 0 )
+                                            }
+
+                                    frag =
+                                        [glsl|
+                                          precision mediump float;
+
+                                          varying vec2 vcoord;
+                                          uniform float age;
+
+                                          void main () {
+                                            float maxAge = 0.3;
+                                            float ageProgress = age / maxAge;
+                                            float radius = 0.1 + (0.15 * ageProgress);
+                                            float dist = length(vec2(0.5, 0.5) - vcoord);
+
+                                            float alpha = smoothstep(radius - 0.01, radius, dist);
+                                            vec4 color = vec4(
+                                              (1.0 * ageProgress) + 0.4,
+                                              (1.0 * ageProgress) + 0.4,
+                                              (1.0 * ageProgress) + 1.0,
+                                              (1.0 - alpha) * (1.0 - age / maxAge)
+                                            );
+
+                                            gl_FragColor = color;
+                                          }
+                                        |]
+                                in
+                                render
+                    )
     in
     { title = "GAME"
     , body =
@@ -1421,7 +1548,7 @@ view model =
             , Mouse.onMove (\event -> MouseMove event.offsetPos)
             ]
             [ GameTwoD.render
-                { time = 0
+                { time = model.age
                 , size = ( round (model.c.getFloat "canvasWidth"), round (model.c.getFloat "canvasHeight") )
                 , camera = cameraOnHero model
                 }
@@ -1430,10 +1557,13 @@ view model =
                     , base
                     , enemyTowers
                     , turrets
+                    , composts
                     , hero
                     , creeps
+
+                    --, particles
                     , model.bullets
-                        |> List.map (\bullet -> drawCircle Color.red bullet.pos 0.5)
+                        |> List.map (\bullet -> drawCircle Color.darkBlue bullet.pos 0.3)
                     , selectedTileOutline
                     ]
                 )
