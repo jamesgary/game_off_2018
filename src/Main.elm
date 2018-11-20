@@ -91,11 +91,19 @@ type alias Model =
     , waterAmt : Float
     , waterMax : Float
     , seed : Random.Seed
+    , base : Base
     }
 
 
 type alias Config =
     { getFloat : String -> Float
+    }
+
+
+type alias Base =
+    { pos : TilePos
+    , healthAmt : Float
+    , healthMax : Float
     }
 
 
@@ -116,8 +124,7 @@ type alias Creep =
 
 
 type alias Cache =
-    { heroTowerPos : TilePos
-    }
+    {}
 
 
 type alias HeroPos =
@@ -183,7 +190,6 @@ type VDir
 type Tile
     = Grass
     | Water
-    | Tower
     | Poop
 
 
@@ -244,9 +250,13 @@ init flags =
       , resources = Resources.init
       , map = initMap
       , creeps = []
-      , cache =
-            { heroTowerPos = ( 2, -2 )
+      , base =
+            { pos = ( 2, -2 )
+            , healthAmt = (makeC config).getFloat "towerHealthMax"
+            , healthMax = (makeC config).getFloat "towerHealthMax"
             }
+      , cache =
+            {}
       , enemyTowers =
             [ { pos = ( 2, -8 )
               , timeSinceLastSpawn = 9999
@@ -302,7 +312,7 @@ initMap =
     """
 11111111111111111111
 10000000000000000001
-10T00010000000000001
+10000010000000000001
 11111110000000000001
 11111100000001000001
 10001110000000000001
@@ -335,9 +345,6 @@ initMap =
 
                                 '1' ->
                                     Water
-
-                                'T' ->
-                                    Tower
 
                                 _ ->
                                     Poop
@@ -476,8 +483,8 @@ update msg model =
                                                 | turrets =
                                                     Dict.insert tilePos
                                                         { timeSinceLastFire = 0
-                                                        , healthAmt = model.c.getFloat "towerHealthMax"
-                                                        , healthMax = model.c.getFloat "towerHealthMax"
+                                                        , healthAmt = model.c.getFloat "baseHealthMax"
+                                                        , healthMax = model.c.getFloat "baseHealthMax"
                                                         }
                                                         m.turrets
                                             }
@@ -693,7 +700,7 @@ moveCreeps delta model =
 
                             ( pos, nextPos, freshProgress ) =
                                 if newProgress > 1 then
-                                    ( creep.nextPos, findNextTileTowards model creep.nextPos model.cache.heroTowerPos, newProgress - 1 )
+                                    ( creep.nextPos, findNextTileTowards model creep.nextPos model.base.pos, newProgress - 1 )
 
                                 else
                                     ( creep.pos, creep.nextPos, newProgress )
@@ -795,7 +802,7 @@ spawnCreeps delta model =
                         if enemyTower.timeSinceLastSpawn + delta > 1.8 then
                             let
                                 nextPos =
-                                    findNextTileTowards model enemyTower.pos model.cache.heroTowerPos
+                                    findNextTileTowards model enemyTower.pos model.base.pos
 
                                 ( offset, newSeed2 ) =
                                     Random.step (vec2OffsetGenerator -0.5 0.5) model.seed
@@ -931,9 +938,6 @@ isPassable tile =
         Poop ->
             False
 
-        Tower ->
-            False
-
 
 dot : Collision.Pt -> Collision.Pt -> Float
 dot ( x1, y1 ) ( x2, y2 ) =
@@ -1008,9 +1012,6 @@ possibleMoves model ( col, row ) =
             (\( _, tile ) ->
                 case tile of
                     Grass ->
-                        True
-
-                    Tower ->
                         True
 
                     Water ->
@@ -1106,13 +1107,6 @@ view model =
                                     , texture = Resources.getTexture "images/water.png" model.resources
                                     }
 
-                            Tower ->
-                                GameTwoDRender.sprite
-                                    { position = ( toFloat col, toFloat row )
-                                    , size = ( 1, 1 )
-                                    , texture = Resources.getTexture "images/tower.png" model.resources
-                                    }
-
                             Poop ->
                                 GameTwoDRender.sprite
                                     { position = ( toFloat col, toFloat row )
@@ -1132,6 +1126,21 @@ view model =
                 (Vec2.vec2 0.9 0.9)
             ]
 
+        base =
+            GameTwoDRender.sprite
+                { position = tilePosToFloats model.base.pos
+                , size = ( 1, 1 )
+                , texture = Resources.getTexture "images/tower.png" model.resources
+                }
+                :: viewHealthMeter
+                    1.5
+                    (tilePosToFloats model.base.pos
+                        |> tupleToVec2
+                        |> Vec2.add (Vec2.vec2 0.5 0.4)
+                    )
+                    model.base.healthAmt
+                    model.base.healthMax
+
         enemyTowers =
             model.enemyTowers
                 |> List.map
@@ -1142,6 +1151,7 @@ view model =
                             , texture = Resources.getTexture "images/enemyTower.png" model.resources
                             }
                             :: viewHealthMeter
+                                1.2
                                 (tilePosToFloats enemyTower.pos
                                     |> tupleToVec2
                                     |> Vec2.add (Vec2.vec2 0.5 0.2)
@@ -1209,7 +1219,7 @@ view model =
                 , model.creeps
                     |> List.map
                         (\creep ->
-                            viewHealthMeter (vec2FromCreep creep) creep.healthAmt creep.healthMax
+                            viewHealthMeter 0.8 (vec2FromCreep creep) creep.healthAmt creep.healthMax
                         )
                     |> List.concat
                 ]
@@ -1252,6 +1262,7 @@ view model =
                 }
                 (List.concat
                     [ map
+                    , base
                     , enemyTowers
                     , turrets
                     , hero
@@ -1334,8 +1345,8 @@ view model =
     }
 
 
-viewHealthMeter : Vec2 -> Float -> Float -> List GameTwoDRender.Renderable
-viewHealthMeter pos amt max =
+viewHealthMeter : Float -> Vec2 -> Float -> Float -> List GameTwoDRender.Renderable
+viewHealthMeter size pos amt max =
     let
         healthOffset =
             Vec2.vec2 0 -0.25
@@ -1346,14 +1357,16 @@ viewHealthMeter pos amt max =
     [ drawRect
         Color.black
         (pos |> Vec2.add healthOffset)
-        (Vec2.vec2 0.9 0.2)
+        (Vec2.scale size (Vec2.vec2 0.9 0.2))
     , drawRect
         Color.green
         (pos
             |> Vec2.add healthOffset
-            |> Vec2.add (Vec2.vec2 (outlineAmt * -0.5 * (1 - (amt / max))) 0)
+            |> Vec2.add (Vec2.vec2 (size * outlineAmt * -0.5 * (1 - (amt / max))) 0)
         )
-        (Vec2.vec2 (outlineAmt * (amt / max)) 0.1)
+        (Vec2.vec2 (outlineAmt * (amt / max)) 0.1
+            |> Vec2.scale size
+        )
     ]
 
 
