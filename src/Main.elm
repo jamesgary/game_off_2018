@@ -94,6 +94,7 @@ type alias Model =
     , waterMax : Float
     , seed : Random.Seed
     , base : Base
+    , isGameOver : Bool
     }
 
 
@@ -284,6 +285,7 @@ init flags =
       , isConfigOpen = isConfigOpen
       , c = makeC config
       , seed = Random.initialSeed (round flags.timestamp)
+      , isGameOver = False
       }
     , Resources.loadTextures
         [ "images/grass.png"
@@ -437,6 +439,7 @@ update msg model =
                 |> applyCreepDamageToBase delta
                 |> applyCreepDamageToHero delta
                 |> collideBulletsWithCreeps delta
+                |> checkGameOver delta
             , Cmd.none
             )
 
@@ -839,6 +842,14 @@ collideBulletsWithCreeps delta model =
     }
 
 
+checkGameOver : Float -> Model -> Model
+checkGameOver tick model =
+    { model
+        | isGameOver =
+            (model.hero.healthAmt <= 0) || (model.base.healthAmt <= 0)
+    }
+
+
 collidesWith : ( Vec2, Float ) -> ( Vec2, Float ) -> Bool
 collidesWith ( v1, rad1 ) ( v2, rad2 ) =
     Vec2.distance v1 v2 <= rad1 + rad2
@@ -1145,7 +1156,14 @@ subscriptions model =
     Sub.batch
         [ Browser.Events.onKeyDown (Decode.map KeyDown (Decode.field "key" Decode.string))
         , Browser.Events.onKeyUp (Decode.map KeyUp (Decode.field "key" Decode.string))
-        , Browser.Events.onAnimationFrameDelta Tick
+        , Sub.batch
+            (if model.isGameOver then
+                []
+
+             else
+                [ Browser.Events.onAnimationFrameDelta Tick
+                ]
+            )
         ]
 
 
@@ -1347,6 +1365,7 @@ view model =
             , Html.Attributes.style "display" "inline-block"
             , Html.Attributes.style "margin" "20px"
             , Html.Attributes.style "font-size" "0"
+            , Html.Attributes.style "position" "relative"
             , Mouse.onDown (\_ -> MouseDown)
             , Mouse.onUp (\_ -> MouseUp)
             , Mouse.onMove (\event -> MouseMove event.offsetPos)
@@ -1368,6 +1387,27 @@ view model =
                     , selectedTileOutline
                     ]
                 )
+            , if model.isGameOver then
+                Html.div
+                    [ Html.Attributes.style "position" "absolute"
+                    , Html.Attributes.style "top" "0"
+                    , Html.Attributes.style "left" "0"
+                    , Html.Attributes.style "width" "100%"
+                    , Html.Attributes.style "height" "100%"
+                    , Html.Attributes.style "background" "rgba(0,0,0,0.5)"
+                    ]
+                    [ Html.div
+                        [ Html.Attributes.style "font-size" "48px"
+                        , Html.Attributes.style "color" "white"
+                        , Html.Attributes.style "text-align" "center"
+                        , Html.Attributes.style "margin-top" "30%"
+                        , Html.Attributes.style "cursor" "default"
+                        ]
+                        [ Html.text "GAME OVER" ]
+                    ]
+
+              else
+                Html.text ""
             ]
         , Html.div
             [ Html.Attributes.style "position" "absolute"
