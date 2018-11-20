@@ -87,7 +87,7 @@ type alias Model =
 
     -- bldgs
     , enemyTowers : List EnemyTower
-    , turrets : Dict TilePos Turret
+    , turrets : List Turret
     , base : Base
 
     -- hero things
@@ -193,7 +193,8 @@ type alias EnemyTower =
 
 
 type alias Turret =
-    { timeSinceLastFire : Float
+    { pos : TilePos
+    , timeSinceLastFire : Float
     , age : Float
     , healthAmt : Float
     , healthMax : Float
@@ -314,7 +315,7 @@ init flags =
               , healthMax = (makeC config).getFloat "towerHealthMax"
               }
             ]
-      , turrets = Dict.empty
+      , turrets = []
       , base =
             { pos = ( 3, -3 )
             , healthAmt = (makeC config).getFloat "towerHealthMax"
@@ -552,13 +553,13 @@ update msg model =
                                         Just ( Grass, tilePos ) ->
                                             { m
                                                 | turrets =
-                                                    Dict.insert tilePos
-                                                        { timeSinceLastFire = 0
-                                                        , healthAmt = model.c.getFloat "baseHealthMax"
-                                                        , healthMax = model.c.getFloat "baseHealthMax"
-                                                        , age = 0
-                                                        }
-                                                        m.turrets
+                                                    { pos = tilePos
+                                                    , timeSinceLastFire = 0
+                                                    , healthAmt = model.c.getFloat "baseHealthMax"
+                                                    , healthMax = model.c.getFloat "baseHealthMax"
+                                                    , age = 0
+                                                    }
+                                                        :: m.turrets
                                             }
 
                                         _ ->
@@ -686,8 +687,8 @@ ageTurrets delta ({ turrets } as model) =
     let
         newTurrets =
             turrets
-                |> Dict.map
-                    (\_ turret ->
+                |> List.map
+                    (\turret ->
                         { turret
                             | age = turret.age + delta
                         }
@@ -761,17 +762,17 @@ makeTurretBullets delta model =
     let
         ( newBullets, newTurrets ) =
             model.turrets
-                |> Dict.foldl
-                    (\pos turret ( bullets, turrets ) ->
+                |> List.foldl
+                    (\turret ( bullets, turrets ) ->
                         let
                             shotBullet =
                                 if turret.age > model.c.getFloat "turretTimeToSprout" && turret.timeSinceLastFire > 0.5 then
                                     model.creeps
-                                        |> List.Extra.minimumBy (\closestCreep -> Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurretPos pos))
+                                        |> List.Extra.minimumBy (\closestCreep -> Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurretPos turret.pos))
                                         |> Maybe.andThen
                                             (\closestCreep ->
-                                                if Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurretPos pos) < 5 ^ 2 then
-                                                    Just (makeBullet PlantBullet (vec2FromTurretPos pos) (vec2FromCreep closestCreep))
+                                                if Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurretPos turret.pos) < 5 ^ 2 then
+                                                    Just (makeBullet PlantBullet (vec2FromTurretPos turret.pos) (vec2FromCreep closestCreep))
 
                                                 else
                                                     Nothing
@@ -782,12 +783,12 @@ makeTurretBullets delta model =
                         in
                         case shotBullet of
                             Just bullet ->
-                                ( bullet :: bullets, Dict.insert pos { turret | timeSinceLastFire = 0 } turrets )
+                                ( bullet :: bullets, { turret | timeSinceLastFire = 0 } :: turrets )
 
                             Nothing ->
-                                ( bullets, Dict.insert pos { turret | timeSinceLastFire = turret.timeSinceLastFire + delta } turrets )
+                                ( bullets, { turret | timeSinceLastFire = turret.timeSinceLastFire + delta } :: turrets )
                     )
-                    ( model.bullets, Dict.empty )
+                    ( model.bullets, [] )
     in
     { model
         | turrets = newTurrets
@@ -1501,11 +1502,11 @@ view model =
 
         turrets =
             model.turrets
-                |> Dict.map
-                    (\pos turret ->
+                |> List.map
+                    (\turret ->
                         if turret.age >= model.c.getFloat "turretTimeToSprout" then
                             [ GameTwoDRender.sprite
-                                { position = tilePosToFloats pos
+                                { position = tilePosToFloats turret.pos
                                 , size = ( 1, 1 )
                                 , texture = Resources.getTexture "images/turret.png" model.resources
                                 }
@@ -1513,20 +1514,19 @@ view model =
 
                         else
                             GameTwoDRender.sprite
-                                { position = tilePosToFloats pos
+                                { position = tilePosToFloats turret.pos
                                 , size = ( 1, 1 )
                                 , texture = Resources.getTexture "images/seedling.png" model.resources
                                 }
                                 :: viewHealthMeter
                                     1
-                                    (tilePosToFloats pos
+                                    (tilePosToFloats turret.pos
                                         |> tupleToVec2
                                         |> Vec2.add (Vec2.vec2 0.5 0.2)
                                     )
                                     turret.age
                                     (model.c.getFloat "turretTimeToSprout")
                     )
-                |> Dict.values
                 |> List.concat
 
         selectedTileOutline =
