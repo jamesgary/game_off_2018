@@ -32,21 +32,22 @@ defaultPesistence : Persistence
 defaultPesistence =
     { isConfigOpen = False
     , config =
-        [ ( "bulletMaxAge", { val = 2, min = 0, max = 5 } )
+        [ ( "bulletDmg", { val = 15, min = 0, max = 20 } )
+        , ( "bulletMaxAge", { val = 2, min = 0, max = 5 } )
         , ( "bulletSpeed", { val = 10, min = 5, max = 50 } )
-        , ( "bulletDmg", { val = 15, min = 0, max = 20 } )
         , ( "canvasHeight", { val = 600, min = 300, max = 1200 } )
         , ( "canvasWidth", { val = 800, min = 400, max = 1600 } )
         , ( "creepDps", { val = 10, min = 0, max = 200 } )
-        , ( "creepSpeed", { val = 1, min = 0, max = 2 } )
         , ( "creepHealth", { val = 100, min = 1, max = 200 } )
-        , ( "towerHealthMax", { val = 1000, min = 100, max = 5000 } )
+        , ( "creepSpeed", { val = 1, min = 0, max = 2 } )
         , ( "heroAcc", { val = 70, min = 10, max = 200 } )
         , ( "heroHealthMax", { val = 100, min = 1, max = 10000 } )
         , ( "heroMaxSpeed", { val = 20, min = 10, max = 100 } )
-        , ( "tilesToShowLengthwise", { val = 20, min = 10, max = 200 } )
         , ( "meterWidth", { val = 450, min = 10, max = 800 } )
         , ( "refillRate", { val = 20, min = 0, max = 1000 } )
+        , ( "tilesToShowLengthwise", { val = 20, min = 10, max = 200 } )
+        , ( "towerHealthMax", { val = 1000, min = 100, max = 5000 } )
+        , ( "turretTimeToSprout", { val = 5, min = 0, max = 30 } )
         , ( "waterBulletCost", { val = 5, min = 0, max = 25 } )
         ]
     }
@@ -152,6 +153,7 @@ type alias EnemyTower =
 
 type alias Turret =
     { timeSinceLastFire : Float
+    , age : Float
     , healthAmt : Float
     , healthMax : Float
     }
@@ -301,6 +303,7 @@ init flags =
         , "images/turret.png"
         , "images/creep.png"
         , "images/tower.png"
+        , "images/seedling.png"
         ]
         |> Cmd.map Resources
     )
@@ -438,6 +441,7 @@ update msg model =
                 |> refillWater delta
                 |> makeTurretBullets delta
                 |> makePlayerBullets delta
+                |> ageTurrets delta
                 |> moveBullets delta
                 |> spawnCreeps delta
                 |> moveCreeps delta
@@ -501,6 +505,7 @@ update msg model =
                                                         { timeSinceLastFire = 0
                                                         , healthAmt = model.c.getFloat "baseHealthMax"
                                                         , healthMax = model.c.getFloat "baseHealthMax"
+                                                        , age = 0
                                                         }
                                                         m.turrets
                                             }
@@ -620,6 +625,21 @@ makePlayerBullets delta model =
         { model | timeSinceLastFire = model.timeSinceLastFire + delta }
 
 
+ageTurrets : Float -> Model -> Model
+ageTurrets delta ({ turrets } as model) =
+    let
+        newTurrets =
+            turrets
+                |> Dict.map
+                    (\_ turret ->
+                        { turret
+                            | age = turret.age + delta
+                        }
+                    )
+    in
+    { model | turrets = newTurrets }
+
+
 refillWater : Float -> Model -> Model
 refillWater delta model =
     { model
@@ -689,7 +709,7 @@ makeTurretBullets delta model =
                     (\pos turret ( bullets, turrets ) ->
                         let
                             shotBullet =
-                                if turret.timeSinceLastFire > 0.5 then
+                                if turret.age > model.c.getFloat "turretTimeToSprout" && turret.timeSinceLastFire > 0.5 then
                                     model.creeps
                                         |> List.Extra.minimumBy (\closestCreep -> Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurretPos pos))
                                         |> Maybe.andThen
@@ -1291,13 +1311,31 @@ view model =
             model.turrets
                 |> Dict.map
                     (\pos turret ->
-                        GameTwoDRender.sprite
-                            { position = tilePosToFloats pos
-                            , size = ( 1, 1 )
-                            , texture = Resources.getTexture "images/turret.png" model.resources
-                            }
+                        if turret.age >= model.c.getFloat "turretTimeToSprout" then
+                            [ GameTwoDRender.sprite
+                                { position = tilePosToFloats pos
+                                , size = ( 1, 1 )
+                                , texture = Resources.getTexture "images/turret.png" model.resources
+                                }
+                            ]
+
+                        else
+                            GameTwoDRender.sprite
+                                { position = tilePosToFloats pos
+                                , size = ( 1, 1 )
+                                , texture = Resources.getTexture "images/seedling.png" model.resources
+                                }
+                                :: viewHealthMeter
+                                    1
+                                    (tilePosToFloats pos
+                                        |> tupleToVec2
+                                        |> Vec2.add (Vec2.vec2 0.5 0.2)
+                                    )
+                                    turret.age
+                                    (model.c.getFloat "turretTimeToSprout")
                     )
                 |> Dict.values
+                |> List.concat
 
         selectedTileOutline =
             case ( model.equipped, hoveringTilePos model ) of
