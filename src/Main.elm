@@ -428,6 +428,7 @@ update msg model =
                 |> moveBullets delta
                 |> spawnCreeps delta
                 |> moveCreeps delta
+                |> applyCreepDamageToBase delta
                 |> collideBulletsWithCreeps delta
             , Cmd.none
             )
@@ -644,6 +645,26 @@ getTilesSurroundingVec2 model pos =
         |> List.filterMap (\neighborPos -> Dict.get neighborPos model.map)
 
 
+getTilePosSurroundingVec2 : Model -> Vec2 -> List TilePos
+getTilePosSurroundingVec2 model pos =
+    pos
+        |> Vec2.add (Vec2.vec2 -0.5 -0.5)
+        |> vec2ToTuple
+        |> Tuple.mapBoth round round
+        |> (\( x, y ) ->
+                [ ( x - 1, y - 1 )
+                , ( x - 1, y )
+                , ( x - 1, y + 1 )
+                , ( x, y - 1 )
+                , ( x, y )
+                , ( x, y + 1 )
+                , ( x + 1, y - 1 )
+                , ( x + 1, y )
+                , ( x + 1, y + 1 )
+                ]
+           )
+
+
 makeTurretBullets : Float -> Model -> Model
 makeTurretBullets delta model =
     let
@@ -713,6 +734,38 @@ moveCreeps delta model =
                         }
                     )
     }
+
+
+applyCreepDamageToBase : Float -> Model -> Model
+applyCreepDamageToBase delta ({ base } as model) =
+    let
+        creepDps =
+            100
+
+        dmg =
+            creepDps * (1000 * delta)
+
+        tilesToCheck =
+            base.pos
+                |> vec2FromTurretPos
+                |> getTilePosSurroundingVec2 model
+
+        numCreeps =
+            model.creeps
+                |> List.filter
+                    (\creep ->
+                        tilesToCheck
+                            |> List.member creep.pos
+                    )
+                |> List.length
+
+        newBase =
+            { base
+                | healthAmt =
+                    base.healthAmt - ((1000 * delta) * toFloat numCreeps)
+            }
+    in
+    { model | base = newBase }
 
 
 collideBulletsWithCreeps : Float -> Model -> Model
@@ -1353,6 +1406,10 @@ viewHealthMeter size pos amt max =
 
         outlineAmt =
             0.8
+
+        ratio =
+            -- Basics.max 0 (amt / max) -- can spot bugs faster without this
+            amt / max
     in
     [ drawRect
         Color.black
@@ -1362,9 +1419,9 @@ viewHealthMeter size pos amt max =
         Color.green
         (pos
             |> Vec2.add healthOffset
-            |> Vec2.add (Vec2.vec2 (size * outlineAmt * -0.5 * (1 - (amt / max))) 0)
+            |> Vec2.add (Vec2.vec2 (size * outlineAmt * -0.5 * (1 - ratio)) 0)
         )
-        (Vec2.vec2 (outlineAmt * (amt / max)) 0.1
+        (Vec2.vec2 (outlineAmt * ratio) 0.1
             |> Vec2.scale size
         )
     ]
