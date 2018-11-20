@@ -76,31 +76,46 @@ type alias Persistence =
 
 
 type alias Model =
-    { hero : Hero
+    { -- fluid things
+      hero : Hero
     , bullets : List Bullet
+    , composts : List Compost
+
+    -- fluid bldgs?
+    , particles : List Particle
+    , creeps : List Creep
+
+    -- bldgs
+    , enemyTowers : List EnemyTower
+    , turrets : Dict TilePos Turret
+    , base : Base
+
+    -- hero things
+    , timeSinceLastFire : Float
+    , waterAmt : Float
+    , waterMax : Float
+    , equipped : Equippable
+
+    -- map
+    , map : Map
+    , inv : Inv
+
+    --config
+    , config : Dict String ConfigVal
+    , isConfigOpen : Bool
+    , c : Config
+
+    -- input
     , keysPressed : Set Key
     , mousePos : Vec2
     , isMouseDown : Bool
-    , resources : Resources
-    , map : Map
-    , enemyTowers : List EnemyTower
-    , turrets : Dict TilePos Turret
-    , creeps : List Creep
-    , timeSinceLastFire : Float
-    , cache : Cache
-    , equipped : Equippable
-    , config : Dict String ConfigVal
-    , c : Config
-    , isConfigOpen : Bool
-    , waterAmt : Float
-    , waterMax : Float
-    , seed : Random.Seed
-    , base : Base
+
+    -- misc
     , gameState : GameState
-    , particles : List Particle
     , age : Float
-    , composts : List Compost
-    , inv : Inv
+    , resources : Resources
+    , seed : Random.Seed
+    , cache : Cache
     }
 
 
@@ -279,19 +294,9 @@ init flags =
             , healthMax = (makeC config).getFloat "heroHealthMax"
             }
       , bullets = []
-      , keysPressed = Set.empty
-      , mousePos = Vec2.vec2 0 0
-      , isMouseDown = False
-      , resources = Resources.init
-      , map = initMap
+      , composts = []
+      , particles = []
       , creeps = []
-      , base =
-            { pos = ( 3, -3 )
-            , healthAmt = (makeC config).getFloat "towerHealthMax"
-            , healthMax = (makeC config).getFloat "towerHealthMax"
-            }
-      , cache =
-            {}
       , enemyTowers =
             [ { pos = ( 2, -8 )
               , timeSinceLastSpawn = 9999
@@ -310,21 +315,30 @@ init flags =
               }
             ]
       , turrets = Dict.empty
+      , base =
+            { pos = ( 3, -3 )
+            , healthAmt = (makeC config).getFloat "towerHealthMax"
+            , healthMax = (makeC config).getFloat "towerHealthMax"
+            }
       , timeSinceLastFire = 0
-      , equipped = Gun
-      , config = config
       , waterAmt = 75
       , waterMax = 100
-      , isConfigOpen = isConfigOpen
-      , c = makeC config
-      , seed = Random.initialSeed (round flags.timestamp)
-      , gameState = Playing
-      , particles = []
-      , composts = []
+      , equipped = Gun
+      , map = initMap
       , inv =
             { compost = 0
             }
+      , config = config
+      , isConfigOpen = isConfigOpen
+      , c = makeC config
+      , keysPressed = Set.empty
+      , mousePos = Vec2.vec2 0 0
+      , isMouseDown = False
+      , gameState = Playing
       , age = 0
+      , resources = Resources.init
+      , seed = Random.initialSeed (round flags.timestamp)
+      , cache = {}
       }
     , Resources.loadTextures
         [ "images/grass.png"
