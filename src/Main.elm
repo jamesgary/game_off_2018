@@ -39,6 +39,7 @@ defaultPesistence =
         , ( "canvasWidth", { val = 800, min = 400, max = 1600 } )
         , ( "creepSpeed", { val = 1, min = 0, max = 2 } )
         , ( "creepHealth", { val = 100, min = 1, max = 200 } )
+        , ( "towerHealthMax", { val = 1000, min = 100, max = 5000 } )
         , ( "heroAcc", { val = 70, min = 10, max = 200 } )
         , ( "heroMaxSpeed", { val = 20, min = 10, max = 100 } )
         , ( "tilesToShowLengthwise", { val = 20, min = 10, max = 200 } )
@@ -132,11 +133,15 @@ type alias Hero =
 type alias EnemyTower =
     { pos : TilePos
     , timeSinceLastSpawn : Float
+    , healthAmt : Float
+    , healthMax : Float
     }
 
 
 type alias Turret =
     { timeSinceLastFire : Float
+    , healthAmt : Float
+    , healthMax : Float
     }
 
 
@@ -243,14 +248,18 @@ init flags =
             { heroTowerPos = ( 2, -2 )
             }
       , enemyTowers =
-            [ { pos = ( 2, -8 ), timeSinceLastSpawn = 9999 }
-            , { pos = ( 13, -4 ), timeSinceLastSpawn = 9999 }
+            [ { pos = ( 2, -8 )
+              , timeSinceLastSpawn = 9999
+              , healthAmt = (makeC config).getFloat "towerHealthMax"
+              , healthMax = (makeC config).getFloat "towerHealthMax"
+              }
+            , { pos = ( 13, -4 )
+              , timeSinceLastSpawn = 9999
+              , healthAmt = (makeC config).getFloat "towerHealthMax"
+              , healthMax = (makeC config).getFloat "towerHealthMax"
+              }
             ]
-      , turrets =
-            [ ( ( 8, -5 ), { timeSinceLastFire = 0 } )
-            ]
-                |> Dict.fromList
-                |> always Dict.empty
+      , turrets = Dict.empty
       , timeSinceLastFire = 0
       , equipped = Gun
       , config = config
@@ -463,7 +472,15 @@ update msg model =
                                 else
                                     case hoveringTileAndPos m of
                                         Just ( Grass, tilePos ) ->
-                                            { m | turrets = Dict.insert tilePos { timeSinceLastFire = 0 } m.turrets }
+                                            { m
+                                                | turrets =
+                                                    Dict.insert tilePos
+                                                        { timeSinceLastFire = 0
+                                                        , healthAmt = model.c.getFloat "towerHealthMax"
+                                                        , healthMax = model.c.getFloat "towerHealthMax"
+                                                        }
+                                                        m.turrets
+                                            }
 
                                         _ ->
                                             m
@@ -1118,13 +1135,21 @@ view model =
         enemyTowers =
             model.enemyTowers
                 |> List.map
-                    (\{ pos } ->
+                    (\enemyTower ->
                         GameTwoDRender.sprite
-                            { position = tilePosToFloats pos
+                            { position = tilePosToFloats enemyTower.pos
                             , size = ( 1, 1 )
                             , texture = Resources.getTexture "images/enemyTower.png" model.resources
                             }
+                            :: viewHealthMeter
+                                (tilePosToFloats enemyTower.pos
+                                    |> tupleToVec2
+                                    |> Vec2.add (Vec2.vec2 0.5 0.2)
+                                )
+                                enemyTower.healthAmt
+                                enemyTower.healthMax
                     )
+                |> List.concat
 
         turrets =
             model.turrets
@@ -1184,17 +1209,7 @@ view model =
                 , model.creeps
                     |> List.map
                         (\creep ->
-                            [ drawRect
-                                Color.black
-                                (vec2FromCreep creep |> Vec2.add (Vec2.vec2 0 -0.25))
-                                (Vec2.vec2 0.9 0.2)
-                            , drawRect
-                                Color.green
-                                (vec2FromCreep creep
-                                    |> Vec2.add (Vec2.vec2 (0.8 * -0.5 * (1 - (creep.healthAmt / creep.healthMax))) -0.25)
-                                )
-                                (Vec2.vec2 (0.8 * (creep.healthAmt / creep.healthMax)) 0.1)
-                            ]
+                            viewHealthMeter (vec2FromCreep creep) creep.healthAmt creep.healthMax
                         )
                     |> List.concat
                 ]
@@ -1319,9 +1334,27 @@ view model =
     }
 
 
-viewHealthMeter : Float -> Float -> Html Msg
-viewHealthMeter amt max =
-    viewMeter amt max 1
+viewHealthMeter : Vec2 -> Float -> Float -> List GameTwoDRender.Renderable
+viewHealthMeter pos amt max =
+    let
+        healthOffset =
+            Vec2.vec2 0 -0.25
+
+        outlineAmt =
+            0.8
+    in
+    [ drawRect
+        Color.black
+        (pos |> Vec2.add healthOffset)
+        (Vec2.vec2 0.9 0.2)
+    , drawRect
+        Color.green
+        (pos
+            |> Vec2.add healthOffset
+            |> Vec2.add (Vec2.vec2 (outlineAmt * -0.5 * (1 - (amt / max))) 0)
+        )
+        (Vec2.vec2 (outlineAmt * (amt / max)) 0.1)
+    ]
 
 
 viewMeter : Float -> Float -> Float -> Html Msg
