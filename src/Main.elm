@@ -99,6 +99,12 @@ type alias Model =
     , particles : List Particle
     , age : Float
     , composts : List Compost
+    , inv : Inv
+    }
+
+
+type alias Inv =
+    { compost : Int
     }
 
 
@@ -308,6 +314,9 @@ init flags =
       , isGameOver = False
       , particles = []
       , composts = []
+      , inv =
+            { compost = 0
+            }
       , age = 0
       }
     , Resources.loadTextures
@@ -467,6 +476,7 @@ update msg model =
                 |> applyCreepDamageToBase delta
                 |> applyCreepDamageToHero delta
                 |> collideBulletsWithCreeps delta
+                |> heroPickUpCompost delta
                 |> checkGameOver delta
             , Cmd.none
             )
@@ -911,6 +921,28 @@ collideBulletsWithCreeps delta model =
         , bullets = bullets
         , particles = particles
         , composts = composts
+    }
+
+
+heroPickUpCompost : Float -> Model -> Model
+heroPickUpCompost delta ({ inv } as model) =
+    let
+        newComposts =
+            model.composts
+                |> List.filter
+                    (\compost ->
+                        Vec2.distance compost.pos model.hero.pos > 1
+                    )
+
+        numPickedUp =
+            List.length model.composts - List.length newComposts
+
+        newInv =
+            { inv | compost = inv.compost + numPickedUp }
+    in
+    { model
+        | composts = newComposts
+        , inv = newInv
     }
 
 
@@ -1532,6 +1564,9 @@ view model =
             ]
             [ Html.text "Currently equipped: "
             , Html.strong [] [ Html.text (equippableStr model.equipped) ]
+            , Html.br [] []
+            , Html.text "Compost: "
+            , Html.strong [] [ Html.text (String.fromInt model.inv.compost) ]
             , Html.br [] []
             , Html.br [] []
             , Html.span [] [ Html.text "Water: " ]
