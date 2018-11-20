@@ -9,29 +9,32 @@
     </div>
     <script src="./js/main.js"></script>
     <script>
-      var config;
+      var persistence;
 
       try {
-        flags = JSON.parse(localStorage.getItem("flags"));
+        persistence = JSON.parse(localStorage.getItem("persistence"));
 
-        if (!flags) { fail() }
+        if (!persistence) { fail() }
       } catch(e) {
-        flags = null;
-        localStorage.removeItem("flags");
+        persistence = null;
+        localStorage.removeItem("persistence");
       }
 
       var app = Elm.Main.init({
         node: document.getElementById('elm'),
-        flags: flags,
+        flags: {
+          persistence: persistence,
+          timestamp: Date.now(),
+        }
       });
 
-      app.ports.saveFlags.subscribe(function(flags) {
-        console.log(flags);
-        localStorage.setItem("flags", JSON.stringify(flags));
+      app.ports.saveFlags.subscribe(function(persistence) {
+        console.log(persistence);
+        localStorage.setItem("persistence", JSON.stringify(persistence));
       });
 
       app.ports.hardReset.subscribe(function() {
-        localStorage.removeItem("flags");
+        localStorage.removeItem("persistence");
       });
 
       //(function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.body.appendChild(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='//rawgit.com/mrdoob/stats.js/master/build/stats.min.js';document.head.appendChild(script);})()

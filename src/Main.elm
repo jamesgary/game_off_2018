@@ -17,18 +17,19 @@ import Html.Events.Extra.Mouse as Mouse
 import Json.Decode as Decode
 import List.Extra
 import Math.Vector2 as Vec2 exposing (Vec2)
+import Random
 import Round
 import Set exposing (Set)
 
 
-port saveFlags : Maybe Flags -> Cmd msg
+port saveFlags : Persistence -> Cmd msg
 
 
 port hardReset : () -> Cmd msg
 
 
-defaultFlags : Flags
-defaultFlags =
+defaultPesistence : Persistence
+defaultPesistence =
     { isConfigOpen = False
     , config =
         [ ( "bulletMaxAge", { val = 2, min = 0, max = 5 } )
@@ -58,6 +59,12 @@ main =
 
 
 type alias Flags =
+    { timestamp : Float
+    , persistence : Maybe Persistence
+    }
+
+
+type alias Persistence =
     { isConfigOpen : Bool
     , config : List ( String, ConfigVal )
     }
@@ -82,6 +89,7 @@ type alias Model =
     , isConfigOpen : Bool
     , waterAmt : Float
     , waterMax : Float
+    , seed : Random.Seed
     }
 
 
@@ -102,8 +110,7 @@ type alias Creep =
     , diagonal : Bool
     , healthAmt : Float
     , healthMax : Float
-
-    --, offset : Vec2
+    , offset : Vec2
     }
 
 
@@ -206,19 +213,19 @@ makeC config =
     }
 
 
-init : Maybe Flags -> ( Model, Cmd Msg )
+init : Flags -> ( Model, Cmd Msg )
 init flags =
     let
         ( config, isConfigOpen ) =
-            case flags of
-                Just f ->
-                    ( Dict.fromList f.config
-                    , f.isConfigOpen
+            case flags.persistence of
+                Just p ->
+                    ( Dict.fromList p.config
+                    , p.isConfigOpen
                     )
 
                 Nothing ->
-                    ( Dict.fromList defaultFlags.config
-                    , defaultFlags.isConfigOpen
+                    ( Dict.fromList defaultPesistence.config
+                    , defaultPesistence.isConfigOpen
                     )
     in
     ( { hero =
@@ -251,6 +258,7 @@ init flags =
       , waterMax = 100
       , isConfigOpen = isConfigOpen
       , c = makeC config
+      , seed = Random.initialSeed (round flags.timestamp)
       }
     , Resources.loadTextures
         [ "images/grass.png"
@@ -495,31 +503,30 @@ update msg model =
                         , c = makeC newConfig
                     }
             in
-            ( newModel, saveFlags (modelToFlags newModel) )
+            ( newModel, saveFlags (modelToPersistence newModel) )
 
         ToggleConfig shouldOpen ->
             let
                 newModel =
                     { model | isConfigOpen = shouldOpen }
             in
-            ( newModel, saveFlags (modelToFlags newModel) )
+            ( newModel, saveFlags (modelToPersistence newModel) )
 
         HardReset ->
             ( { model
                 | isConfigOpen = True
-                , config = Dict.fromList defaultFlags.config
-                , c = makeC (Dict.fromList defaultFlags.config)
+                , config = Dict.fromList defaultPesistence.config
+                , c = makeC (Dict.fromList defaultPesistence.config)
               }
             , hardReset ()
             )
 
 
-modelToFlags : Model -> Maybe Flags
-modelToFlags model =
-    Just
-        { isConfigOpen = model.isConfigOpen
-        , config = Dict.toList model.config
-        }
+modelToPersistence : Model -> Persistence
+modelToPersistence model =
+    { isConfigOpen = model.isConfigOpen
+    , config = Dict.toList model.config
+    }
 
 
 hoveringTileAndPos : Model -> Maybe ( Tile, TilePos )
@@ -691,7 +698,7 @@ collideBulletsWithCreeps delta model =
             model.bullets
                 |> List.foldl
                     (\bullet ( shotBullets, creepsRemaining ) ->
-                        case List.Extra.splitWhen (\creep -> collidesWith ( bullet.pos, 0.2 ) ( vec2FromCreep creep, 0.5 )) creepsRemaining of
+                        case List.Extra.splitWhen (\creep -> collidesWith ( bullet.pos, 0.1 ) ( vec2FromCreep creep, 0.5 )) creepsRemaining of
                             Just ( firstHalf, foundCreep :: secondHalf ) ->
                                 let
                                     newCreep =
@@ -764,45 +771,50 @@ canPhysicallyPlaceTurretOnMap model =
 spawnCreeps : Float -> Model -> Model
 spawnCreeps delta model =
     let
-        newEnemyTowersAndCreeps =
+        ( newEnemyTowers, newCreeps, newSeed ) =
             model.enemyTowers
-                |> List.map
-                    (\enemyTower ->
+                |> List.foldl
+                    (\enemyTower ( enemyTowers, creeps, seed ) ->
                         if enemyTower.timeSinceLastSpawn + delta > 1.8 then
                             let
                                 nextPos =
                                     findNextTileTowards model enemyTower.pos model.cache.heroTowerPos
+
+                                ( offset, newSeed2 ) =
+                                    Random.step (vec2OffsetGenerator -0.5 0.5) model.seed
                             in
-                            ( { enemyTower | timeSinceLastSpawn = 0 }
-                            , [ { pos = enemyTower.pos
-                                , nextPos = nextPos
-                                , progress = 0
-                                , diagonal = isDiagonal enemyTower.pos nextPos
-                                , healthAmt = model.c.getFloat "creepHealth"
-                                , healthMax = model.c.getFloat "creepHealth"
-                                }
-                              ]
+                            ( { enemyTower | timeSinceLastSpawn = 0 } :: enemyTowers
+                            , { pos = enemyTower.pos
+                              , nextPos = nextPos
+                              , progress = 0
+                              , diagonal = isDiagonal enemyTower.pos nextPos
+                              , healthAmt = model.c.getFloat "creepHealth"
+                              , healthMax = model.c.getFloat "creepHealth"
+                              , offset = offset
+                              }
+                                :: creeps
+                            , newSeed2
                             )
 
                         else
-                            ( { enemyTower | timeSinceLastSpawn = enemyTower.timeSinceLastSpawn + delta }
-                            , []
+                            ( { enemyTower | timeSinceLastSpawn = enemyTower.timeSinceLastSpawn + delta } :: enemyTowers
+                            , creeps
+                            , seed
                             )
                     )
-
-        newEnemyTowers =
-            newEnemyTowersAndCreeps
-                |> List.map Tuple.first
-
-        newCreeps =
-            newEnemyTowersAndCreeps
-                |> List.map Tuple.second
-                |> List.concat
+                    ( [], [], model.seed )
     in
     { model
         | enemyTowers = newEnemyTowers
         , creeps = List.append newCreeps model.creeps
+        , seed = newSeed
     }
+
+
+vec2OffsetGenerator : Float -> Float -> Random.Generator Vec2
+vec2OffsetGenerator min max =
+    Random.pair (Random.float min max) (Random.float min max)
+        |> Random.map tupleToVec2
 
 
 moveHero : Float -> Model -> Model
@@ -1161,11 +1173,9 @@ view model =
                         (\creep ->
                             GameTwoDRender.sprite
                                 { position =
-                                    tilePosSub creep.nextPos creep.pos
-                                        |> tilePosToFloats
-                                        |> tupleToVec2
-                                        |> Vec2.scale creep.progress
-                                        |> Vec2.add (creep.pos |> tilePosToFloats |> tupleToVec2)
+                                    creep
+                                        |> vec2FromCreep
+                                        |> Vec2.add (Vec2.vec2 -0.5 -0.5)
                                         |> vec2ToTuple
                                 , size = ( 1, 1 )
                                 , texture = Resources.getTexture "images/creep.png" model.resources
@@ -1401,6 +1411,7 @@ vec2FromCreep creep =
         |> tupleToVec2
         |> Vec2.scale creep.progress
         |> Vec2.add (creep.pos |> tilePosToFloats |> tupleToVec2)
+        |> Vec2.add creep.offset
         |> Vec2.add (Vec2.vec2 0.5 0.5)
 
 
