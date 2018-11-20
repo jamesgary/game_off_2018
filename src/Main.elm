@@ -20,6 +20,7 @@ import Math.Vector2 as Vec2 exposing (Vec2)
 import Random
 import Round
 import Set exposing (Set)
+import WebGL
 
 
 port saveFlags : Persistence -> Cmd msg
@@ -115,7 +116,7 @@ type alias Compost =
 
 
 type Particle
-    = BulletHitCreep Vec2 Float
+    = BulletHitCreep Vec2 Float Float
 
 
 type alias Config =
@@ -877,7 +878,7 @@ applyCreepDamageToHero delta ({ hero } as model) =
 collideBulletsWithCreeps : Float -> Model -> Model
 collideBulletsWithCreeps delta model =
     let
-        { particles, bullets, creeps, composts } =
+        { particles, bullets, creeps, composts, seed } =
             model.bullets
                 |> List.foldl
                     (\bullet tmp ->
@@ -886,8 +887,13 @@ collideBulletsWithCreeps delta model =
                                 let
                                     newCreep =
                                         { foundCreep | healthAmt = foundCreep.healthAmt - model.c.getFloat "bulletDmg" }
+
+                                    ( angle, newSeed ) =
+                                        Random.step
+                                            (Random.float 0 (2 * pi))
+                                            tmp.seed
                                 in
-                                { particles = BulletHitCreep bullet.pos 0 :: tmp.particles
+                                { particles = BulletHitCreep bullet.pos angle 0 :: tmp.particles
                                 , bullets = tmp.bullets
                                 , creeps =
                                     if newCreep.healthAmt > 0 then
@@ -901,6 +907,7 @@ collideBulletsWithCreeps delta model =
 
                                     else
                                         { pos = vec2FromCreep foundCreep, age = 0 } :: tmp.composts
+                                , seed = newSeed
                                 }
 
                             _ ->
@@ -908,12 +915,14 @@ collideBulletsWithCreeps delta model =
                                 , bullets = bullet :: tmp.bullets
                                 , creeps = tmp.creeps
                                 , composts = tmp.composts
+                                , seed = tmp.seed
                                 }
                     )
                     { particles = model.particles
                     , bullets = []
                     , creeps = model.creeps
                     , composts = model.composts
+                    , seed = model.seed
                     }
     in
     { model
@@ -921,6 +930,7 @@ collideBulletsWithCreeps delta model =
         , bullets = bullets
         , particles = particles
         , composts = composts
+        , seed = seed
     }
 
 
@@ -1054,9 +1064,9 @@ ageParticles delta model =
                 |> List.filterMap
                     (\particle ->
                         case particle of
-                            BulletHitCreep pos age ->
+                            BulletHitCreep pos angle age ->
                                 if age + delta < 1 then
-                                    Just (BulletHitCreep pos (age + delta))
+                                    Just (BulletHitCreep pos angle (age + delta))
 
                                 else
                                     Nothing
@@ -1498,13 +1508,14 @@ view model =
                 |> List.map
                     (\particle ->
                         case particle of
-                            BulletHitCreep pos age ->
+                            BulletHitCreep pos angle age ->
                                 let
                                     makeUniforms { cameraProj, transform, time } =
                                         { cameraProj = cameraProj
                                         , transform = transform
                                         , time = time
                                         , age = age
+                                        , angle = angle
                                         }
 
                                     size =
@@ -1512,37 +1523,12 @@ view model =
 
                                     render =
                                         GameTwoDRender.customFragment makeUniforms
-                                            { fragmentShader = frag
+                                            { fragmentShader = bulletHitFrag
                                             , position = ( Vec2.getX pos - (0.5 * size), Vec2.getY pos - (0.5 * size), 0 )
                                             , size = ( size, size )
                                             , rotation = 0
                                             , pivot = ( 0, 0 )
                                             }
-
-                                    frag =
-                                        [glsl|
-                                          precision mediump float;
-
-                                          varying vec2 vcoord;
-                                          uniform float age;
-
-                                          void main () {
-                                            float maxAge = 0.3;
-                                            float ageProgress = age / maxAge;
-                                            float radius = 0.1 + (0.15 * ageProgress);
-                                            float dist = length(vec2(0.5, 0.5) - vcoord);
-
-                                            float alpha = smoothstep(radius - 0.01, radius, dist);
-                                            vec4 color = vec4(
-                                              (1.0 * ageProgress) + 0.4,
-                                              (1.0 * ageProgress) + 0.4,
-                                              (1.0 * ageProgress) + 1.0,
-                                              (1.0 - alpha) * (1.0 - age / maxAge)
-                                            );
-
-                                            gl_FragColor = color;
-                                          }
-                                        |]
                                 in
                                 render
                     )
@@ -1595,8 +1581,7 @@ view model =
                     , composts
                     , hero
                     , creeps
-
-                    --, particles
+                    , particles
                     , model.bullets
                         |> List.map (\bullet -> drawCircle Color.darkBlue bullet.pos 0.3)
                     , selectedTileOutline
@@ -1694,6 +1679,36 @@ view model =
             ]
         ]
     }
+
+
+bulletHitFrag : WebGL.Shader a { b | age : Float, angle : Float } { vcoord : Vec2 }
+bulletHitFrag =
+    [glsl|
+      precision mediump float;
+
+      varying vec2 vcoord;
+      uniform float age;
+      uniform float angle;
+
+      void main () {
+        float maxAge = 0.4;
+        float ageProgress = age / maxAge;
+        float radius = 0.04 + (0.07 * ageProgress);
+        //vec2  pos = vec2(0.5, (0.5 + (0.2 * ageProgress)));
+        vec2  pos = vec2(0.5 + 0.2 * ageProgress * sin(angle), 0.5 + 0.2 * ageProgress * cos(angle));
+        float dist = length(pos - vcoord);
+
+        float alpha = smoothstep(radius - 0.01, radius, dist);
+        vec4 color = vec4(
+          (1.0 * ageProgress) + 0.4,
+          (1.0 * ageProgress) + 0.4,
+          (1.0 * ageProgress) + 1.0,
+          (1.0 - alpha) * (1.0 - age / maxAge)
+        );
+
+        gl_FragColor = color;
+      }
+    |]
 
 
 viewHealthMeter : Float -> Vec2 -> Float -> Float -> List GameTwoDRender.Renderable
