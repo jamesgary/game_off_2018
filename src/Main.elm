@@ -258,12 +258,23 @@ update msg model =
             )
 
         Tick delta ->
-            ( model, Cmd.none )
+            ( case model.state of
+                MapEditor mapEditorModel ->
+                    { model
+                        | state =
+                            MapEditor
+                                (MapEditor.update (MapEditor.Tick delta) session mapEditorModel)
+                    }
+
+                _ ->
+                    model
+            , Cmd.none
+            )
 
         MapEditorMsg mapEditorMsg ->
             ( case model.state of
                 MapEditor mapEditorModel ->
-                    { model | state = MapEditor (MapEditor.update mapEditorMsg mapEditorModel) }
+                    { model | state = MapEditor (MapEditor.update mapEditorMsg session mapEditorModel) }
 
                 _ ->
                     model
@@ -298,7 +309,8 @@ subscriptions model =
                             []
 
                 MapEditor mapEditorModel ->
-                    []
+                    [ Browser.Events.onAnimationFrameDelta Tick
+                    ]
             )
         ]
 

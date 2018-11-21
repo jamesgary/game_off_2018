@@ -10,21 +10,27 @@ import Html exposing (Html)
 import Html.Attributes
 import Html.Events.Extra.Mouse as Mouse
 import Math.Vector2 as Vec2 exposing (Vec2)
+import Set exposing (Set)
 
 
-type Msg
-    = MouseMove ( Float, Float )
-    | MouseDown
-    | MouseUp
+type
+    Msg
+    --= MouseMove ( Float, Float )
+    --| MouseDown
+    --| MouseUp
+    = Tick Float
 
 
 type alias Model =
-    { map : Map }
+    { map : Map
+    , center : Vec2
+    }
 
 
 init : Session -> Model
 init session =
     { map = initMap
+    , center = Vec2.vec2 3 -3
     }
 
 
@@ -92,17 +98,57 @@ initMap =
         |> Dict.fromList
 
 
-update : Msg -> Model -> Model
-update msg model =
-    model
+update : Msg -> Session -> Model -> Model
+update msg session model =
+    case msg of
+        Tick delta ->
+            { model
+                | center =
+                    Vec2.add
+                        model.center
+                        (Vec2.scale 0.2 (heroDirInput session.keysPressed))
+            }
+
+
+heroDirInput : Set Key -> Vec2
+heroDirInput keysPressed =
+    { x =
+        if
+            Set.member "ArrowLeft" keysPressed
+                || Set.member "a" keysPressed
+        then
+            -1
+
+        else if
+            Set.member "ArrowRight" keysPressed
+                || Set.member "d" keysPressed
+        then
+            1
+
+        else
+            0
+    , y =
+        if
+            Set.member "ArrowUp" keysPressed
+                || Set.member "w" keysPressed
+        then
+            1
+
+        else if
+            Set.member "ArrowDown" keysPressed
+                || Set.member "s" keysPressed
+        then
+            -1
+
+        else
+            0
+    }
+        |> Vec2.fromRecord
 
 
 view : Session -> Model -> Html Msg
 view session model =
     let
-        center =
-            Vec2.vec2 5 -3
-
         tileSize =
             32
 
@@ -124,9 +170,10 @@ view session model =
             , Html.Attributes.style "position" "relative"
             , Html.Attributes.style "margin" "0"
             , Html.Attributes.style "font-size" "0"
-            , Mouse.onDown (\_ -> MouseDown)
-            , Mouse.onUp (\_ -> MouseUp)
-            , Mouse.onMove (\event -> MouseMove event.offsetPos)
+
+            --, Mouse.onDown (\_ -> MouseDown)
+            --, Mouse.onUp (\_ -> MouseUp)
+            --, Mouse.onMove (\event -> MouseMove event.offsetPos)
             ]
             [ GameTwoD.render
                 { time = 0
@@ -137,19 +184,16 @@ view session model =
                 , camera =
                     GameTwoDCamera.fixedArea
                         (tilesAcross * tilesVert)
-                        ( Vec2.getX center, Vec2.getY center )
+                        ( Vec2.getX model.center, Vec2.getY model.center )
                 }
-                (drawMap ( tilesAcross, tilesVert ) session model)
+                (drawMap model.center ( tilesAcross, tilesVert ) session model)
             ]
         ]
 
 
-drawMap : ( Float, Float ) -> Session -> Model -> List GameTwoDRender.Renderable
-drawMap ( numTilesLengthwise, numTilesHeightwise ) session model =
+drawMap : Vec2 -> ( Float, Float ) -> Session -> Model -> List GameTwoDRender.Renderable
+drawMap center ( numTilesLengthwise, numTilesHeightwise ) session model =
     let
-        center =
-            Vec2.vec2 0 0
-
         left =
             (Vec2.getX center
                 - (0.5 * numTilesLengthwise)
