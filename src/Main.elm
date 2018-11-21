@@ -2,6 +2,7 @@ port module Main exposing (main)
 
 import Browser
 import Browser.Events
+import Common exposing (..)
 import Dict exposing (Dict)
 import Game
 import Game.Resources as Resources exposing (Resources)
@@ -10,6 +11,7 @@ import Html.Attributes
 import Html.Events
 import Html.Events.Extra.Mouse as Mouse
 import Json.Decode as Decode
+import MapEditor
 import Math.Vector2 as Vec2 exposing (Vec2)
 import Random
 import Set exposing (Set)
@@ -63,44 +65,7 @@ type alias Model =
 
 type AppState
     = Game Game.Model
-    | MapEditor
-
-
-type alias Session =
-    { configFloats : Dict String ConfigFloat
-    , c : Config
-    , isConfigOpen : Bool
-
-    -- input
-    , keysPressed : Set Key
-    , mousePos : Vec2
-    , isMouseDown : Bool
-
-    -- misc
-    , resources : Resources
-    , seed : Random.Seed
-    }
-
-
-type alias Config =
-    { getFloat : String -> Float
-    }
-
-
-type alias Flags =
-    { timestamp : Int
-    , persistence : Maybe Persistence
-    }
-
-
-type alias Persistence =
-    { isConfigOpen : Bool
-    , configFloats : List ( String, ConfigFloat )
-    }
-
-
-type alias Key =
-    String
+    | MapEditor MapEditor.Model
 
 
 type Msg
@@ -114,6 +79,7 @@ type Msg
     | ChangeConfig String String
     | ToggleConfig Bool
     | HardReset
+    | MapEditorMsg MapEditor.Msg
 
 
 makeC : Dict String ConfigFloat -> Config
@@ -176,7 +142,7 @@ init flags =
         session =
             sessionFromFlags flags
     in
-    ( { state = MapEditor --Game.init session
+    ( { state = MapEditor (MapEditor.init session) --Game.init session
       , session = session
       }
     , Resources.loadTextures
@@ -194,13 +160,6 @@ init flags =
         ]
         |> Cmd.map Resources
     )
-
-
-type alias ConfigFloat =
-    { val : Float
-    , min : Float
-    , max : Float
-    }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -296,6 +255,16 @@ update msg model =
         Tick delta ->
             ( model, Cmd.none )
 
+        MapEditorMsg mapEditorMsg ->
+            ( case model.state of
+                MapEditor mapEditorModel ->
+                    { model | state = MapEditor (MapEditor.update mapEditorMsg mapEditorModel) }
+
+                _ ->
+                    model
+            , Cmd.none
+            )
+
 
 modelToPersistence : Model -> Persistence
 modelToPersistence model =
@@ -323,7 +292,7 @@ subscriptions model =
                         Game.Win ->
                             []
 
-                MapEditor ->
+                MapEditor mapEditorModel ->
                     []
             )
         ]
@@ -332,8 +301,9 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
     case model.state of
-        Game gameData ->
+        Game gameModel ->
             Html.text "game!"
 
-        MapEditor ->
-            Html.text "Map Editor"
+        MapEditor mapModel ->
+            MapEditor.view model.session mapModel
+                |> Html.map MapEditorMsg
