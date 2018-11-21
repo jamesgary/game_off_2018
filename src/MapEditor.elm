@@ -113,31 +113,13 @@ update msg session model =
             }
 
         MouseMove ( x, y ) ->
-            let
-                viewportWidth =
-                    session.windowWidth
-
-                viewportHeight =
-                    session.windowHeight
-
-                tilesAcross =
-                    viewportWidth / model.tileSize
-
-                tilesVert =
-                    viewportHeight / model.tileSize
-            in
             { model
                 | hoveringTile =
                     GameTwoDCamera.viewportToGameCoordinates
                         (getCamera session model)
                         ( round session.windowWidth, round session.windowHeight )
-                        (model.center
-                            |> Vec2.add (Vec2.vec2 x y)
-                            |> vec2ToTuple
-                            |> Tuple.mapBoth round round
-                        )
-                        |> (\( xx, yy ) -> ( xx - 0.5, yy - 0.5 ))
-                        |> Tuple.mapBoth round round
+                        ( round x, round y )
+                        |> (\( xx, yy ) -> ( round <| xx - 0.5, round <| yy - 0.5 ))
                         |> Just
             }
 
@@ -145,17 +127,11 @@ update msg session model =
 getCamera : Session -> Model -> GameTwoDCamera.Camera
 getCamera session model =
     let
-        viewportWidth =
-            session.windowWidth
-
-        viewportHeight =
-            session.windowHeight
-
         tilesAcross =
-            viewportWidth / model.tileSize
+            session.windowWidth / model.tileSize
 
         tilesVert =
-            viewportHeight / model.tileSize
+            session.windowHeight / model.tileSize
     in
     GameTwoDCamera.fixedArea
         (tilesAcross * tilesVert)
@@ -200,19 +176,6 @@ heroDirInput keysPressed =
 
 view : Session -> Model -> Html Msg
 view session model =
-    let
-        viewportWidth =
-            session.windowWidth
-
-        viewportHeight =
-            session.windowHeight
-
-        tilesAcross =
-            viewportWidth / model.tileSize
-
-        tilesVert =
-            viewportHeight / model.tileSize
-    in
     Html.div []
         [ Html.div
             [ Html.Attributes.style "display" "inline-block"
@@ -227,16 +190,13 @@ view session model =
             [ GameTwoD.render
                 { time = 0
                 , size =
-                    ( round viewportWidth
-                    , round viewportHeight
+                    ( round session.windowWidth
+                    , round session.windowHeight
                     )
-                , camera =
-                    GameTwoDCamera.fixedArea
-                        (tilesAcross * tilesVert)
-                        ( Vec2.getX model.center, Vec2.getY model.center )
+                , camera = getCamera session model
                 }
                 (List.concat
-                    [ drawMap model.center ( tilesAcross, tilesVert ) session model
+                    [ drawMap model.center session model
                     , drawSelectedTileOutline session model
                     ]
                 )
@@ -244,38 +204,39 @@ view session model =
         ]
 
 
-getGameCoordinates : GameTwoDCamera.Camera -> ( Int, Int ) -> ( Int, Int ) -> ( Float, Float )
-getGameCoordinates camera ( elementWidth, elementHeight ) ( x, y ) =
-    ( 1, 2 )
-
-
-drawMap : Vec2 -> ( Float, Float ) -> Session -> Model -> List GameTwoDRender.Renderable
-drawMap center ( numTilesLengthwise, numTilesHeightwise ) session model =
+drawMap : Vec2 -> Session -> Model -> List GameTwoDRender.Renderable
+drawMap center session model =
     let
+        tilesAcross =
+            session.windowWidth / model.tileSize
+
+        tilesVert =
+            session.windowHeight / model.tileSize
+
         left =
             (Vec2.getX center
-                - (0.5 * numTilesLengthwise)
+                - (0.5 * tilesAcross)
                 |> floor
             )
                 - 1
 
         right =
             (Vec2.getX center
-                + (0.5 * numTilesLengthwise)
+                + (0.5 * tilesAcross)
                 |> ceiling
             )
                 + 1
 
         bot =
             (Vec2.getY center
-                - (0.5 * numTilesHeightwise)
+                - (0.5 * tilesVert)
                 |> floor
             )
                 - 1
 
         top =
             (Vec2.getY center
-                + (0.5 * numTilesHeightwise)
+                + (0.5 * tilesVert)
                 |> ceiling
             )
                 + 1
@@ -326,13 +287,10 @@ drawSelectedTileOutline : Session -> Model -> List GameTwoDRender.Renderable
 drawSelectedTileOutline session model =
     case model.hoveringTile of
         Just ( x, y ) ->
-            [ GameTwoDRender.spriteWithOptions
-                { position = ( toFloat x, toFloat y, 0 )
+            [ GameTwoDRender.sprite
+                { position = ( toFloat x, toFloat y )
                 , size = ( 1, 1 )
                 , texture = GameResources.getTexture "images/selectedTile.png" session.resources
-                , rotation = 0
-                , pivot = ( 0, 0 )
-                , tiling = ( 1, 1 )
                 }
             ]
 
