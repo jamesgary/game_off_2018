@@ -8,6 +8,7 @@ import Game.TwoD.Camera as GameTwoDCamera exposing (Camera)
 import Game.TwoD.Render as GameTwoDRender
 import Html exposing (Html)
 import Html.Attributes
+import Html.Events
 import Html.Events.Extra.Mouse as Mouse
 import Math.Vector2 as Vec2 exposing (Vec2)
 import Set exposing (Set)
@@ -15,8 +16,9 @@ import Set exposing (Set)
 
 type Msg
     = MouseMove ( Float, Float )
-      --| MouseDown
-      --| MouseUp
+    | MouseDown
+    | MouseUp
+    | ChooseTool Tool
     | Tick Float
 
 
@@ -25,7 +27,14 @@ type alias Model =
     , center : Vec2
     , hoveringTile : Maybe TilePos
     , tileSize : Float
+    , isMouseDown : Bool
+    , currentTool : Tool
     }
+
+
+type Tool
+    = WaterTool
+    | GrassTool
 
 
 init : Session -> Model
@@ -34,6 +43,8 @@ init session =
     , center = Vec2.vec2 3 -3
     , hoveringTile = Nothing
     , tileSize = 32
+    , isMouseDown = False
+    , currentTool = GrassTool
     }
 
 
@@ -113,15 +124,45 @@ update msg session model =
             }
 
         MouseMove ( x, y ) ->
-            { model
-                | hoveringTile =
+            let
+                hoveringTile =
                     GameTwoDCamera.viewportToGameCoordinates
                         (getCamera session model)
                         ( round session.windowWidth, round session.windowHeight )
                         ( round x, round y )
                         |> (\( xx, yy ) -> ( round <| xx - 0.5, round <| yy - 0.5 ))
                         |> Just
+
+                map =
+                    case ( model.isMouseDown, model.hoveringTile ) of
+                        ( True, Just tilePos ) ->
+                            let
+                                newTile =
+                                    case model.currentTool of
+                                        WaterTool ->
+                                            Water
+
+                                        GrassTool ->
+                                            Grass
+                            in
+                            Dict.insert tilePos newTile model.map
+
+                        _ ->
+                            model.map
+            in
+            { model
+                | hoveringTile = hoveringTile
+                , map = map
             }
+
+        MouseDown ->
+            { model | isMouseDown = True }
+
+        MouseUp ->
+            { model | isMouseDown = False }
+
+        ChooseTool tool ->
+            { model | currentTool = tool }
 
 
 getCamera : Session -> Model -> GameTwoDCamera.Camera
@@ -182,9 +223,8 @@ view session model =
             , Html.Attributes.style "position" "relative"
             , Html.Attributes.style "margin" "0"
             , Html.Attributes.style "font-size" "0"
-
-            --, Mouse.onDown (\_ -> MouseDown)
-            --, Mouse.onUp (\_ -> MouseUp)
+            , Mouse.onDown (\_ -> MouseDown)
+            , Mouse.onUp (\_ -> MouseUp)
             , Mouse.onMove (\event -> MouseMove event.offsetPos)
             ]
             [ GameTwoD.render
@@ -217,10 +257,24 @@ drawToolbox session model =
         , Html.Attributes.style "background" "#eee"
         , Html.Attributes.style "border" "2px outset white"
         ]
-        [ Html.button [] [ Html.text "WATER" ]
+        [ toolBtn model.currentTool WaterTool "Water"
         , Html.br [] []
-        , Html.button [] [ Html.text "LAND" ]
+        , toolBtn model.currentTool GrassTool "Grass"
         ]
+
+
+toolBtn : Tool -> Tool -> String -> Html Msg
+toolBtn currentTool tool label =
+    Html.button
+        [ Html.Events.onClick (ChooseTool tool)
+        , Html.Attributes.style "outline" "none"
+        , if currentTool == tool then
+            Html.Attributes.style "background" "#ccc"
+
+          else
+            Html.Attributes.style "background" "#fff"
+        ]
+        [ Html.text label ]
 
 
 drawMap : Vec2 -> Session -> Model -> List GameTwoDRender.Renderable
