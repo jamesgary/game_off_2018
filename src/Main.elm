@@ -268,11 +268,8 @@ type Msg
 
 dlog : String -> a -> a
 dlog str val =
+    --Debug.log str val
     val
-
-
-
---Debug.log str val
 
 
 makeC : Dict String ConfigVal -> Config
@@ -1567,8 +1564,8 @@ drawRect color pos size =
         }
 
 
-isTilePosVisible : TilePos -> Model -> Bool
-isTilePosVisible ( x, y ) model =
+drawMap : Model -> List GameTwoDRender.Renderable
+drawMap model =
     let
         left =
             (Vec2.getX model.hero.pos
@@ -1598,50 +1595,53 @@ isTilePosVisible ( x, y ) model =
             )
                 + 1
     in
-    (x > left) && (x < right) && (y > bot) && (y < top)
+    List.range left right
+        |> List.map
+            (\x ->
+                List.range bot top
+                    |> List.map
+                        (\y ->
+                            case Dict.get ( x, y ) model.map of
+                                Just Grass ->
+                                    Just
+                                        (GameTwoDRender.sprite
+                                            { position = tilePosToFloats ( x, y )
+                                            , size = ( 1, 1 )
+                                            , texture = Resources.getTexture "images/grass.png" model.resources
+                                            }
+                                        )
+
+                                Just Water ->
+                                    Just
+                                        (GameTwoDRender.sprite
+                                            { position = tilePosToFloats ( x, y )
+                                            , size = ( 1, 1 )
+                                            , texture = Resources.getTexture "images/water.png" model.resources
+                                            }
+                                        )
+
+                                Just Poop ->
+                                    Just
+                                        (GameTwoDRender.sprite
+                                            { position = tilePosToFloats ( x, y )
+                                            , size = ( 1, 1 )
+                                            , texture = Nothing
+                                            }
+                                        )
+
+                                Nothing ->
+                                    Nothing
+                        )
+                    |> List.filterMap identity
+            )
+        |> List.concat
 
 
 view : Model -> Html Msg
 view model =
     let
         map =
-            model.map
-                |> Dict.toList
-                |> List.map
-                    (\( tilePos, tile ) ->
-                        if isTilePosVisible tilePos model then
-                            case tile of
-                                Grass ->
-                                    Just
-                                        (GameTwoDRender.sprite
-                                            { position = tilePosToFloats tilePos
-                                            , size = ( 1, 1 )
-                                            , texture = Resources.getTexture "images/grass.png" model.resources
-                                            }
-                                        )
-
-                                Water ->
-                                    Just
-                                        (GameTwoDRender.sprite
-                                            { position = tilePosToFloats tilePos
-                                            , size = ( 1, 1 )
-                                            , texture = Resources.getTexture "images/water.png" model.resources
-                                            }
-                                        )
-
-                                Poop ->
-                                    Just
-                                        (GameTwoDRender.sprite
-                                            { position = tilePosToFloats tilePos
-                                            , size = ( 1, 1 )
-                                            , texture = Nothing
-                                            }
-                                        )
-
-                        else
-                            Nothing
-                    )
-                |> List.filterMap identity
+            drawMap model
 
         hero =
             drawRect
