@@ -1,7 +1,7 @@
-module Common exposing (Config, ConfigFloat, Flags, Key, Map, Persistence, Session, Tile(..), TilePos, tilePosToFloats, tilesToShowHeightwise)
+module Common exposing (Config, ConfigFloat, Flags, Key, Map, Persistence, PlacementAvailability(..), Session, Tile(..), TilePos, tilePosToFloats, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
 
 import Dict exposing (Dict)
-import Game.Resources as Resources exposing (Resources)
+import Game.Resources as GameResources exposing (Resources)
 import Math.Vector2 as Vec2 exposing (Vec2)
 import Random
 import Set exposing (Set)
@@ -14,8 +14,6 @@ type alias Session =
 
     -- input
     , keysPressed : Set Key
-    , mousePos : Vec2
-    , isMouseDown : Bool
 
     -- browser
     , windowWidth : Float
@@ -83,3 +81,22 @@ tilesToShowHeightwise c =
 tilePosToFloats : TilePos -> ( Float, Float )
 tilePosToFloats ( col, row ) =
     ( toFloat col, toFloat row )
+
+
+type PlacementAvailability
+    = Shouldnt
+    | Cant
+    | Can
+
+
+tupleToVec2 : ( Float, Float ) -> Vec2
+tupleToVec2 ( x, y ) =
+    { x = x, y = y }
+        |> Vec2.fromRecord
+
+
+vec2ToTuple : Vec2 -> ( Float, Float )
+vec2ToTuple vec2 =
+    vec2
+        |> Vec2.toRecord
+        |> (\{ x, y } -> ( x, y ))

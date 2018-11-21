@@ -71,9 +71,6 @@ type AppState
 type Msg
     = KeyDown String
     | KeyUp String
-    | MouseDown
-    | MouseUp
-    | MouseMove ( Float, Float )
     | Tick Float
     | Resources Resources.Msg
     | ChangeConfig String String
@@ -128,8 +125,6 @@ sessionFromFlags flags =
 
     -- input
     , keysPressed = Set.empty
-    , mousePos = Vec2.vec2 0 0
-    , isMouseDown = False
 
     --browser
     , windowWidth = flags.windowWidth
@@ -181,25 +176,6 @@ update msg model =
 
         KeyDown str ->
             ( { model | session = { session | keysPressed = Set.insert str session.keysPressed } }
-            , Cmd.none
-            )
-
-        MouseMove ( mouseX, mouseY ) ->
-            let
-                mousePos =
-                    Vec2.vec2 mouseX mouseY
-            in
-            ( { model | session = { session | mousePos = mousePos } }
-            , Cmd.none
-            )
-
-        MouseDown ->
-            ( { model | session = { session | isMouseDown = True } }
-            , Cmd.none
-            )
-
-        MouseUp ->
-            ( { model | session = { session | isMouseDown = False } }
             , Cmd.none
             )
 
@@ -293,6 +269,7 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ Browser.Events.onKeyDown (Decode.map KeyDown (Decode.field "key" Decode.string))
+        , Browser.Events.onKeyUp (Decode.map KeyUp (Decode.field "key" Decode.string))
         , Browser.Events.onKeyUp (Decode.map KeyUp (Decode.field "key" Decode.string))
         , Sub.batch
             (case model.state of

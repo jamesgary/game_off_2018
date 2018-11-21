@@ -13,17 +13,18 @@ import Math.Vector2 as Vec2 exposing (Vec2)
 import Set exposing (Set)
 
 
-type
-    Msg
-    --= MouseMove ( Float, Float )
-    --| MouseDown
-    --| MouseUp
-    = Tick Float
+type Msg
+    = MouseMove ( Float, Float )
+      --| MouseDown
+      --| MouseUp
+    | Tick Float
 
 
 type alias Model =
     { map : Map
     , center : Vec2
+    , hoveringTile : Maybe TilePos
+    , tileSize : Float
     }
 
 
@@ -31,47 +32,49 @@ init : Session -> Model
 init session =
     { map = initMap
     , center = Vec2.vec2 3 -3
+    , hoveringTile = Nothing
+    , tileSize = 32
     }
 
 
 initMap : Map
 initMap =
     """
-1111111111111
-1000000000001
-1010100000001
-1000000000001
-1010101010101
-1000000000001
-1111111111111
-1111111111111
-1000000000001
-1010100000001
-1000000000001
-1010101010101
-1000000000001
-1111111111111
-1111111111111
-1000000000001
-1010100000001
-1000000000001
-1010101010101
-1000000000001
-1111111111111
-1111111111111
-1000000000001
-1010100000001
-1000000000001
-1010101010101
-1000000000001
-1111111111111
-1111111111111
-1000000000001
-1010100000001
-1000000000001
-1010101010101
-1000000000001
-1111111111111
+1111111111111111111111111111111111111111111111111111
+1000000000001100000000000110000000000011000000000001
+1010100000001101010000000110101000000011010100000001
+1000000000001100000000000110000000000011000000000001
+1010101010101101010101010110101010101011010101010101
+1000000000001100000000000110000000000011000000000001
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1000000000001100000000000110000000000011000000000001
+1010100000001101010000000110101000000011010100000001
+1000000000001100000000000110000000000011000000000001
+1010101010101101010101010110101010101011010101010101
+1000000000001100000000000110000000000011000000000001
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1000000000001100000000000110000000000011000000000001
+1010100000001101010000000110101000000011010100000001
+1000000000001100000000000110000000000011000000000001
+1010101010101101010101010110101010101011010101010101
+1000000000001100000000000110000000000011000000000001
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1000000000001100000000000110000000000011000000000001
+1010100000001101010000000110101000000011010100000001
+1000000000001100000000000110000000000011000000000001
+1010101010101101010101010110101010101011010101010101
+1000000000001100000000000110000000000011000000000001
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1000000000001100000000000110000000000011000000000001
+1010100000001101010000000110101000000011010100000001
+1000000000001100000000000110000000000011000000000001
+1010101010101101010101010110101010101011010101010101
+1000000000001100000000000110000000000011000000000001
+1111111111111111111111111111111111111111111111111111
 """
         |> String.trim
         |> String.lines
@@ -108,6 +111,55 @@ update msg session model =
                         model.center
                         (Vec2.scale 0.2 (heroDirInput session.keysPressed))
             }
+
+        MouseMove ( x, y ) ->
+            let
+                viewportWidth =
+                    session.windowWidth
+
+                viewportHeight =
+                    session.windowHeight
+
+                tilesAcross =
+                    viewportWidth / model.tileSize
+
+                tilesVert =
+                    viewportHeight / model.tileSize
+            in
+            { model
+                | hoveringTile =
+                    GameTwoDCamera.viewportToGameCoordinates
+                        (getCamera session model)
+                        ( round session.windowWidth, round session.windowHeight )
+                        (model.center
+                            |> Vec2.add (Vec2.vec2 x y)
+                            |> vec2ToTuple
+                            |> Tuple.mapBoth round round
+                        )
+                        |> (\( xx, yy ) -> ( xx - 0.5, yy - 0.5 ))
+                        |> Tuple.mapBoth round round
+                        |> Just
+            }
+
+
+getCamera : Session -> Model -> GameTwoDCamera.Camera
+getCamera session model =
+    let
+        viewportWidth =
+            session.windowWidth
+
+        viewportHeight =
+            session.windowHeight
+
+        tilesAcross =
+            viewportWidth / model.tileSize
+
+        tilesVert =
+            viewportHeight / model.tileSize
+    in
+    GameTwoDCamera.fixedArea
+        (tilesAcross * tilesVert)
+        ( Vec2.getX model.center, Vec2.getY model.center )
 
 
 heroDirInput : Set Key -> Vec2
@@ -149,9 +201,6 @@ heroDirInput keysPressed =
 view : Session -> Model -> Html Msg
 view session model =
     let
-        tileSize =
-            32
-
         viewportWidth =
             session.windowWidth
 
@@ -159,10 +208,10 @@ view session model =
             session.windowHeight
 
         tilesAcross =
-            viewportWidth / tileSize
+            viewportWidth / model.tileSize
 
         tilesVert =
-            viewportHeight / tileSize
+            viewportHeight / model.tileSize
     in
     Html.div []
         [ Html.div
@@ -173,7 +222,7 @@ view session model =
 
             --, Mouse.onDown (\_ -> MouseDown)
             --, Mouse.onUp (\_ -> MouseUp)
-            --, Mouse.onMove (\event -> MouseMove event.offsetPos)
+            , Mouse.onMove (\event -> MouseMove event.offsetPos)
             ]
             [ GameTwoD.render
                 { time = 0
@@ -186,9 +235,18 @@ view session model =
                         (tilesAcross * tilesVert)
                         ( Vec2.getX model.center, Vec2.getY model.center )
                 }
-                (drawMap model.center ( tilesAcross, tilesVert ) session model)
+                (List.concat
+                    [ drawMap model.center ( tilesAcross, tilesVert ) session model
+                    , drawSelectedTileOutline session model
+                    ]
+                )
             ]
         ]
+
+
+getGameCoordinates : GameTwoDCamera.Camera -> ( Int, Int ) -> ( Int, Int ) -> ( Float, Float )
+getGameCoordinates camera ( elementWidth, elementHeight ) ( x, y ) =
+    ( 1, 2 )
 
 
 drawMap : Vec2 -> ( Float, Float ) -> Session -> Model -> List GameTwoDRender.Renderable
@@ -262,3 +320,21 @@ drawMap center ( numTilesLengthwise, numTilesHeightwise ) session model =
                     |> List.filterMap identity
             )
         |> List.concat
+
+
+drawSelectedTileOutline : Session -> Model -> List GameTwoDRender.Renderable
+drawSelectedTileOutline session model =
+    case model.hoveringTile of
+        Just ( x, y ) ->
+            [ GameTwoDRender.spriteWithOptions
+                { position = ( toFloat x, toFloat y, 0 )
+                , size = ( 1, 1 )
+                , texture = GameResources.getTexture "images/selectedTile.png" session.resources
+                , rotation = 0
+                , pivot = ( 0, 0 )
+                , tiling = ( 1, 1 )
+                }
+            ]
+
+        Nothing ->
+            []
