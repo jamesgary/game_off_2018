@@ -10,6 +10,8 @@ import Html exposing (Html)
 import Html.Attributes
 import Html.Events
 import Html.Events.Extra.Mouse as Mouse
+import Html.Events.Extra.Wheel as Wheel
+import List.Zipper as Zipper exposing (Zipper)
 import Math.Vector2 as Vec2 exposing (Vec2)
 import Set exposing (Set)
 
@@ -20,6 +22,7 @@ type Msg
     | MouseUp
     | ChooseTool Tool
     | Tick Float
+    | Zoom Wheel.Event
 
 
 type alias Model =
@@ -29,7 +32,22 @@ type alias Model =
     , tileSize : Float
     , isMouseDown : Bool
     , currentTool : Tool
+    , zoomLevels : Zipper Float
     }
+
+
+zoomedTileSize : Model -> Float
+zoomedTileSize model =
+    model.tileSize * Zipper.current model.zoomLevels
+
+
+defaultZoomLevels : Zipper Float
+defaultZoomLevels =
+    [ 1 / 4, 1 / 2, 1, 2 ]
+        |> Zipper.fromList
+        |> Zipper.withDefault 99
+        |> Zipper.findFirst (\lvl -> lvl == 1)
+        |> Zipper.withDefault 99
 
 
 type Tool
@@ -45,6 +63,7 @@ init session =
     , tileSize = 32
     , isMouseDown = False
     , currentTool = GrassTool
+    , zoomLevels = defaultZoomLevels
     }
 
 
@@ -164,15 +183,35 @@ update msg session model =
         ChooseTool tool ->
             { model | currentTool = tool }
 
+        Zoom wheelEvent ->
+            if wheelEvent.deltaY < 0 then
+                { model
+                    | zoomLevels =
+                        model.zoomLevels
+                            |> Zipper.next
+                            |> Maybe.withDefault model.zoomLevels
+                }
+
+            else if wheelEvent.deltaY > 0 then
+                { model
+                    | zoomLevels =
+                        model.zoomLevels
+                            |> Zipper.previous
+                            |> Maybe.withDefault model.zoomLevels
+                }
+
+            else
+                model
+
 
 getCamera : Session -> Model -> GameTwoDCamera.Camera
 getCamera session model =
     let
         tilesAcross =
-            session.windowWidth / model.tileSize
+            session.windowWidth / zoomedTileSize model
 
         tilesVert =
-            session.windowHeight / model.tileSize
+            session.windowHeight / zoomedTileSize model
     in
     GameTwoDCamera.fixedArea
         (tilesAcross * tilesVert)
@@ -226,6 +265,7 @@ view session model =
             , Mouse.onDown (\_ -> MouseDown)
             , Mouse.onUp (\_ -> MouseUp)
             , Mouse.onMove (\event -> MouseMove event.offsetPos)
+            , Wheel.onWheel Zoom
             ]
             [ GameTwoD.render
                 { time = 0
@@ -281,10 +321,10 @@ drawMap : Vec2 -> Session -> Model -> List GameTwoDRender.Renderable
 drawMap center session model =
     let
         tilesAcross =
-            session.windowWidth / model.tileSize
+            session.windowWidth / zoomedTileSize model
 
         tilesVert =
-            session.windowHeight / model.tileSize
+            session.windowHeight / zoomedTileSize model
 
         left =
             (Vec2.getX center
