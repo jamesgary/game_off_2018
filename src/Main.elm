@@ -300,7 +300,7 @@ init flags =
                     )
     in
     ( { hero =
-            { pos = Vec2.vec2 9 -3
+            { pos = Vec2.vec2 9 -13
             , vel = Vec2.vec2 0 0
             , healthAmt = (makeC config).getFloat "heroHealthMax"
             , healthMax = (makeC config).getFloat "heroHealthMax"
@@ -310,26 +310,27 @@ init flags =
       , particles = []
       , creeps = []
       , enemyTowers =
-            [ { pos = ( 2, -8 )
+            [ { pos = ( 12, -8 )
               , timeSinceLastSpawn = 9999
               , healthAmt = (makeC config).getFloat "towerHealthMax"
               , healthMax = (makeC config).getFloat "towerHealthMax"
               }
-            , { pos = ( 11, -5 )
-              , timeSinceLastSpawn = 9999
-              , healthAmt = (makeC config).getFloat "towerHealthMax"
-              , healthMax = (makeC config).getFloat "towerHealthMax"
-              }
-            , { pos = ( 14, -1 )
-              , timeSinceLastSpawn = 9999
-              , healthAmt = (makeC config).getFloat "towerHealthMax"
-              , healthMax = (makeC config).getFloat "towerHealthMax"
-              }
+
+            --, { pos = ( 11, -15 )
+            --  , timeSinceLastSpawn = 9999
+            --  , healthAmt = (makeC config).getFloat "towerHealthMax"
+            --  , healthMax = (makeC config).getFloat "towerHealthMax"
+            --  }
+            --, { pos = ( 14, -11 )
+            --  , timeSinceLastSpawn = 9999
+            --  , healthAmt = (makeC config).getFloat "towerHealthMax"
+            --  , healthMax = (makeC config).getFloat "towerHealthMax"
+            --  }
             ]
       , turrets = []
       , moneyCrops = []
       , base =
-            { pos = ( 3, -3 )
+            { pos = ( 13, -13 )
             , healthAmt = (makeC config).getFloat "towerHealthMax"
             , healthMax = (makeC config).getFloat "towerHealthMax"
             }
@@ -387,25 +388,48 @@ cameraOnHero model =
 initMap : Map
 initMap =
     """
-11111111111111111111
-10000000000000000001
-10000000000000000001
-10000000000000000001
-10000010000000000001
-10000010000000000001
-11111111111111111101
-11111100000000000001
-10001110000000000001
-10001110011111111111
-10001110000000000001
-10001110000000000001
-10001111111110000001
-10000011111111111001
-10000011111111000001
-10000011111111000001
-10000001111111001111
-10000000000000000111
-11111111111111111111
+1111111111111111111111111111111111111111
+1111111111111111111111111111111111111111
+1111111111111111111111111111111111111111
+1111111111111111111111111111111111111111
+1111111111111111111111111111111111111111
+1111111111111111111111111111111111111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+0000000000000000000000000000000000111111
+0000000000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111110000000000000000000000000000111111
+1111111111111111111111111111111111111111
+1111111111111111111111111111111111111111
+1111111111111111111111111111111111111111
+1111111111111111111111111111111111111111
+1111111111111111111111111111111111111111
+1111111111111111111111111111111111111111
 """
         |> String.trim
         |> String.lines
@@ -1485,6 +1509,40 @@ drawRect color pos size =
         }
 
 
+isTilePosVisible : TilePos -> Model -> Bool
+isTilePosVisible ( x, y ) model =
+    let
+        left =
+            (Vec2.getX model.hero.pos
+                - (0.5 * model.c.getFloat "tilesToShowLengthwise")
+                |> floor
+            )
+                - 1
+
+        right =
+            (Vec2.getX model.hero.pos
+                + (0.5 * model.c.getFloat "tilesToShowLengthwise")
+                |> ceiling
+            )
+                + 1
+
+        bot =
+            (Vec2.getY model.hero.pos
+                - (0.5 * tilesToShowHeightwise model.c)
+                |> floor
+            )
+                - 1
+
+        top =
+            (Vec2.getY model.hero.pos
+                + (0.5 * tilesToShowHeightwise model.c)
+                |> ceiling
+            )
+                + 1
+    in
+    (x > left) && (x < right) && (y > bot) && (y < top)
+
+
 view : Model -> Html Msg
 view model =
     let
@@ -1492,29 +1550,40 @@ view model =
             model.map
                 |> Dict.toList
                 |> List.map
-                    (\( ( col, row ), tile ) ->
-                        case tile of
-                            Grass ->
-                                GameTwoDRender.sprite
-                                    { position = ( toFloat col, toFloat row )
-                                    , size = ( 1, 1 )
-                                    , texture = Resources.getTexture "images/grass.png" model.resources
-                                    }
+                    (\( tilePos, tile ) ->
+                        if isTilePosVisible tilePos model then
+                            case tile of
+                                Grass ->
+                                    Just
+                                        (GameTwoDRender.sprite
+                                            { position = tilePosToFloats tilePos
+                                            , size = ( 1, 1 )
+                                            , texture = Resources.getTexture "images/grass.png" model.resources
+                                            }
+                                        )
 
-                            Water ->
-                                GameTwoDRender.sprite
-                                    { position = ( toFloat col, toFloat row )
-                                    , size = ( 1, 1 )
-                                    , texture = Resources.getTexture "images/water.png" model.resources
-                                    }
+                                Water ->
+                                    Just
+                                        (GameTwoDRender.sprite
+                                            { position = tilePosToFloats tilePos
+                                            , size = ( 1, 1 )
+                                            , texture = Resources.getTexture "images/water.png" model.resources
+                                            }
+                                        )
 
-                            Poop ->
-                                GameTwoDRender.sprite
-                                    { position = ( toFloat col, toFloat row )
-                                    , size = ( 1, 1 )
-                                    , texture = Nothing
-                                    }
+                                Poop ->
+                                    Just
+                                        (GameTwoDRender.sprite
+                                            { position = tilePosToFloats tilePos
+                                            , size = ( 1, 1 )
+                                            , texture = Nothing
+                                            }
+                                        )
+
+                        else
+                            Nothing
                     )
+                |> List.filterMap identity
 
         hero =
             drawRect
@@ -1733,6 +1802,7 @@ view model =
             ]
             [ Html.text "WASD to move. 1 to switch to Gun, 2 to switch to MoneyCrop Seeds, 3 to switch to Turret Seeds."
             , Html.hr [] []
+            , Html.text ("PLAYER POS: " ++ Debug.toString model.hero.pos)
             ]
         , Html.div
             [ Html.Attributes.style "margin" "5px 20px 0"
@@ -1744,6 +1814,13 @@ view model =
             , Html.br [] []
             , Html.text "Compost: "
             , Html.strong [] [ Html.text (String.fromInt model.inv.compost) ]
+            , Html.br [] []
+            , Html.text "--- DEBUG ---"
+            , Html.br [] []
+            , Html.text "Map sprites (visible/total): "
+            , Html.strong [] [ Html.text (String.fromInt (List.length map)) ]
+            , Html.strong [] [ Html.text "/" ]
+            , Html.strong [] [ Html.text (String.fromInt (Dict.size model.map)) ]
             , Html.br [] []
             , Html.br [] []
             , Html.span [] [ Html.text "Water: " ]
