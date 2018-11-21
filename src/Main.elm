@@ -131,6 +131,10 @@ sessionFromFlags flags =
     , mousePos = Vec2.vec2 0 0
     , isMouseDown = False
 
+    --browser
+    , windowWidth = flags.windowWidth
+    , windowHeight = flags.windowHeight
+
     -- misc
     , resources = Resources.init
     , seed = Random.initialSeed flags.timestamp

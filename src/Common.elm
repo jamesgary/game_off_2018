@@ -17,6 +17,10 @@ type alias Session =
     , mousePos : Vec2
     , isMouseDown : Bool
 
+    -- browser
+    , windowWidth : Float
+    , windowHeight : Float
+
     -- misc
     , resources : Resources
     , seed : Random.Seed
@@ -30,6 +34,8 @@ type alias Config =
 
 type alias Flags =
     { timestamp : Int
+    , windowWidth : Float
+    , windowHeight : Float
     , persistence : Maybe Persistence
     }
 

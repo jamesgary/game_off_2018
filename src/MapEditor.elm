@@ -33,9 +33,37 @@ initMap =
     """
 1111111111111
 1000000000001
+1010100000001
 1000000000001
+1010101010101
 1000000000001
+1111111111111
+1111111111111
 1000000000001
+1010100000001
+1000000000001
+1010101010101
+1000000000001
+1111111111111
+1111111111111
+1000000000001
+1010100000001
+1000000000001
+1010101010101
+1000000000001
+1111111111111
+1111111111111
+1000000000001
+1010100000001
+1000000000001
+1010101010101
+1000000000001
+1111111111111
+1111111111111
+1000000000001
+1010100000001
+1000000000001
+1010101010101
 1000000000001
 1111111111111
 """
@@ -73,15 +101,29 @@ view : Session -> Model -> Html Msg
 view session model =
     let
         center =
-            Vec2.vec2 0 0
+            Vec2.vec2 5 -3
+
+        tileSize =
+            32
+
+        viewportWidth =
+            session.windowWidth
+
+        viewportHeight =
+            session.windowHeight
+
+        tilesAcross =
+            viewportWidth / tileSize
+
+        tilesVert =
+            viewportHeight / tileSize
     in
     Html.div []
         [ Html.div
-            [ Html.Attributes.style "border" "1px solid black"
-            , Html.Attributes.style "display" "inline-block"
-            , Html.Attributes.style "margin" "20px"
-            , Html.Attributes.style "font-size" "0"
+            [ Html.Attributes.style "display" "inline-block"
             , Html.Attributes.style "position" "relative"
+            , Html.Attributes.style "margin" "0"
+            , Html.Attributes.style "font-size" "0"
             , Mouse.onDown (\_ -> MouseDown)
             , Mouse.onUp (\_ -> MouseUp)
             , Mouse.onMove (\event -> MouseMove event.offsetPos)
@@ -89,49 +131,49 @@ view session model =
             [ GameTwoD.render
                 { time = 0
                 , size =
-                    ( round (session.c.getFloat "canvasWidth")
-                    , round (session.c.getFloat "canvasHeight")
+                    ( round viewportWidth
+                    , round viewportHeight
                     )
                 , camera =
                     GameTwoDCamera.fixedArea
-                        (tilesToShowHeightwise session.c * session.c.getFloat "tilesToShowLengthwise")
+                        (tilesAcross * tilesVert)
                         ( Vec2.getX center, Vec2.getY center )
                 }
-                (drawMap session model)
+                (drawMap ( tilesAcross, tilesVert ) session model)
             ]
         ]
 
 
-drawMap : Session -> Model -> List GameTwoDRender.Renderable
-drawMap session model =
+drawMap : ( Float, Float ) -> Session -> Model -> List GameTwoDRender.Renderable
+drawMap ( numTilesLengthwise, numTilesHeightwise ) session model =
     let
         center =
             Vec2.vec2 0 0
 
         left =
             (Vec2.getX center
-                - (0.5 * session.c.getFloat "tilesToShowLengthwise")
+                - (0.5 * numTilesLengthwise)
                 |> floor
             )
                 - 1
 
         right =
             (Vec2.getX center
-                + (0.5 * session.c.getFloat "tilesToShowLengthwise")
+                + (0.5 * numTilesLengthwise)
                 |> ceiling
             )
                 + 1
 
         bot =
             (Vec2.getY center
-                - (0.5 * tilesToShowHeightwise session.c)
+                - (0.5 * numTilesHeightwise)
                 |> floor
             )
                 - 1
 
         top =
             (Vec2.getY center
-                + (0.5 * tilesToShowHeightwise session.c)
+                + (0.5 * numTilesHeightwise)
                 |> ceiling
             )
                 + 1
