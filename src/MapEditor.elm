@@ -201,6 +201,25 @@ view session model =
                     ]
                 )
             ]
+        , drawToolbox session model
+        ]
+
+
+drawToolbox : Session -> Model -> Html Msg
+drawToolbox session model =
+    Html.div
+        [ Html.Attributes.style "font-size" "16px"
+        , Html.Attributes.style "position" "fixed"
+        , Html.Attributes.style "right" "0"
+        , Html.Attributes.style "top" "0"
+        , Html.Attributes.style "padding" "20px"
+        , Html.Attributes.style "margin" "5px"
+        , Html.Attributes.style "background" "#eee"
+        , Html.Attributes.style "border" "2px outset white"
+        ]
+        [ Html.button [] [ Html.text "WATER" ]
+        , Html.br [] []
+        , Html.button [] [ Html.text "LAND" ]
         ]
 
 
