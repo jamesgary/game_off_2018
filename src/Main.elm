@@ -79,6 +79,7 @@ type Msg
     | ChangeConfig String String
     | ToggleConfig Bool
     | HardReset
+      -- app msgs
     | MapEditorMsg MapEditor.Msg
 
 

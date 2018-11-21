@@ -1,4 +1,4 @@
-module Common exposing (Config, ConfigFloat, Flags, Key, Persistence, Session)
+module Common exposing (Config, ConfigFloat, Flags, Key, Map, Persistence, Session, Tile(..), TilePos, tilePosToFloats, tilesToShowHeightwise)
 
 import Dict exposing (Dict)
 import Game.Resources as Resources exposing (Resources)
@@ -49,3 +49,31 @@ type alias ConfigFloat =
 
 type alias Key =
     String
+
+
+
+-- Map stuff
+
+
+type alias Map =
+    Dict TilePos Tile
+
+
+type Tile
+    = Grass
+    | Water
+    | Poop
+
+
+type alias TilePos =
+    ( Int, Int )
+
+
+tilesToShowHeightwise : Config -> Float
+tilesToShowHeightwise c =
+    c.getFloat "tilesToShowLengthwise" * (c.getFloat "canvasHeight" / c.getFloat "canvasWidth")
+
+
+tilePosToFloats : TilePos -> ( Float, Float )
+tilePosToFloats ( col, row ) =
+    ( toFloat col, toFloat row )
