@@ -21,6 +21,7 @@ type Msg
     | MouseDown
     | MouseUp
     | ChooseTool Tool
+    | ChooseTile Tile
     | Tick Float
     | Zoom Wheel.Event
 
@@ -32,7 +33,9 @@ type alias Model =
     , tileSize : Float
     , isMouseDown : Bool
     , currentTool : Tool
+    , currentTile : Tile
     , zoomLevels : Zipper Float
+    , maybeRectOrigin : Maybe TilePos
     }
 
 
@@ -51,8 +54,8 @@ defaultZoomLevels =
 
 
 type Tool
-    = WaterTool
-    | GrassTool
+    = Pencil
+    | Rect
 
 
 init : Session -> Model
@@ -62,8 +65,10 @@ init session =
     , hoveringTile = Nothing
     , tileSize = 32
     , isMouseDown = False
-    , currentTool = GrassTool
+    , currentTool = Pencil
+    , currentTile = Grass
     , zoomLevels = defaultZoomLevels
+    , maybeRectOrigin = Nothing
     }
 
 
@@ -71,39 +76,39 @@ initMap : Map
 initMap =
     """
 1111111111111111111111111111111111111111111111111111
-1000000000001100000000000110000000000011000000000001
-1010100000001101010000000110101000000011010100000001
-1000000000001100000000000110000000000011000000000001
-1010101010101101010101010110101010101011010101010101
-1000000000001100000000000110000000000011000000000001
 1111111111111111111111111111111111111111111111111111
 1111111111111111111111111111111111111111111111111111
-1000000000001100000000000110000000000011000000000001
-1010100000001101010000000110101000000011010100000001
-1000000000001100000000000110000000000011000000000001
-1010101010101101010101010110101010101011010101010101
-1000000000001100000000000110000000000011000000000001
 1111111111111111111111111111111111111111111111111111
 1111111111111111111111111111111111111111111111111111
-1000000000001100000000000110000000000011000000000001
-1010100000001101010000000110101000000011010100000001
-1000000000001100000000000110000000000011000000000001
-1010101010101101010101010110101010101011010101010101
-1000000000001100000000000110000000000011000000000001
 1111111111111111111111111111111111111111111111111111
 1111111111111111111111111111111111111111111111111111
-1000000000001100000000000110000000000011000000000001
-1010100000001101010000000110101000000011010100000001
-1000000000001100000000000110000000000011000000000001
-1010101010101101010101010110101010101011010101010101
-1000000000001100000000000110000000000011000000000001
 1111111111111111111111111111111111111111111111111111
 1111111111111111111111111111111111111111111111111111
-1000000000001100000000000110000000000011000000000001
-1010100000001101010000000110101000000011010100000001
-1000000000001100000000000110000000000011000000000001
-1010101010101101010101010110101010101011010101010101
-1000000000001100000000000110000000000011000000000001
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
+1111111111111111111111111111111111111111111111111111
 1111111111111111111111111111111111111111111111111111
 """
         |> String.trim
@@ -155,16 +160,12 @@ update msg session model =
                 map =
                     case ( model.isMouseDown, model.hoveringTile ) of
                         ( True, Just tilePos ) ->
-                            let
-                                newTile =
-                                    case model.currentTool of
-                                        WaterTool ->
-                                            Water
+                            case model.currentTool of
+                                Pencil ->
+                                    Dict.insert tilePos model.currentTile model.map
 
-                                        GrassTool ->
-                                            Grass
-                            in
-                            Dict.insert tilePos newTile model.map
+                                Rect ->
+                                    model.map
 
                         _ ->
                             model.map
@@ -175,13 +176,31 @@ update msg session model =
             }
 
         MouseDown ->
-            { model | isMouseDown = True }
+            { model
+                | isMouseDown = True
+                , maybeRectOrigin =
+                    case model.currentTool of
+                        Rect ->
+                            model.hoveringTile
+
+                        _ ->
+                            Nothing
+            }
 
         MouseUp ->
-            { model | isMouseDown = False }
+            applyRect session model
+                |> (\m ->
+                        { m
+                            | isMouseDown = False
+                            , maybeRectOrigin = Nothing
+                        }
+                   )
 
         ChooseTool tool ->
             { model | currentTool = tool }
+
+        ChooseTile tile ->
+            { model | currentTile = tile }
 
         Zoom wheelEvent ->
             if wheelEvent.deltaY < 0 then
@@ -277,6 +296,7 @@ view session model =
                 }
                 (List.concat
                     [ drawMap model.center session model
+                    , drawRect session model
                     , drawSelectedTileOutline session model
                     ]
                 )
@@ -297,9 +317,13 @@ drawToolbox session model =
         , Html.Attributes.style "background" "#eee"
         , Html.Attributes.style "border" "2px outset white"
         ]
-        [ toolBtn model.currentTool WaterTool "Water"
+        [ toolBtn model.currentTool Pencil "Pencil"
         , Html.br [] []
-        , toolBtn model.currentTool GrassTool "Grass"
+        , toolBtn model.currentTool Rect "Rect"
+        , Html.hr [] []
+        , tileBtn model.currentTile Water "Water"
+        , Html.br [] []
+        , tileBtn model.currentTile Grass "Grass"
         ]
 
 
@@ -315,6 +339,87 @@ toolBtn currentTool tool label =
             Html.Attributes.style "background" "#fff"
         ]
         [ Html.text label ]
+
+
+tileBtn : Tile -> Tile -> String -> Html Msg
+tileBtn currentTile tile label =
+    Html.button
+        [ Html.Events.onClick (ChooseTile tile)
+        , Html.Attributes.style "outline" "none"
+        , if currentTile == tile then
+            Html.Attributes.style "background" "#ccc"
+
+          else
+            Html.Attributes.style "background" "#fff"
+        ]
+        [ Html.text label ]
+
+
+applyRect : Session -> Model -> Model
+applyRect session model =
+    case ( model.maybeRectOrigin, model.hoveringTile ) of
+        ( Just ( x1, y1 ), Just ( x2, y2 ) ) ->
+            List.range (min x1 x2) (max x1 x2)
+                |> List.map
+                    (\x ->
+                        List.range (min y1 y2) (max y1 y2)
+                            |> List.map
+                                (\y ->
+                                    ( ( x, y ), model.currentTile )
+                                )
+                    )
+                |> List.concat
+                |> Dict.fromList
+                |> (\newTileDict ->
+                        { model | map = Dict.union newTileDict model.map }
+                   )
+
+        _ ->
+            model
+
+
+drawRect : Session -> Model -> List GameTwoDRender.Renderable
+drawRect session model =
+    case ( model.maybeRectOrigin, model.hoveringTile ) of
+        ( Just ( x1, y1 ), Just ( x2, y2 ) ) ->
+            List.range (min x1 x2) (max x1 x2)
+                |> List.map
+                    (\x ->
+                        List.range (min y1 y2) (max y1 y2)
+                            |> List.map
+                                (\y ->
+                                    drawTile session ( x, y ) model.currentTile
+                                )
+                    )
+                |> List.concat
+
+        _ ->
+            []
+
+
+drawTile : Session -> TilePos -> Tile -> GameTwoDRender.Renderable
+drawTile session tilePos tile =
+    case tile of
+        Grass ->
+            GameTwoDRender.sprite
+                { position = tilePosToFloats tilePos
+                , size = ( 1, 1 )
+                , texture = GameResources.getTexture "images/grass.png" session.resources
+                }
+
+        Water ->
+            GameTwoDRender.sprite
+                { position = tilePosToFloats tilePos
+                , size = ( 1, 1 )
+                , texture = GameResources.getTexture "images/water.png" session.resources
+                }
+
+        Poop ->
+            GameTwoDRender.sprite
+                { position = tilePosToFloats tilePos
+                , size = ( 1, 1 )
+                , texture = Nothing
+                }
 
 
 drawMap : Vec2 -> Session -> Model -> List GameTwoDRender.Renderable
