@@ -180,12 +180,13 @@ update msg session model =
                 | isMouseDown = True
                 , maybeRectOrigin =
                     case model.currentTool of
+                        Pencil ->
+                            Nothing
+
                         Rect ->
                             model.hoveringTile
-
-                        _ ->
-                            Nothing
             }
+                |> applyPencil session
 
         MouseUp ->
             applyRect session model
@@ -353,6 +354,16 @@ tileBtn currentTile tile label =
             Html.Attributes.style "background" "#fff"
         ]
         [ Html.text label ]
+
+
+applyPencil : Session -> Model -> Model
+applyPencil session model =
+    case model.hoveringTile of
+        Just tilePos ->
+            { model | map = Dict.insert tilePos model.currentTile model.map }
+
+        Nothing ->
+            model
 
 
 applyRect : Session -> Model -> Model
