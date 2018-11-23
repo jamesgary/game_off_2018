@@ -114,34 +114,6 @@ defaultPesistence =
     }
 
 
-mapFromAscii : String -> Map
-mapFromAscii str =
-    str
-        |> String.trim
-        |> String.lines
-        |> List.indexedMap
-            (\row line ->
-                line
-                    |> String.toList
-                    |> List.indexedMap
-                        (\col char ->
-                            ( ( col, -row )
-                            , case char of
-                                '0' ->
-                                    Grass
-
-                                '1' ->
-                                    Water
-
-                                _ ->
-                                    Poop
-                            )
-                        )
-            )
-        |> List.concat
-        |> Dict.fromList
-
-
 main =
     Browser.element
         { init = init

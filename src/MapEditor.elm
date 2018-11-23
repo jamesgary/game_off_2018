@@ -29,7 +29,7 @@ type Msg
 
 
 type alias Model =
-    { map : Map
+    { editingMap : SavedMap
     , center : Vec2
     , hoveringTile : Maybe TilePos
     , tileSize : Float
@@ -62,10 +62,9 @@ type Tool
 
 init : Session -> Model
 init session =
-    { map =
+    { editingMap =
         session.savedMaps
             |> List.head
-            |> Maybe.map .map
             |> Maybe.withDefault initMap
     , center = Vec2.vec2 3 -3
     , hoveringTile = Nothing
@@ -78,39 +77,22 @@ init session =
     }
 
 
-initMap : Map
+initMap : SavedMap
 initMap =
-    """
-1111111111111111111111111111111
-1111111111111111111111111111111
-1111111111111111111111111111111
-1111111111111111111111111111111
-1111111111111111111111111111111
-1111111111111111111111111111111
+    { name = "New Map"
+    , map =
+        """
+1111
+1001
+1001
+1111
 """
-        |> String.trim
-        |> String.lines
-        |> List.indexedMap
-            (\row line ->
-                line
-                    |> String.toList
-                    |> List.indexedMap
-                        (\col char ->
-                            ( ( col, -row )
-                            , case char of
-                                '0' ->
-                                    Grass
-
-                                '1' ->
-                                    Water
-
-                                _ ->
-                                    Poop
-                            )
-                        )
-            )
-        |> List.concat
-        |> Dict.fromList
+            |> mapFromAscii
+    , hero = ( 1, 1 )
+    , enemyTowers = []
+    , base = ( 2, 2 )
+    , size = ( 4, 4 )
+    }
 
 
 update : Msg -> Session -> Model -> Model
@@ -134,22 +116,26 @@ update msg session model =
                         |> (\( xx, yy ) -> ( round <| xx - 0.5, round <| yy - 0.5 ))
                         |> Just
 
-                map =
+                editingMap =
                     case ( model.isMouseDown, model.hoveringTile ) of
                         ( True, Just tilePos ) ->
                             case model.currentTool of
                                 Pencil ->
-                                    Dict.insert tilePos model.currentTile model.map
+                                    let
+                                        em =
+                                            model.editingMap
+                                    in
+                                    { em | map = Dict.insert tilePos model.currentTile model.editingMap.map }
 
                                 Rect ->
-                                    model.map
+                                    model.editingMap
 
                         _ ->
-                            model.map
+                            model.editingMap
             in
             { model
                 | hoveringTile = hoveringTile
-                , map = map
+                , editingMap = editingMap
             }
 
         MouseDown ->
@@ -203,7 +189,7 @@ update msg session model =
         LoadMap mapName ->
             case List.Extra.find (\map -> map.name == mapName) session.savedMaps of
                 Just savedMap ->
-                    { model | map = savedMap.map }
+                    { model | editingMap = savedMap }
 
                 Nothing ->
                     Debug.todo "bad saved map :("
@@ -393,7 +379,11 @@ applyPencil : Session -> Model -> Model
 applyPencil session model =
     case model.hoveringTile of
         Just tilePos ->
-            { model | map = Dict.insert tilePos model.currentTile model.map }
+            let
+                editingMap =
+                    model.editingMap
+            in
+            { model | editingMap = { editingMap | map = Dict.insert tilePos model.currentTile model.editingMap.map } }
 
         Nothing ->
             model
@@ -415,7 +405,11 @@ applyRect session model =
                 |> List.concat
                 |> Dict.fromList
                 |> (\newTileDict ->
-                        { model | map = Dict.union newTileDict model.map }
+                        let
+                            editingMap =
+                                model.editingMap
+                        in
+                        { model | editingMap = { editingMap | map = Dict.union newTileDict model.editingMap.map } }
                    )
 
         _ ->
@@ -509,7 +503,7 @@ drawMap center session model =
                 List.range bot top
                     |> List.map
                         (\y ->
-                            case Dict.get ( x, y ) model.map of
+                            case Dict.get ( x, y ) model.editingMap.map of
                                 Just Grass ->
                                     Just
                                         (GameTwoDRender.sprite

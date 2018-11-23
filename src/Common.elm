@@ -1,4 +1,4 @@
-module Common exposing (Config, ConfigFloat, Key, Map, PlacementAvailability(..), SavedMap, Session, Tile(..), TilePos, tilePosToFloats, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
+module Common exposing (Config, ConfigFloat, Key, Map, PlacementAvailability(..), SavedMap, Session, Tile(..), TilePos, mapFromAscii, tilePosToFloats, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
 
 import Dict exposing (Dict)
 import Game.Resources as GameResources exposing (Resources)
@@ -99,3 +99,31 @@ type alias SavedMap =
     , base : TilePos
     , size : ( Int, Int )
     }
+
+
+mapFromAscii : String -> Map
+mapFromAscii str =
+    str
+        |> String.trim
+        |> String.lines
+        |> List.indexedMap
+            (\row line ->
+                line
+                    |> String.toList
+                    |> List.indexedMap
+                        (\col char ->
+                            ( ( col, -row )
+                            , case char of
+                                '0' ->
+                                    Grass
+
+                                '1' ->
+                                    Water
+
+                                _ ->
+                                    Poop
+                            )
+                        )
+            )
+        |> List.concat
+        |> Dict.fromList
