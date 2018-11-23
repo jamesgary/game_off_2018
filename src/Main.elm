@@ -18,10 +18,7 @@ import Random
 import Set exposing (Set)
 
 
-port saveFlags : Json.Decode.Value -> Cmd msg
-
-
-port hardReset : () -> Cmd msg
+port performEffects : List Json.Decode.Value -> Cmd msg
 
 
 type alias Flags =
@@ -276,14 +273,24 @@ update msg model =
                             }
                     }
             in
-            ( newModel, saveFlags (modelToPersistence newModel |> encodePersistence) )
+            ( newModel
+            , performEffects
+                [ Json.Encode.object
+                    [ ( "id", Json.Encode.string "SAVE" )
+                    , ( "persistence", modelToPersistence newModel |> encodePersistence )
+                    ]
+                ]
+            )
 
         ToggleConfig shouldOpen ->
             let
                 newModel =
                     { model | session = { session | isConfigOpen = shouldOpen } }
             in
-            ( newModel, saveFlags (modelToPersistence newModel |> encodePersistence) )
+            --( newModel, performEffects (modelToPersistence newModel |> encodePersistence) )
+            ( newModel
+            , performEffects [ Json.Encode.object [ ( "id", Json.Encode.string "SAVE" ) ] ]
+            )
 
         HardReset ->
             ( { model
@@ -294,7 +301,7 @@ update msg model =
                         , c = makeC defaultPesistence.configFloats
                     }
               }
-            , hardReset ()
+            , performEffects [ Json.Encode.object [ ( "id", Json.Encode.string "HARD_RESET" ) ] ]
             )
 
         Tick delta ->
@@ -304,17 +311,8 @@ update msg model =
                         ( newModel, effects ) =
                             MapEditor.update (MapEditor.Tick delta) session mapEditorModel
                     in
-                    ( { model | state = MapEditor newModel }
-                    , effects
-                        |> List.map
-                            (\effect ->
-                                case effect of
-                                    MapEditor.SaveEffect ->
-                                        Cmd.none
-                                            |> Debug.log "Svajsweogfj"
-                            )
-                        |> Cmd.batch
-                    )
+                    { model | state = MapEditor newModel }
+                        |> performMapEffects effects
 
                 _ ->
                     ( model, Cmd.none )
@@ -326,27 +324,41 @@ update msg model =
                         ( newModel, effects ) =
                             MapEditor.update mapEditorMsg session mapEditorModel
                     in
-                    ( { model | state = MapEditor newModel }
-                    , effects
-                        |> List.map
-                            (\effect ->
-                                case effect of
-                                    MapEditor.SaveEffect ->
-                                        Cmd.none
-                                            |> Debug.log "Svajsweogfj"
-                            )
-                        |> Cmd.batch
-                    )
+                    { model | state = MapEditor newModel }
+                        |> performMapEffects effects
 
                 _ ->
                     ( model, Cmd.none )
+
+
+
+-- may belong in map editor?
+
+
+performMapEffects : List MapEditor.Effect -> Model -> ( Model, Cmd Msg )
+performMapEffects effects model =
+    ( model
+    , effects
+        |> List.map
+            (\effect ->
+                case effect of
+                    MapEditor.SaveMapEffect editingMap ->
+                        performEffects
+                            [ Json.Encode.object
+                                [ ( "id", Json.Encode.string "SAVE" )
+                                , ( "persistence", modelToPersistence model |> encodePersistence )
+                                ]
+                            ]
+            )
+        |> Cmd.batch
+    )
 
 
 modelToPersistence : Model -> Persistence
 modelToPersistence model =
     { isConfigOpen = model.session.isConfigOpen
     , configFloats = model.session.configFloats
-    , savedMaps = [] --model.session.savedMaps
+    , savedMaps = model.session.savedMaps
     }
 
 
@@ -399,8 +411,16 @@ savedMapDecoder =
 tilePosDecoder : Json.Decode.Decoder TilePos
 tilePosDecoder =
     Json.Decode.map2 (\x y -> ( x, y ))
-        (Json.Decode.index 0 Json.Decode.int)
-        (Json.Decode.index 1 Json.Decode.int)
+        (Json.Decode.field "x" Json.Decode.int)
+        (Json.Decode.field "y" Json.Decode.int)
+
+
+
+--tilePosDecoder : Json.Decode.Decoder TilePos
+--tilePosDecoder =
+--    Json.Decode.map2 (\x y -> ( x, y ))
+--        (Json.Decode.index 0 Json.Decode.int)
+--        (Json.Decode.index 1 Json.Decode.int)
 
 
 mapDecoder : Json.Decode.Decoder Map
@@ -451,12 +471,77 @@ encodePersistence persistence =
         , ( "configFloats"
           , Json.Encode.dict
                 identity
-                identity
-                Dict.empty
+                encodeConfigFloat
+                persistence.configFloats
           )
+        , ( "savedMaps"
+          , Json.Encode.list
+                encodeSavedMap
+                persistence.savedMaps
+          )
+        ]
 
-        --todo
-        , ( "savedMaps", Json.Encode.list identity [] )
+
+encodeSavedMap : SavedMap -> Json.Decode.Value
+encodeSavedMap savedMap =
+    Json.Encode.object
+        [ ( "name", Json.Encode.string savedMap.name )
+        , ( "map", encodeMap savedMap.map )
+        , ( "hero", encodeTilePos savedMap.hero )
+        , ( "enemyTowers", Json.Encode.list encodeTilePos savedMap.enemyTowers )
+        , ( "base", encodeTilePos savedMap.base )
+        , ( "size", encodeTilePos savedMap.size )
+        ]
+
+
+encodeTilePos : TilePos -> Json.Decode.Value
+encodeTilePos ( x, y ) =
+    Json.Encode.object
+        [ ( "x", Json.Encode.int x )
+        , ( "y", Json.Encode.int y )
+        ]
+
+
+encodeMap : Map -> Json.Decode.Value
+encodeMap map =
+    map
+        |> Dict.toList
+        |> List.map
+            (\( tilePos, tile ) ->
+                ( stringifyTilePos tilePos
+                , encodeTile tile
+                )
+            )
+        |> Dict.fromList
+        |> Json.Encode.dict identity identity
+
+
+stringifyTilePos : TilePos -> String
+stringifyTilePos ( x, y ) =
+    String.fromInt x ++ "," ++ String.fromInt y
+
+
+encodeTile : Tile -> Json.Decode.Value
+encodeTile tile =
+    (case tile of
+        Grass ->
+            "grass"
+
+        Water ->
+            "water"
+
+        Poop ->
+            "poop"
+    )
+        |> Json.Encode.string
+
+
+encodeConfigFloat : ConfigFloat -> Json.Decode.Value
+encodeConfigFloat configFloat =
+    Json.Encode.object
+        [ ( "val", Json.Encode.float configFloat.val )
+        , ( "min", Json.Encode.float configFloat.min )
+        , ( "max", Json.Encode.float configFloat.max )
         ]
 
 

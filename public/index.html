@@ -23,6 +23,7 @@
       var app = Elm.Main.init({
         node: document.getElementById('elm'),
         flags: {
+          // CHANGE ME WHEN CHANGING FLAGS
           persistence: persistence,
           timestamp: Date.now(),
           windowWidth: window.innerWidth,
@@ -30,13 +31,25 @@
         }
       });
 
-      app.ports.saveFlags.subscribe(function(persistence) {
-        console.log(persistence);
-        localStorage.setItem("persistence", JSON.stringify(persistence));
-      });
+      app.ports.performEffects.subscribe(function(effects) {
+        for (let i = 0; i < effects.length; i++) {
+          let effect = effects[i];
 
-      app.ports.hardReset.subscribe(function() {
-        localStorage.removeItem("persistence");
+          // CHANGE ME WHEN CHANGING EFFECTS
+          switch (effect.id) {
+            case "SAVE":
+              console.log("savin");
+              console.log(effect.persistence);
+              localStorage.setItem("persistence", JSON.stringify(effect.persistence));
+              break;
+            case "HARD_RESET":
+              console.log("hard resetin");
+              localStorage.removeItem("persistence");
+              break;
+            default:
+              console.error("unknown effect: " + effect);
+          }
+        }
       });
 
       (function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.getElementById("stats").appendChild(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='//rawgit.com/mrdoob/stats.js/master/build/stats.min.js';document.head.appendChild(script);})()

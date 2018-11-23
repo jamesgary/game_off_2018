@@ -26,7 +26,7 @@ type Msg
     | Tick Float
     | Zoom Wheel.Event
     | LoadMap String
-    | Save
+    | SaveMap
 
 
 type alias Model =
@@ -211,8 +211,10 @@ update msg session model =
             , []
             )
 
-        Save ->
-            ( model, [ SaveEffect ] )
+        SaveMap ->
+            ( model
+            , [ SaveMapEffect model.editingMap ]
+            )
 
 
 getCamera : Session -> Model -> GameTwoDCamera.Camera
@@ -349,7 +351,7 @@ drawSavedMaps session model =
                             , Html.div [] <|
                                 if isActive then
                                     [ Html.button
-                                        [ Html.Events.onClick Save
+                                        [ Html.Events.onClick SaveMap
                                         , Html.Attributes.style "background" "#afa"
                                         , Html.Attributes.style "font-size" "16px"
                                         , Html.Attributes.style "cursor" "pointer"
@@ -603,4 +605,4 @@ drawSelectedTileOutline session model =
 type
     Effect
     -- maybe should carry json?
-    = SaveEffect
+    = SaveMapEffect SavedMap
