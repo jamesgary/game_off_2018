@@ -11,6 +11,7 @@ import Html.Attributes
 import Html.Events
 import Html.Events.Extra.Mouse as Mouse
 import Html.Events.Extra.Wheel as Wheel
+import List.Extra
 import List.Zipper as Zipper exposing (Zipper)
 import Math.Vector2 as Vec2 exposing (Vec2)
 import Set exposing (Set)
@@ -24,6 +25,7 @@ type Msg
     | ChooseTile Tile
     | Tick Float
     | Zoom Wheel.Event
+    | LoadMap String
 
 
 type alias Model =
@@ -198,6 +200,14 @@ update msg session model =
             else
                 model
 
+        LoadMap mapName ->
+            case List.Extra.find (\map -> map.name == mapName) session.savedMaps of
+                Just savedMap ->
+                    { model | map = savedMap.map }
+
+                Nothing ->
+                    Debug.todo "bad saved map :("
+
 
 getCamera : Session -> Model -> GameTwoDCamera.Camera
 getCamera session model =
@@ -317,7 +327,12 @@ drawSavedMaps session model =
                                 [ Html.Attributes.style "margin-right" "10px"
                                 ]
                                 [ Html.text savedMap.name ]
-                            , Html.div [] [ Html.button [] [ Html.text "Load" ] ]
+                            , Html.div []
+                                [ Html.button
+                                    [ Html.Events.onClick (LoadMap savedMap.name)
+                                    ]
+                                    [ Html.text "Load" ]
+                                ]
                             ]
                     )
             )
