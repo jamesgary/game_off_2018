@@ -62,22 +62,52 @@ defaultPesistence =
         , ( "waterBulletCost", { val = 5, min = 0, max = 25 } )
         ]
             |> Dict.fromList
-    , savedMaps = []
+    , savedMaps =
+        [ { name = "Tutorial"
+          , map =
+                mapFromAscii
+                    """
+0000000
+0111110
+0111110
+0100110
+0000000
+"""
+          , hero = ( 1, 1 )
+          , enemyTowers = [ ( 1, 5 ), ( 2, 4 ) ]
+          , base = ( 2, 2 )
+          , size = ( 6, 5 )
+          }
+        ]
     }
 
 
-savedMaps : List SavedMap
-savedMaps =
-    []
+mapFromAscii : String -> Map
+mapFromAscii str =
+    str
+        |> String.trim
+        |> String.lines
+        |> List.indexedMap
+            (\row line ->
+                line
+                    |> String.toList
+                    |> List.indexedMap
+                        (\col char ->
+                            ( ( col, -row )
+                            , case char of
+                                '0' ->
+                                    Grass
 
+                                '1' ->
+                                    Water
 
-type alias SavedMap =
-    { map : Map
-    , hero : TilePos
-    , enemyTowers : List TilePos
-    , base : TilePos
-    , size : ( Int, Int )
-    }
+                                _ ->
+                                    Poop
+                            )
+                        )
+            )
+        |> List.concat
+        |> Dict.fromList
 
 
 main =
@@ -139,21 +169,13 @@ dlog str val =
 sessionFromFlags : Flags -> Session
 sessionFromFlags flags =
     let
-        ( configFloats, isConfigOpen ) =
-            case flags.persistence of
-                Just persistence ->
-                    ( persistence.configFloats
-                    , persistence.isConfigOpen
-                    )
-
-                Nothing ->
-                    ( defaultPesistence.configFloats
-                    , defaultPesistence.isConfigOpen
-                    )
+        persistence =
+            flags.persistence
+                |> Maybe.withDefault defaultPesistence
     in
-    { configFloats = configFloats
-    , c = makeC configFloats
-    , isConfigOpen = isConfigOpen
+    { configFloats = persistence.configFloats
+    , c = makeC persistence.configFloats
+    , isConfigOpen = persistence.isConfigOpen
 
     -- input
     , keysPressed = Set.empty
@@ -161,6 +183,9 @@ sessionFromFlags flags =
     --browser
     , windowWidth = flags.windowWidth
     , windowHeight = flags.windowHeight
+
+    -- map editorish
+    , savedMaps = persistence.savedMaps
 
     -- misc
     , resources = Resources.init
@@ -303,11 +328,12 @@ modelToPersistence model =
 
 jsonToFlags : Json.Decode.Value -> Flags
 jsonToFlags json =
-    { timestamp = 0
-    , windowWidth = 0
-    , windowHeight = 0
-    , persistence = Nothing
-    }
+    case Json.Decode.decodeValue flagsDecoder json of
+        Ok flags ->
+            flags
+
+        Err err ->
+            Debug.todo ("flags bad man: " ++ Json.Decode.errorToString err)
 
 
 flagsDecoder : Json.Decode.Decoder Flags
@@ -337,7 +363,8 @@ configFloatDecoder =
 
 savedMapDecoder : Json.Decode.Decoder SavedMap
 savedMapDecoder =
-    Json.Decode.map5 SavedMap
+    Json.Decode.map6 SavedMap
+        (Json.Decode.field "name" Json.Decode.string)
         (Json.Decode.field "map" mapDecoder)
         (Json.Decode.field "hero" tilePosDecoder)
         (Json.Decode.field "enemyTowers" (Json.Decode.list tilePosDecoder))

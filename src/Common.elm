@@ -1,4 +1,4 @@
-module Common exposing (Config, ConfigFloat, Key, Map, PlacementAvailability(..), Session, Tile(..), TilePos, tilePosToFloats, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
+module Common exposing (Config, ConfigFloat, Key, Map, PlacementAvailability(..), SavedMap, Session, Tile(..), TilePos, tilePosToFloats, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
 
 import Dict exposing (Dict)
 import Game.Resources as GameResources exposing (Resources)
@@ -14,6 +14,9 @@ type alias Session =
 
     -- input
     , keysPressed : Set Key
+
+    -- map editorish
+    , savedMaps : List SavedMap
 
     -- browser
     , windowWidth : Float
@@ -86,3 +89,13 @@ vec2ToTuple vec2 =
     vec2
         |> Vec2.toRecord
         |> (\{ x, y } -> ( x, y ))
+
+
+type alias SavedMap =
+    { name : String
+    , map : Map
+    , hero : TilePos
+    , enemyTowers : List TilePos
+    , base : TilePos
+    , size : ( Int, Int )
+    }
