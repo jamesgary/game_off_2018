@@ -218,6 +218,7 @@ init jsonFlags =
         , "images/tower.png"
         , "images/seedling.png"
         , "images/compost.png"
+        , "images/hero.png"
         ]
         |> Cmd.map Resources
     )

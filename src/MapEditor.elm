@@ -59,6 +59,7 @@ defaultZoomLevels =
 type Tool
     = Pencil
     | Rect
+    | HeroTool
 
 
 init : Session -> Model
@@ -134,6 +135,9 @@ update msg session model =
                                 Rect ->
                                     model.editingMap
 
+                                HeroTool ->
+                                    model.editingMap
+
                         _ ->
                             model.editingMap
             in
@@ -155,6 +159,9 @@ update msg session model =
 
                         Rect ->
                             model.hoveringTile
+
+                        HeroTool ->
+                            Nothing
               }
                 |> applyPencil session
             , session
@@ -164,9 +171,23 @@ update msg session model =
         MouseUp ->
             ( applyRect session model
                 |> (\m ->
+                        let
+                            editingMap =
+                                model.editingMap
+                        in
                         { m
                             | isMouseDown = False
                             , maybeRectOrigin = Nothing
+                            , editingMap =
+                                { editingMap
+                                    | hero =
+                                        case ( m.currentTool, m.hoveringTile ) of
+                                            ( HeroTool, Just tilePos ) ->
+                                                tilePos
+
+                                            _ ->
+                                                m.editingMap.hero
+                                }
                         }
                    )
             , session
@@ -311,6 +332,7 @@ view session model =
                 (List.concat
                     [ drawMap model.center session model
                     , drawRect session model
+                    , drawHero session model
                     , drawSelectedTileOutline session model
                     ]
                 )
@@ -409,9 +431,13 @@ drawToolbox session model =
         , Html.br [] []
         , toolBtn model.currentTool Rect "Rect"
         , Html.hr [] []
+        , toolBtn model.currentTool HeroTool "Hero"
+        , Html.hr [] []
         , tileBtn model.currentTile Water "Water"
         , Html.br [] []
         , tileBtn model.currentTile Grass "Grass"
+        , Html.hr [] []
+        , Html.hr [] []
         ]
 
 
@@ -501,6 +527,16 @@ drawRect session model =
 
         _ ->
             []
+
+
+drawHero : Session -> Model -> List GameTwoDRender.Renderable
+drawHero session model =
+    [ GameTwoDRender.sprite
+        { position = tilePosToFloats model.editingMap.hero
+        , size = ( 1, 1 )
+        , texture = GameResources.getTexture "images/hero.png" session.resources
+        }
+    ]
 
 
 drawTile : Session -> TilePos -> Tile -> GameTwoDRender.Renderable
@@ -611,12 +647,27 @@ drawSelectedTileOutline : Session -> Model -> List GameTwoDRender.Renderable
 drawSelectedTileOutline session model =
     case model.hoveringTile of
         Just ( x, y ) ->
-            [ GameTwoDRender.sprite
-                { position = ( toFloat x, toFloat y )
-                , size = ( 1, 1 )
-                , texture = GameResources.getTexture "images/selectedTile.png" session.resources
-                }
-            ]
+            case model.currentTool of
+                HeroTool ->
+                    [ GameTwoDRender.sprite
+                        { position = tilePosToFloats model.editingMap.hero
+                        , size = ( 1, 1 )
+                        , texture = GameResources.getTexture "images/hero.png" session.resources
+                        }
+                    , GameTwoDRender.sprite
+                        { position = ( toFloat x, toFloat y )
+                        , size = ( 1, 1 )
+                        , texture = GameResources.getTexture "images/selectedTile.png" session.resources
+                        }
+                    ]
+
+                _ ->
+                    [ GameTwoDRender.sprite
+                        { position = ( toFloat x, toFloat y )
+                        , size = ( 1, 1 )
+                        , texture = GameResources.getTexture "images/selectedTile.png" session.resources
+                        }
+                    ]
 
         Nothing ->
             []
