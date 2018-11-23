@@ -205,7 +205,7 @@ update msg session model =
                 |> (\m ->
                         let
                             editingMap =
-                                model.editingMap
+                                m.editingMap
                         in
                         { m
                             | isMouseDown = False
