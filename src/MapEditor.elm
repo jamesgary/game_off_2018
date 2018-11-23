@@ -1,4 +1,4 @@
-module MapEditor exposing (Model, Msg(..), init, update, view)
+module MapEditor exposing (Effect(..), Model, Msg(..), init, update, view)
 
 import Common exposing (..)
 import Dict exposing (Dict)
@@ -26,6 +26,7 @@ type Msg
     | Tick Float
     | Zoom Wheel.Event
     | LoadMap String
+    | Save
 
 
 type alias Model =
@@ -95,16 +96,18 @@ initMap =
     }
 
 
-update : Msg -> Session -> Model -> Model
+update : Msg -> Session -> Model -> ( Model, List Effect )
 update msg session model =
     case msg of
         Tick delta ->
-            { model
+            ( { model
                 | center =
                     Vec2.add
                         model.center
                         (Vec2.scale 0.2 (heroDirInput session.keysPressed))
-            }
+              }
+            , []
+            )
 
         MouseMove ( x, y ) ->
             let
@@ -133,13 +136,15 @@ update msg session model =
                         _ ->
                             model.editingMap
             in
-            { model
+            ( { model
                 | hoveringTile = hoveringTile
                 , editingMap = editingMap
-            }
+              }
+            , []
+            )
 
         MouseDown ->
-            { model
+            ( { model
                 | isMouseDown = True
                 , maybeRectOrigin =
                     case model.currentTool of
@@ -148,26 +153,34 @@ update msg session model =
 
                         Rect ->
                             model.hoveringTile
-            }
+              }
                 |> applyPencil session
+            , []
+            )
 
         MouseUp ->
-            applyRect session model
+            ( applyRect session model
                 |> (\m ->
                         { m
                             | isMouseDown = False
                             , maybeRectOrigin = Nothing
                         }
                    )
+            , []
+            )
 
         ChooseTool tool ->
-            { model | currentTool = tool }
+            ( { model | currentTool = tool }
+            , []
+            )
 
         ChooseTile tile ->
-            { model | currentTile = tile }
+            ( { model | currentTile = tile }
+            , []
+            )
 
         Zoom wheelEvent ->
-            if wheelEvent.deltaY < 0 then
+            ( if wheelEvent.deltaY < 0 then
                 { model
                     | zoomLevels =
                         model.zoomLevels
@@ -175,7 +188,7 @@ update msg session model =
                             |> Maybe.withDefault model.zoomLevels
                 }
 
-            else if wheelEvent.deltaY > 0 then
+              else if wheelEvent.deltaY > 0 then
                 { model
                     | zoomLevels =
                         model.zoomLevels
@@ -183,16 +196,23 @@ update msg session model =
                             |> Maybe.withDefault model.zoomLevels
                 }
 
-            else
+              else
                 model
+            , []
+            )
 
         LoadMap mapName ->
-            case List.Extra.find (\map -> map.name == mapName) session.savedMaps of
+            ( case List.Extra.find (\map -> map.name == mapName) session.savedMaps of
                 Just savedMap ->
                     { model | editingMap = savedMap }
 
                 Nothing ->
                     Debug.todo "bad saved map :("
+            , []
+            )
+
+        Save ->
+            ( model, [ SaveEffect ] )
 
 
 getCamera : Session -> Model -> GameTwoDCamera.Camera
@@ -329,7 +349,7 @@ drawSavedMaps session model =
                             , Html.div [] <|
                                 if isActive then
                                     [ Html.button
-                                        [ Html.Events.onClick (LoadMap savedMap.name)
+                                        [ Html.Events.onClick Save
                                         , Html.Attributes.style "background" "#afa"
                                         , Html.Attributes.style "font-size" "16px"
                                         , Html.Attributes.style "cursor" "pointer"
@@ -578,3 +598,9 @@ drawSelectedTileOutline session model =
 
         Nothing ->
             []
+
+
+type
+    Effect
+    -- maybe should carry json?
+    = SaveEffect

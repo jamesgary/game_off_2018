@@ -298,28 +298,48 @@ update msg model =
             )
 
         Tick delta ->
-            ( case model.state of
+            case model.state of
                 MapEditor mapEditorModel ->
-                    { model
-                        | state =
-                            MapEditor
-                                (MapEditor.update (MapEditor.Tick delta) session mapEditorModel)
-                    }
+                    let
+                        ( newModel, effects ) =
+                            MapEditor.update (MapEditor.Tick delta) session mapEditorModel
+                    in
+                    ( { model | state = MapEditor newModel }
+                    , effects
+                        |> List.map
+                            (\effect ->
+                                case effect of
+                                    MapEditor.SaveEffect ->
+                                        Cmd.none
+                                            |> Debug.log "Svajsweogfj"
+                            )
+                        |> Cmd.batch
+                    )
 
                 _ ->
-                    model
-            , Cmd.none
-            )
+                    ( model, Cmd.none )
 
         MapEditorMsg mapEditorMsg ->
-            ( case model.state of
+            case model.state of
                 MapEditor mapEditorModel ->
-                    { model | state = MapEditor (MapEditor.update mapEditorMsg session mapEditorModel) }
+                    let
+                        ( newModel, effects ) =
+                            MapEditor.update mapEditorMsg session mapEditorModel
+                    in
+                    ( { model | state = MapEditor newModel }
+                    , effects
+                        |> List.map
+                            (\effect ->
+                                case effect of
+                                    MapEditor.SaveEffect ->
+                                        Cmd.none
+                                            |> Debug.log "Svajsweogfj"
+                            )
+                        |> Cmd.batch
+                    )
 
                 _ ->
-                    model
-            , Cmd.none
-            )
+                    ( model, Cmd.none )
 
 
 modelToPersistence : Model -> Persistence
