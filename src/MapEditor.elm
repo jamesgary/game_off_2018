@@ -326,15 +326,25 @@ drawSavedMaps session model =
                                 [ Html.Attributes.style "margin-right" "10px"
                                 ]
                                 [ Html.text savedMap.name ]
-                            , Html.div []
-                                [ Html.button
-                                    [ Html.Events.onClick (LoadMap savedMap.name)
-                                    , Html.Attributes.style "font-size" "16px"
-                                    , Html.Attributes.style "font-size" "16px"
-                                    , Html.Attributes.style "cursor" "pointer"
+                            , Html.div [] <|
+                                if isActive then
+                                    [ Html.button
+                                        [ Html.Events.onClick (LoadMap savedMap.name)
+                                        , Html.Attributes.style "background" "#afa"
+                                        , Html.Attributes.style "font-size" "16px"
+                                        , Html.Attributes.style "cursor" "pointer"
+                                        ]
+                                        [ Html.text "Save" ]
                                     ]
-                                    [ Html.text "Load" ]
-                                ]
+
+                                else
+                                    [ Html.button
+                                        [ Html.Events.onClick (LoadMap savedMap.name)
+                                        , Html.Attributes.style "font-size" "16px"
+                                        , Html.Attributes.style "cursor" "pointer"
+                                        ]
+                                        [ Html.text "Load" ]
+                                    ]
                             ]
                     )
             )
