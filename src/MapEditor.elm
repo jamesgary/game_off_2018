@@ -277,7 +277,50 @@ view session model =
                     ]
                 )
             ]
+        , drawSavedMaps session model
         , drawToolbox session model
+        ]
+
+
+drawSavedMaps : Session -> Model -> Html Msg
+drawSavedMaps session model =
+    Html.div
+        [ Html.Attributes.style "font-size" "16px"
+        , Html.Attributes.style "position" "fixed"
+        , Html.Attributes.style "left" "0"
+        , Html.Attributes.style "top" "0"
+        , Html.Attributes.style "padding" "10px"
+        , Html.Attributes.style "margin" "5px"
+        , Html.Attributes.style "background" "#eee"
+        , Html.Attributes.style "border" "2px outset white"
+        , Html.Attributes.style "font-family" "sans-serif"
+        ]
+        [ Html.div
+            [ Html.Attributes.style "display" "flex"
+            , Html.Attributes.style "flex-direction" "column"
+            , Html.Attributes.style "justify-content" "space-between"
+            , Html.Attributes.style "align-items" "stretch"
+            ]
+            (session.savedMaps
+                |> List.map
+                    (\savedMap ->
+                        Html.div
+                            [ Html.Attributes.style "display" "flex"
+                            , Html.Attributes.style "background" "#ddd"
+                            , Html.Attributes.style "border" "2px solid #ccc"
+                            , Html.Attributes.style "margin" "2px"
+                            , Html.Attributes.style "padding" "2px"
+                            , Html.Attributes.style "align-items" "stretch"
+                            , Html.Attributes.style "justify-content" "space-between"
+                            ]
+                            [ Html.div
+                                [ Html.Attributes.style "margin-right" "10px"
+                                ]
+                                [ Html.text savedMap.name ]
+                            , Html.div [] [ Html.button [] [ Html.text "Load" ] ]
+                            ]
+                    )
+            )
         ]
 
 

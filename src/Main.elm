@@ -78,6 +78,38 @@ defaultPesistence =
           , base = ( 2, 2 )
           , size = ( 6, 5 )
           }
+        , { name = "Level One"
+          , map =
+                mapFromAscii
+                    """
+0000000
+0111110
+0111110
+0111110
+0000000
+"""
+          , hero = ( 1, 1 )
+          , enemyTowers = [ ( 1, 5 ), ( 2, 4 ) ]
+          , base = ( 2, 2 )
+          , size = ( 6, 5 )
+          }
+        , { name = "Final Boss"
+          , map =
+                mapFromAscii
+                    """
+000010
+000010
+000010
+000010
+000011
+000011
+000011
+"""
+          , hero = ( 1, 1 )
+          , enemyTowers = [ ( 1, 5 ), ( 2, 4 ) ]
+          , base = ( 2, 2 )
+          , size = ( 6, 5 )
+          }
         ]
     }
 
