@@ -62,6 +62,7 @@ type Tool
     | HeroTool
     | BaseTool
     | EnemyTowerTool
+    | ClearTool
 
 
 init : Session -> Model
@@ -126,24 +127,28 @@ update msg session model =
                 editingMap =
                     case ( model.isMouseDown, model.hoveringTile ) of
                         ( True, Just tilePos ) ->
+                            let
+                                em =
+                                    model.editingMap
+                            in
                             case model.currentTool of
                                 Pencil ->
-                                    let
-                                        em =
-                                            model.editingMap
-                                    in
-                                    { em | map = Dict.insert tilePos model.currentTile model.editingMap.map }
+                                    { em
+                                        | map =
+                                            Dict.insert
+                                                tilePos
+                                                model.currentTile
+                                                model.editingMap.map
+                                    }
 
-                                Rect ->
-                                    model.editingMap
+                                ClearTool ->
+                                    { em
+                                        | enemyTowers =
+                                            Set.remove tilePos model.editingMap.enemyTowers
+                                                |> Debug.log "HSDOUF"
+                                    }
 
-                                HeroTool ->
-                                    model.editingMap
-
-                                BaseTool ->
-                                    model.editingMap
-
-                                EnemyTowerTool ->
+                                _ ->
                                     model.editingMap
 
                         _ ->
@@ -168,14 +173,27 @@ update msg session model =
                         Rect ->
                             model.hoveringTile
 
-                        HeroTool ->
+                        _ ->
                             Nothing
+                , editingMap =
+                    case model.hoveringTile of
+                        Just tilePos ->
+                            let
+                                em =
+                                    model.editingMap
+                            in
+                            case model.currentTool of
+                                ClearTool ->
+                                    { em
+                                        | enemyTowers =
+                                            Set.remove tilePos model.editingMap.enemyTowers
+                                    }
 
-                        BaseTool ->
-                            Nothing
+                                _ ->
+                                    model.editingMap
 
-                        EnemyTowerTool ->
-                            Nothing
+                        Nothing ->
+                            model.editingMap
               }
                 |> applyPencil session
             , session
@@ -471,6 +489,8 @@ drawToolbox session model =
         , toolBtn model.currentTool BaseTool "Base"
         , Html.br [] []
         , toolBtn model.currentTool EnemyTowerTool "Enemy Tower"
+        , Html.br [] []
+        , toolBtn model.currentTool ClearTool "(clear)"
         ]
 
 
