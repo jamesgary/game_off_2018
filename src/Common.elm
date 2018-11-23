@@ -1,4 +1,4 @@
-module Common exposing (Config, ConfigFloat, Flags, Key, Map, Persistence, PlacementAvailability(..), Session, Tile(..), TilePos, tilePosToFloats, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
+module Common exposing (Config, ConfigFloat, Key, Map, PlacementAvailability(..), Session, Tile(..), TilePos, tilePosToFloats, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
 
 import Dict exposing (Dict)
 import Game.Resources as GameResources exposing (Resources)
@@ -27,20 +27,6 @@ type alias Session =
 
 type alias Config =
     { getFloat : String -> Float
-    }
-
-
-type alias Flags =
-    { timestamp : Int
-    , windowWidth : Float
-    , windowHeight : Float
-    , persistence : Maybe Persistence
-    }
-
-
-type alias Persistence =
-    { isConfigOpen : Bool
-    , configFloats : List ( String, ConfigFloat )
     }
 
 

@@ -10,17 +10,33 @@ import Html exposing (Html)
 import Html.Attributes
 import Html.Events
 import Html.Events.Extra.Mouse as Mouse
-import Json.Decode as Decode
+import Json.Decode
+import Json.Encode
 import MapEditor
 import Math.Vector2 as Vec2 exposing (Vec2)
 import Random
 import Set exposing (Set)
 
 
-port saveFlags : Persistence -> Cmd msg
+port saveFlags : Json.Decode.Value -> Cmd msg
 
 
 port hardReset : () -> Cmd msg
+
+
+type alias Flags =
+    { timestamp : Int
+    , windowWidth : Float
+    , windowHeight : Float
+    , persistence : Maybe Persistence
+    }
+
+
+type alias Persistence =
+    { isConfigOpen : Bool
+    , configFloats : Dict String ConfigFloat
+    , savedMaps : List SavedMap
+    }
 
 
 defaultPesistence : Persistence
@@ -45,6 +61,22 @@ defaultPesistence =
         , ( "turretTimeToSprout", { val = 5, min = 0, max = 30 } )
         , ( "waterBulletCost", { val = 5, min = 0, max = 25 } )
         ]
+            |> Dict.fromList
+    , savedMaps = []
+    }
+
+
+savedMaps : List SavedMap
+savedMaps =
+    []
+
+
+type alias SavedMap =
+    { map : Map
+    , hero : TilePos
+    , enemyTowers : List TilePos
+    , base : TilePos
+    , size : ( Int, Int )
     }
 
 
@@ -110,12 +142,12 @@ sessionFromFlags flags =
         ( configFloats, isConfigOpen ) =
             case flags.persistence of
                 Just persistence ->
-                    ( Dict.fromList persistence.configFloats
+                    ( persistence.configFloats
                     , persistence.isConfigOpen
                     )
 
                 Nothing ->
-                    ( Dict.fromList defaultPesistence.configFloats
+                    ( defaultPesistence.configFloats
                     , defaultPesistence.isConfigOpen
                     )
     in
@@ -136,9 +168,12 @@ sessionFromFlags flags =
     }
 
 
-init : Flags -> ( Model, Cmd Msg )
-init flags =
+init : Json.Decode.Value -> ( Model, Cmd Msg )
+init jsonFlags =
     let
+        flags =
+            jsonToFlags jsonFlags
+
         session =
             sessionFromFlags flags
     in
@@ -212,22 +247,22 @@ update msg model =
                             }
                     }
             in
-            ( newModel, saveFlags (modelToPersistence newModel) )
+            ( newModel, saveFlags (modelToPersistence newModel |> encodePersistence) )
 
         ToggleConfig shouldOpen ->
             let
                 newModel =
                     { model | session = { session | isConfigOpen = shouldOpen } }
             in
-            ( newModel, saveFlags (modelToPersistence newModel) )
+            ( newModel, saveFlags (modelToPersistence newModel |> encodePersistence) )
 
         HardReset ->
             ( { model
                 | session =
                     { session
                         | isConfigOpen = True
-                        , configFloats = Dict.fromList defaultPesistence.configFloats
-                        , c = makeC (Dict.fromList defaultPesistence.configFloats)
+                        , configFloats = defaultPesistence.configFloats
+                        , c = makeC defaultPesistence.configFloats
                     }
               }
             , hardReset ()
@@ -261,16 +296,125 @@ update msg model =
 modelToPersistence : Model -> Persistence
 modelToPersistence model =
     { isConfigOpen = model.session.isConfigOpen
-    , configFloats = Dict.toList model.session.configFloats
+    , configFloats = model.session.configFloats
+    , savedMaps = [] --model.session.savedMaps
     }
+
+
+jsonToFlags : Json.Decode.Value -> Flags
+jsonToFlags json =
+    { timestamp = 0
+    , windowWidth = 0
+    , windowHeight = 0
+    , persistence = Nothing
+    }
+
+
+flagsDecoder : Json.Decode.Decoder Flags
+flagsDecoder =
+    Json.Decode.map4 Flags
+        (Json.Decode.field "timestamp" Json.Decode.int)
+        (Json.Decode.field "windowWidth" Json.Decode.float)
+        (Json.Decode.field "windowHeight" Json.Decode.float)
+        (Json.Decode.field "persistence"
+            (Json.Decode.nullable
+                (Json.Decode.map3 Persistence
+                    (Json.Decode.field "isConfigOpen" Json.Decode.bool)
+                    (Json.Decode.field "configFloats" (Json.Decode.dict configFloatDecoder))
+                    (Json.Decode.field "savedMaps" (Json.Decode.list savedMapDecoder))
+                )
+            )
+        )
+
+
+configFloatDecoder : Json.Decode.Decoder ConfigFloat
+configFloatDecoder =
+    Json.Decode.map3 ConfigFloat
+        (Json.Decode.field "val" Json.Decode.float)
+        (Json.Decode.field "min" Json.Decode.float)
+        (Json.Decode.field "max" Json.Decode.float)
+
+
+savedMapDecoder : Json.Decode.Decoder SavedMap
+savedMapDecoder =
+    Json.Decode.map5 SavedMap
+        (Json.Decode.field "map" mapDecoder)
+        (Json.Decode.field "hero" tilePosDecoder)
+        (Json.Decode.field "enemyTowers" (Json.Decode.list tilePosDecoder))
+        (Json.Decode.field "base" tilePosDecoder)
+        (Json.Decode.field "size" tilePosDecoder)
+
+
+tilePosDecoder : Json.Decode.Decoder TilePos
+tilePosDecoder =
+    Json.Decode.map2 (\x y -> ( x, y ))
+        (Json.Decode.index 0 Json.Decode.int)
+        (Json.Decode.index 1 Json.Decode.int)
+
+
+mapDecoder : Json.Decode.Decoder Map
+mapDecoder =
+    Json.Decode.dict tileDecoder
+        |> Json.Decode.map
+            (\tilePosStrTileDict ->
+                tilePosStrTileDict
+                    |> Dict.toList
+                    |> List.map
+                        (\( tilePosStr, tile ) ->
+                            case String.split "," tilePosStr of
+                                [ x, y ] ->
+                                    ( ( String.toInt x |> Maybe.withDefault 0
+                                      , String.toInt y |> Maybe.withDefault 0
+                                      )
+                                    , tile
+                                    )
+
+                                _ ->
+                                    ( ( 0, 0 ), tile )
+                        )
+                    |> Dict.fromList
+            )
+
+
+tileDecoder : Json.Decode.Decoder Tile
+tileDecoder =
+    Json.Decode.string
+        |> Json.Decode.map
+            (\tile ->
+                case tile of
+                    "grass" ->
+                        Grass
+
+                    "water" ->
+                        Water
+
+                    _ ->
+                        Poop
+            )
+
+
+encodePersistence : Persistence -> Json.Decode.Value
+encodePersistence persistence =
+    Json.Encode.object
+        [ ( "isConfigOpen", Json.Encode.bool persistence.isConfigOpen )
+        , ( "configFloats"
+          , Json.Encode.dict
+                identity
+                identity
+                Dict.empty
+          )
+
+        --todo
+        , ( "savedMaps", Json.Encode.list identity [] )
+        ]
 
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Browser.Events.onKeyDown (Decode.map KeyDown (Decode.field "key" Decode.string))
-        , Browser.Events.onKeyUp (Decode.map KeyUp (Decode.field "key" Decode.string))
-        , Browser.Events.onKeyUp (Decode.map KeyUp (Decode.field "key" Decode.string))
+        [ Browser.Events.onKeyDown (Json.Decode.map KeyDown (Json.Decode.field "key" Json.Decode.string))
+        , Browser.Events.onKeyUp (Json.Decode.map KeyUp (Json.Decode.field "key" Json.Decode.string))
+        , Browser.Events.onKeyUp (Json.Decode.map KeyUp (Json.Decode.field "key" Json.Decode.string))
         , Sub.batch
             (case model.state of
                 Game gameModel ->
