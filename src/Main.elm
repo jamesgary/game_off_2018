@@ -223,6 +223,14 @@ init jsonFlags =
     )
 
 
+updateStateAndSession : Model -> ( AppState, Session ) -> Model
+updateStateAndSession model ( appState, session ) =
+    { model
+        | state = appState
+        , session = session
+    }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
@@ -308,10 +316,13 @@ update msg model =
             case model.state of
                 MapEditor mapEditorModel ->
                     let
-                        ( newModel, effects ) =
+                        ( newModel, newSession, effects ) =
                             MapEditor.update (MapEditor.Tick delta) session mapEditorModel
                     in
-                    { model | state = MapEditor newModel }
+                    { model
+                        | state = MapEditor newModel
+                        , session = newSession
+                    }
                         |> performMapEffects effects
 
                 _ ->
@@ -321,18 +332,17 @@ update msg model =
             case model.state of
                 MapEditor mapEditorModel ->
                     let
-                        ( newModel, effects ) =
+                        ( newModel, newSession, effects ) =
                             MapEditor.update mapEditorMsg session mapEditorModel
                     in
-                    { model | state = MapEditor newModel }
+                    { model
+                        | state = MapEditor newModel
+                        , session = newSession
+                    }
                         |> performMapEffects effects
 
                 _ ->
                     ( model, Cmd.none )
-
-
-
--- may belong in map editor?
 
 
 performMapEffects : List MapEditor.Effect -> Model -> ( Model, Cmd Msg )

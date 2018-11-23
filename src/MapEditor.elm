@@ -96,7 +96,7 @@ initMap =
     }
 
 
-update : Msg -> Session -> Model -> ( Model, List Effect )
+update : Msg -> Session -> Model -> ( Model, Session, List Effect )
 update msg session model =
     case msg of
         Tick delta ->
@@ -106,6 +106,7 @@ update msg session model =
                         model.center
                         (Vec2.scale 0.2 (heroDirInput session.keysPressed))
               }
+            , session
             , []
             )
 
@@ -140,6 +141,7 @@ update msg session model =
                 | hoveringTile = hoveringTile
                 , editingMap = editingMap
               }
+            , session
             , []
             )
 
@@ -155,6 +157,7 @@ update msg session model =
                             model.hoveringTile
               }
                 |> applyPencil session
+            , session
             , []
             )
 
@@ -166,16 +169,19 @@ update msg session model =
                             , maybeRectOrigin = Nothing
                         }
                    )
+            , session
             , []
             )
 
         ChooseTool tool ->
             ( { model | currentTool = tool }
+            , session
             , []
             )
 
         ChooseTile tile ->
             ( { model | currentTile = tile }
+            , session
             , []
             )
 
@@ -198,6 +204,7 @@ update msg session model =
 
               else
                 model
+            , session
             , []
             )
 
@@ -208,11 +215,24 @@ update msg session model =
 
                 Nothing ->
                     Debug.todo "bad saved map :("
+            , session
             , []
             )
 
         SaveMap ->
             ( model
+            , { session
+                | savedMaps =
+                    session.savedMaps
+                        |> List.map
+                            (\savedMap ->
+                                if savedMap.name == model.editingMap.name then
+                                    model.editingMap
+
+                                else
+                                    savedMap
+                            )
+              }
             , [ SaveMapEffect model.editingMap ]
             )
 
