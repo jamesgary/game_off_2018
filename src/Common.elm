@@ -95,7 +95,7 @@ type alias SavedMap =
     { name : String
     , map : Map
     , hero : TilePos
-    , enemyTowers : List TilePos
+    , enemyTowers : Set TilePos
     , base : TilePos
     , size : ( Int, Int )
     }

@@ -71,7 +71,7 @@ defaultPesistence =
 0000000
 """
           , hero = ( 1, 1 )
-          , enemyTowers = [ ( 1, 5 ), ( 2, 4 ) ]
+          , enemyTowers = Set.fromList [ ( 1, 5 ), ( 2, 4 ) ]
           , base = ( 2, 2 )
           , size = ( 6, 5 )
           }
@@ -86,7 +86,7 @@ defaultPesistence =
 0000000
 """
           , hero = ( 1, 1 )
-          , enemyTowers = [ ( 1, 5 ), ( 2, 4 ) ]
+          , enemyTowers = Set.fromList [ ( 1, 5 ), ( 2, 4 ) ]
           , base = ( 2, 2 )
           , size = ( 6, 5 )
           }
@@ -103,7 +103,7 @@ defaultPesistence =
 000011
 """
           , hero = ( 1, 1 )
-          , enemyTowers = [ ( 1, 5 ), ( 2, 4 ) ]
+          , enemyTowers = Set.fromList [ ( 1, 5 ), ( 2, 4 ) ]
           , base = ( 2, 2 )
           , size = ( 6, 5 )
           }
@@ -414,7 +414,9 @@ savedMapDecoder =
         (Json.Decode.field "name" Json.Decode.string)
         (Json.Decode.field "map" mapDecoder)
         (Json.Decode.field "hero" tilePosDecoder)
-        (Json.Decode.field "enemyTowers" (Json.Decode.list tilePosDecoder))
+        (Json.Decode.field "enemyTowers" (Json.Decode.list tilePosDecoder)
+            |> Json.Decode.map Set.fromList
+        )
         (Json.Decode.field "base" tilePosDecoder)
         (Json.Decode.field "size" tilePosDecoder)
 
@@ -499,7 +501,11 @@ encodeSavedMap savedMap =
         [ ( "name", Json.Encode.string savedMap.name )
         , ( "map", encodeMap savedMap.map )
         , ( "hero", encodeTilePos savedMap.hero )
-        , ( "enemyTowers", Json.Encode.list encodeTilePos savedMap.enemyTowers )
+        , ( "enemyTowers"
+          , savedMap.enemyTowers
+                |> Set.toList
+                |> Json.Encode.list encodeTilePos
+          )
         , ( "base", encodeTilePos savedMap.base )
         , ( "size", encodeTilePos savedMap.size )
         ]

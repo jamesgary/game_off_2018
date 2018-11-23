@@ -60,6 +60,8 @@ type Tool
     = Pencil
     | Rect
     | HeroTool
+    | BaseTool
+    | EnemyTowerTool
 
 
 init : Session -> Model
@@ -91,7 +93,7 @@ initMap =
 """
             |> mapFromAscii
     , hero = ( 1, 1 )
-    , enemyTowers = []
+    , enemyTowers = Set.empty
     , base = ( 2, 2 )
     , size = ( 4, 4 )
     }
@@ -138,6 +140,12 @@ update msg session model =
                                 HeroTool ->
                                     model.editingMap
 
+                                BaseTool ->
+                                    model.editingMap
+
+                                EnemyTowerTool ->
+                                    model.editingMap
+
                         _ ->
                             model.editingMap
             in
@@ -161,6 +169,12 @@ update msg session model =
                             model.hoveringTile
 
                         HeroTool ->
+                            Nothing
+
+                        BaseTool ->
+                            Nothing
+
+                        EnemyTowerTool ->
                             Nothing
               }
                 |> applyPencil session
@@ -187,6 +201,20 @@ update msg session model =
 
                                             _ ->
                                                 m.editingMap.hero
+                                    , base =
+                                        case ( m.currentTool, m.hoveringTile ) of
+                                            ( BaseTool, Just tilePos ) ->
+                                                tilePos
+
+                                            _ ->
+                                                m.editingMap.base
+                                    , enemyTowers =
+                                        case ( m.currentTool, m.hoveringTile ) of
+                                            ( EnemyTowerTool, Just tilePos ) ->
+                                                Set.insert tilePos m.editingMap.enemyTowers
+
+                                            _ ->
+                                                m.editingMap.enemyTowers
                                 }
                         }
                    )
@@ -332,7 +360,9 @@ view session model =
                 (List.concat
                     [ drawMap model.center session model
                     , drawRect session model
+                    , drawBase session model
                     , drawHero session model
+                    , drawEnemyTowers session model
                     , drawSelectedTileOutline session model
                     ]
                 )
@@ -431,13 +461,16 @@ drawToolbox session model =
         , Html.br [] []
         , toolBtn model.currentTool Rect "Rect"
         , Html.hr [] []
-        , toolBtn model.currentTool HeroTool "Hero"
-        , Html.hr [] []
         , tileBtn model.currentTile Water "Water"
         , Html.br [] []
         , tileBtn model.currentTile Grass "Grass"
         , Html.hr [] []
         , Html.hr [] []
+        , toolBtn model.currentTool HeroTool "Hero"
+        , Html.br [] []
+        , toolBtn model.currentTool BaseTool "Base"
+        , Html.br [] []
+        , toolBtn model.currentTool EnemyTowerTool "Enemy Tower"
         ]
 
 
@@ -537,6 +570,30 @@ drawHero session model =
         , texture = GameResources.getTexture "images/hero.png" session.resources
         }
     ]
+
+
+drawBase : Session -> Model -> List GameTwoDRender.Renderable
+drawBase session model =
+    [ GameTwoDRender.sprite
+        { position = tilePosToFloats model.editingMap.base
+        , size = ( 1, 1 )
+        , texture = GameResources.getTexture "images/tower.png" session.resources
+        }
+    ]
+
+
+drawEnemyTowers : Session -> Model -> List GameTwoDRender.Renderable
+drawEnemyTowers session model =
+    model.editingMap.enemyTowers
+        |> Set.toList
+        |> List.map
+            (\et ->
+                GameTwoDRender.sprite
+                    { position = tilePosToFloats et
+                    , size = ( 1, 1 )
+                    , texture = GameResources.getTexture "images/enemyTower.png" session.resources
+                    }
+            )
 
 
 drawTile : Session -> TilePos -> Tile -> GameTwoDRender.Renderable
