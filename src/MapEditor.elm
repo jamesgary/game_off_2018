@@ -300,15 +300,28 @@ drawSavedMaps session model =
             (session.savedMaps
                 |> List.map
                     (\savedMap ->
+                        let
+                            isActive =
+                                model.editingMap.name == savedMap.name
+                        in
                         Html.div
-                            [ Html.Attributes.style "display" "flex"
-                            , Html.Attributes.style "background" "#ddd"
-                            , Html.Attributes.style "border" "2px solid #ccc"
-                            , Html.Attributes.style "margin" "2px"
-                            , Html.Attributes.style "padding" "2px"
-                            , Html.Attributes.style "align-items" "stretch"
-                            , Html.Attributes.style "justify-content" "space-between"
-                            ]
+                            (List.append
+                                [ Html.Attributes.style "display" "flex"
+                                , Html.Attributes.style "border" "2px solid #ccc"
+                                , Html.Attributes.style "margin" "2px"
+                                , Html.Attributes.style "padding" "8px 15px"
+                                , Html.Attributes.style "align-items" "stretch"
+                                , Html.Attributes.style "justify-content" "space-between"
+                                ]
+                                (if isActive then
+                                    [ Html.Attributes.style "background" "#07f"
+                                    , Html.Attributes.style "color" "white"
+                                    ]
+
+                                 else
+                                    [ Html.Attributes.style "background" "#ddd" ]
+                                )
+                            )
                             [ Html.div
                                 [ Html.Attributes.style "margin-right" "10px"
                                 ]
@@ -316,6 +329,9 @@ drawSavedMaps session model =
                             , Html.div []
                                 [ Html.button
                                     [ Html.Events.onClick (LoadMap savedMap.name)
+                                    , Html.Attributes.style "font-size" "16px"
+                                    , Html.Attributes.style "font-size" "16px"
+                                    , Html.Attributes.style "cursor" "pointer"
                                     ]
                                     [ Html.text "Load" ]
                                 ]
