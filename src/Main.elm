@@ -60,22 +60,7 @@ defaultPesistence =
         ]
             |> Dict.fromList
     , savedMaps =
-        [ { name = "Tutorial"
-          , map =
-                mapFromAscii
-                    """
-0000000
-0111110
-0111110
-0100110
-0000000
-"""
-          , hero = ( 1, 1 )
-          , enemyTowers = Set.fromList [ ( 1, 5 ), ( 2, 4 ) ]
-          , base = ( 2, 2 )
-          , size = ( 6, 5 )
-          }
-        , { name = "Level One"
+        [ { name = "New Map"
           , map =
                 mapFromAscii
                     """
@@ -84,23 +69,6 @@ defaultPesistence =
 0111110
 0111110
 0000000
-"""
-          , hero = ( 1, 1 )
-          , enemyTowers = Set.fromList [ ( 1, 5 ), ( 2, 4 ) ]
-          , base = ( 2, 2 )
-          , size = ( 6, 5 )
-          }
-        , { name = "Final Boss"
-          , map =
-                mapFromAscii
-                    """
-000010
-000010
-000010
-000010
-000011
-000011
-000011
 """
           , hero = ( 1, 1 )
           , enemyTowers = Set.fromList [ ( 1, 5 ), ( 2, 4 ) ]
