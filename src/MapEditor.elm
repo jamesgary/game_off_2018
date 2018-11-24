@@ -104,14 +104,17 @@ update : Msg -> Session -> Model -> ( Model, Session, List Effect )
 update msg session model =
     case msg of
         Tick delta ->
-            ( { model
-                | center =
+            let
+                newCenter =
                     Vec2.add
                         model.center
-                        (Vec2.scale 0.2 (heroDirInput session.keysPressed))
+                        (Vec2.scale 2 (heroDirInput session.keysPressed))
+            in
+            ( { model
+                | center = newCenter
               }
             , session
-            , []
+            , [ MoveCamera newCenter ]
             )
 
         MouseMove ( x, y ) ->
@@ -754,3 +757,4 @@ type
     Effect
     -- maybe should carry json?
     = SaveMapEffect SavedMap
+    | MoveCamera Vec2

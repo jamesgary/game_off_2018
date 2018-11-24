@@ -6,53 +6,90 @@
   </head>
   <body>
     <div id="elm"></div>
+    <div id="pixi"></div>
     <div id="stats"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/4.8.2/pixi.min.js"></script>
     <script src="./js/main.js"></script>
     <script>
-      var persistence;
+      function init() {
+        PIXI.SCALE_MODES.DEFAULT = PIXI.SCALE_MODES.NEAREST;
+        var app = new PIXI.Application({
+          width: window.innerWidth,
+          height: window.innerHeight,
+          roundPixels: true,
+          resolution: 1,
+        });
+        document.getElementById("pixi").appendChild(app.view);
 
-      try {
-        persistence = JSON.parse(localStorage.getItem("persistence"));
+        // create a texture from an image path
+        var waterTex = PIXI.Texture.fromImage('images/water.png');
 
-        if (!persistence) { fail() }
-      } catch(e) {
-        persistence = null;
-        localStorage.removeItem("persistence");
+        var oceanBgTilingSprite = new PIXI.extras.TilingSprite(
+          waterTex,
+          app.screen.width,
+          app.screen.height
+        );
+        app.stage.addChild(oceanBgTilingSprite);
+
+        //app.ticker.add(function() {
+        //  oceanBgTilingSprite.tileScale.x = 1;//2 + Math.sin(count);
+        //  oceanBgTilingSprite.tileScale.y = 1;//2 + Math.cos(count);
+        //  oceanBgTilingSprite.tilePosition.x += 0;
+        //  oceanBgTilingSprite.tilePosition.y += 1.55;
+        //});
+
+        var persistence;
+
+        try {
+          persistence = JSON.parse(localStorage.getItem("persistence"));
+
+          if (!persistence) { fail() }
+        } catch(e) {
+          persistence = null;
+          localStorage.removeItem("persistence");
+        }
+
+        var app = Elm.Main.init({
+          node: document.getElementById('elm'),
+          flags: {
+            // CHANGE ME WHEN CHANGING FLAGS
+            persistence: persistence,
+            timestamp: Date.now(),
+            windowWidth: window.innerWidth,
+            windowHeight: window.innerHeight,
+          }
+        });
+
+        app.ports.performEffects.subscribe(function(effects) {
+          for (let i = 0; i < effects.length; i++) {
+            let effect = effects[i];
+
+            // CHANGE ME WHEN CHANGING EFFECTS
+            switch (effect.id) {
+              case "SAVE":
+                console.log("savin");
+                console.log(effect.persistence);
+                localStorage.setItem("persistence", JSON.stringify(effect.persistence));
+                break;
+              case "HARD_RESET":
+                console.log("hard resetin");
+                localStorage.removeItem("persistence");
+                break;
+              case "MOVE_CAMERA":
+                console.log("movin camera");
+                oceanBgTilingSprite.tilePosition.x = -effect.x;
+                oceanBgTilingSprite.tilePosition.y = effect.y;
+                break;
+              default:
+                console.error("unknown effect: " + effect);
+            }
+          }
+        });
+
+        (function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.getElementById("stats").appendChild(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='//rawgit.com/mrdoob/stats.js/master/build/stats.min.js';document.head.appendChild(script);})()
       }
 
-      var app = Elm.Main.init({
-        node: document.getElementById('elm'),
-        flags: {
-          // CHANGE ME WHEN CHANGING FLAGS
-          persistence: persistence,
-          timestamp: Date.now(),
-          windowWidth: window.innerWidth,
-          windowHeight: window.innerHeight,
-        }
-      });
-
-      app.ports.performEffects.subscribe(function(effects) {
-        for (let i = 0; i < effects.length; i++) {
-          let effect = effects[i];
-
-          // CHANGE ME WHEN CHANGING EFFECTS
-          switch (effect.id) {
-            case "SAVE":
-              console.log("savin");
-              console.log(effect.persistence);
-              localStorage.setItem("persistence", JSON.stringify(effect.persistence));
-              break;
-            case "HARD_RESET":
-              console.log("hard resetin");
-              localStorage.removeItem("persistence");
-              break;
-            default:
-              console.error("unknown effect: " + effect);
-          }
-        }
-      });
-
-      (function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.getElementById("stats").appendChild(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='//rawgit.com/mrdoob/stats.js/master/build/stats.min.js';document.head.appendChild(script);})()
+      init();
     </script>
   </body>
 </html>

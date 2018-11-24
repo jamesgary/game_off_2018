@@ -328,6 +328,15 @@ performMapEffects effects model =
                                 , ( "persistence", modelToPersistence model |> encodePersistence )
                                 ]
                             ]
+
+                    MapEditor.MoveCamera pos ->
+                        performEffects
+                            [ Json.Encode.object
+                                [ ( "id", Json.Encode.string "MOVE_CAMERA" )
+                                , ( "x", Json.Encode.float (Vec2.getX pos) )
+                                , ( "y", Json.Encode.float (Vec2.getY pos) )
+                                ]
+                            ]
             )
         |> Cmd.batch
     )
@@ -559,6 +568,11 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
+    Html.text ""
+
+
+view2 : Model -> Html Msg
+view2 model =
     case model.state of
         Game gameModel ->
             Html.text "game!"
