@@ -12,6 +12,13 @@
     <script src="./js/main.js"></script>
     <script>
       function init() {
+
+        // PIXIIIIIIIIIIIIIIIIIIIII
+        // PIXIIIIIIIIIIIIIIIIIIIII
+        // PIXIIIIIIIIIIIIIIIIIIIII
+
+        // Some DOM setup
+
         PIXI.SCALE_MODES.DEFAULT = PIXI.SCALE_MODES.NEAREST;
         var app = new PIXI.Application({
           width: window.innerWidth,
@@ -21,15 +28,24 @@
         });
         document.getElementById("pixi").appendChild(app.view);
 
-        // create a texture from an image path
+        // Load textures
+
         var waterTex = PIXI.Texture.fromImage('images/water.png');
+        //var grassTex = PIXI.Texture.fromImage('images/grass.png');
+
+        // Create sprites/containers
 
         var oceanBgTilingSprite = new PIXI.extras.TilingSprite(
           waterTex,
           app.screen.width,
           app.screen.height
         );
+        var mapTileContainer = new PIXI.particles.ParticleContainer();
+        var mapTileSprites = [];
+
+        // Add sprites to stage
         app.stage.addChild(oceanBgTilingSprite);
+        app.stage.addChild(mapTileContainer);
 
         //app.ticker.add(function() {
         //  oceanBgTilingSprite.tileScale.x = 1;//2 + Math.sin(count);
@@ -60,6 +76,8 @@
           }
         });
 
+        let center = {x: 0, y: 0};
+
         app.ports.performEffects.subscribe(function(effects) {
           for (let i = 0; i < effects.length; i++) {
             let effect = effects[i];
@@ -76,12 +94,30 @@
                 localStorage.removeItem("persistence");
                 break;
               case "MOVE_CAMERA":
-                console.log("movin camera");
-                oceanBgTilingSprite.tilePosition.x = -effect.x;
-                oceanBgTilingSprite.tilePosition.y = effect.y;
+                center.x = effect.x
+                center.y = effect.y
+                break;
+              case "DRAW_MAP":
+                oceanBgTilingSprite.tilePosition.x = -center.x;
+                oceanBgTilingSprite.tilePosition.y = center.y;
+
+                for (let i = 0; i < effect.map.length; i++) {
+                  let tile = effect.map[i]; // tile.pos, tile.tile
+
+                  let sprite;
+                  if (mapTileSprites.length <= i) {
+                    sprite = new PIXI.Sprite.fromImage('images/grass.png');
+                    mapTileContainer.addChild(sprite);
+                    mapTileSprites[i] = sprite;
+                  } else {
+                    sprite = mapTileSprites[i];
+                  }
+                  sprite.x = -center.x + (tile.pos.x * 32);
+                  sprite.y = center.y + (tile.pos.y * 32);
+                }
                 break;
               default:
-                console.error("unknown effect: " + effect);
+                //console.error("unknown effect: " + JSON.stringify(effect));
             }
           }
         });

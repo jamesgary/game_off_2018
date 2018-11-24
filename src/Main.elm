@@ -337,6 +337,24 @@ performMapEffects effects model =
                                 , ( "y", Json.Encode.float (Vec2.getY pos) )
                                 ]
                             ]
+
+                    MapEditor.DrawMap map ->
+                        performEffects
+                            [ Json.Encode.object
+                                [ ( "id", Json.Encode.string "DRAW_MAP" )
+                                , ( "map"
+                                  , map
+                                        |> Dict.toList
+                                        |> Json.Encode.list
+                                            (\( tilePos, tile ) ->
+                                                Json.Encode.object
+                                                    [ ( "pos", encodeTilePos tilePos )
+                                                    , ( "tile", encodeTile tile )
+                                                    ]
+                                            )
+                                  )
+                                ]
+                            ]
             )
         |> Cmd.batch
     )

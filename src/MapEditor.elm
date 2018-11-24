@@ -114,7 +114,9 @@ update msg session model =
                 | center = newCenter
               }
             , session
-            , [ MoveCamera newCenter ]
+            , [ MoveCamera newCenter
+              , DrawMap model.editingMap.map
+              ]
             )
 
         MouseMove ( x, y ) ->
@@ -758,3 +760,4 @@ type
     -- maybe should carry json?
     = SaveMapEffect SavedMap
     | MoveCamera Vec2
+    | DrawMap Map
