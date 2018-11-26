@@ -5,7 +5,6 @@ import Browser.Events
 import Common exposing (..)
 import Dict exposing (Dict)
 import Game
-import Game.Resources as Resources exposing (Resources)
 import Html exposing (Html)
 import Html.Attributes
 import Html.Events
@@ -103,7 +102,6 @@ type Msg
     = KeyDown String
     | KeyUp String
     | Tick Float
-    | Resources Resources.Msg
     | ChangeConfig String String
     | ToggleConfig Bool
     | HardReset
@@ -157,7 +155,6 @@ sessionFromFlags flags =
     , savedMaps = persistence.savedMaps
 
     -- misc
-    , resources = Resources.init
     , seed = Random.initialSeed flags.timestamp
     }
 
@@ -174,21 +171,7 @@ init jsonFlags =
     ( { state = MapEditor (MapEditor.init session) --Game.init session
       , session = session
       }
-    , Resources.loadTextures
-        [--[ "images/grass.png"
-         --, "images/water.png"
-         --, "images/selectedTile.png"
-         --, "images/selectedTile-inactive.png"
-         --, "images/enemyTower.png"
-         --, "images/turret.png"
-         --, "images/moneyCrop.png"
-         --, "images/creep.png"
-         --, "images/tower.png"
-         --, "images/seedling.png"
-         --, "images/compost.png"
-         --, "images/hero.png"
-        ]
-        |> Cmd.map Resources
+    , Cmd.none
     )
 
 
@@ -214,17 +197,6 @@ update msg model =
 
         KeyDown str ->
             ( { model | session = { session | keysPressed = Set.insert str session.keysPressed } }
-            , Cmd.none
-            )
-
-        Resources resourcesMsg ->
-            ( { model
-                | session =
-                    { session
-                        | resources =
-                            Resources.update resourcesMsg session.resources
-                    }
-              }
             , Cmd.none
             )
 

@@ -1,7 +1,6 @@
 module Common exposing (Config, ConfigFloat, Key, Map, PlacementAvailability(..), SavedMap, Session, Texture(..), Tile(..), TilePos, mapFromAscii, textureToStr, tilePosToFloats, tileToStr, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
 
 import Dict exposing (Dict)
-import Game.Resources as GameResources exposing (Resources)
 import Math.Vector2 as Vec2 exposing (Vec2)
 import Random
 import Set exposing (Set)
@@ -23,7 +22,6 @@ type alias Session =
     , windowHeight : Float
 
     -- misc
-    , resources : Resources
     , seed : Random.Seed
     }
 

@@ -3,10 +3,6 @@ module MapEditor exposing (Effect(..), Model, Msg(..), init, update, view)
 import Common exposing (..)
 import Dict exposing (Dict)
 import Dict.Extra
-import Game.Resources as GameResources exposing (Resources)
-import Game.TwoD as GameTwoD
-import Game.TwoD.Camera as GameTwoDCamera exposing (Camera)
-import Game.TwoD.Render as GameTwoDRender
 import Html exposing (Html)
 import Html.Attributes
 import Html.Events
@@ -356,20 +352,6 @@ update msg session model =
               }
             , [ SaveMapEffect model.editingMap ]
             )
-
-
-getCamera : Session -> Model -> GameTwoDCamera.Camera
-getCamera session model =
-    let
-        tilesAcross =
-            session.windowWidth / zoomedTileSize model
-
-        tilesVert =
-            session.windowHeight / zoomedTileSize model
-    in
-    GameTwoDCamera.fixedArea
-        (tilesAcross * tilesVert)
-        ( Vec2.getX model.center, Vec2.getY model.center )
 
 
 heroDirInput : Set Key -> Vec2
@@ -739,36 +721,6 @@ applyRect session model =
 
         _ ->
             model
-
-
-drawSelectedTileOutline : Session -> Model -> List GameTwoDRender.Renderable
-drawSelectedTileOutline session model =
-    case model.hoveringTile of
-        Just ( x, y ) ->
-            case model.currentTool of
-                HeroTool ->
-                    [ GameTwoDRender.sprite
-                        { position = tilePosToFloats model.editingMap.hero
-                        , size = ( 1, 1 )
-                        , texture = GameResources.getTexture "images/hero.png" session.resources
-                        }
-                    , GameTwoDRender.sprite
-                        { position = ( toFloat x, toFloat y )
-                        , size = ( 1, 1 )
-                        , texture = GameResources.getTexture "images/selectedTile.png" session.resources
-                        }
-                    ]
-
-                _ ->
-                    [ GameTwoDRender.sprite
-                        { position = ( toFloat x, toFloat y )
-                        , size = ( 1, 1 )
-                        , texture = GameResources.getTexture "images/selectedTile.png" session.resources
-                        }
-                    ]
-
-        Nothing ->
-            []
 
 
 type
