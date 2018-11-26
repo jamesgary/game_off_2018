@@ -24,6 +24,7 @@ type Msg
     | Zoom Wheel.Event
     | LoadMap String
     | SaveMap
+    | PlayMap
 
 
 type alias Model =
@@ -354,6 +355,12 @@ update msg session model =
             , [ SaveMapEffect model.editingMap ]
             )
 
+        PlayMap ->
+            ( model
+            , session
+            , [ PlayMapEffect model.editingMap ]
+            )
+
 
 heroDirInput : Set Key -> Vec2
 heroDirInput keysPressed =
@@ -592,6 +599,14 @@ drawSavedMaps session model =
                                         , Html.Attributes.style "cursor" "pointer"
                                         ]
                                         [ Html.text "Save" ]
+                                    , Html.text " "
+                                    , Html.button
+                                        [ Html.Events.onClick PlayMap
+                                        , Html.Attributes.style "background" "orange"
+                                        , Html.Attributes.style "font-size" "16px"
+                                        , Html.Attributes.style "cursor" "pointer"
+                                        ]
+                                        [ Html.text "Play" ]
                                     ]
 
                                 else
@@ -759,6 +774,7 @@ type
     Effect
     -- maybe should carry json?
     = SaveMapEffect SavedMap
+    | PlayMapEffect SavedMap
     | MoveCamera Vec2
     | DrawSprites (List SpriteLayer)
     | ZoomEffect Float

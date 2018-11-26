@@ -264,7 +264,7 @@ update msg model =
                         | state = MapEditor newModel
                         , session = newSession
                     }
-                        |> performMapEffects effects
+                        |> performMapEffects newSession effects
 
                 _ ->
                     ( model, Cmd.none )
@@ -280,46 +280,64 @@ update msg model =
                         | state = MapEditor newModel
                         , session = newSession
                     }
-                        |> performMapEffects effects
+                        |> performMapEffects newSession effects
 
                 _ ->
                     ( model, Cmd.none )
 
 
-performMapEffects : List MapEditor.Effect -> Model -> ( Model, Cmd Msg )
-performMapEffects effects model =
-    ( model
-    , effects
-        |> List.map
-            (\effect ->
+performMapEffects : Session -> List MapEditor.Effect -> Model -> ( Model, Cmd Msg )
+performMapEffects session effects model =
+    effects
+        |> List.foldl
+            (\effect ( updatingModel, updatingCmds ) ->
                 case effect of
                     MapEditor.SaveMapEffect editingMap ->
-                        performEffects
+                        ( updatingModel
+                        , performEffects
                             [ Json.Encode.object
                                 [ ( "id", Json.Encode.string "SAVE" )
-                                , ( "persistence", modelToPersistence model |> encodePersistence )
+                                , ( "persistence", modelToPersistence updatingModel |> encodePersistence )
                                 ]
                             ]
+                            :: updatingCmds
+                        )
+
+                    MapEditor.PlayMapEffect editingMap ->
+                        let
+                            ( newestModel, _ ) =
+                                Game.initTryOut session editingMap
+                        in
+                        ( { updatingModel | state = Game newestModel }
+                        , updatingCmds
+                        )
 
                     MapEditor.ZoomEffect zoomLevel ->
-                        performEffects
+                        ( updatingModel
+                        , performEffects
                             [ Json.Encode.object
                                 [ ( "id", Json.Encode.string "ZOOM" )
                                 , ( "zoomLevel", Json.Encode.float zoomLevel )
                                 ]
                             ]
+                            :: updatingCmds
+                        )
 
                     MapEditor.MoveCamera pos ->
-                        performEffects
+                        ( updatingModel
+                        , performEffects
                             [ Json.Encode.object
                                 [ ( "id", Json.Encode.string "MOVE_CAMERA" )
                                 , ( "x", Json.Encode.float (Vec2.getX pos * 32) )
                                 , ( "y", Json.Encode.float (Vec2.getY pos * 32) )
                                 ]
                             ]
+                            :: updatingCmds
+                        )
 
                     MapEditor.DrawSprites layers ->
-                        performEffects
+                        ( updatingModel
+                        , performEffects
                             [ Json.Encode.object
                                 [ ( "id", Json.Encode.string "DRAW" )
                                 , ( "layers"
@@ -352,9 +370,11 @@ performMapEffects effects model =
                                   )
                                 ]
                             ]
+                            :: updatingCmds
+                        )
             )
-        |> Cmd.batch
-    )
+            ( model, [] )
+        |> Tuple.mapSecond Cmd.batch
 
 
 modelToPersistence : Model -> Persistence
