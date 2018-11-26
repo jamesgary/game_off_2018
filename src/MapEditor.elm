@@ -779,17 +779,3 @@ type
     | MoveCamera Vec2
     | DrawSprites (List SpriteLayer)
     | ZoomEffect Float
-
-
-type alias SpriteLayer =
-    { name : String
-    , zOrder : Int
-    , sprites : List Sprite
-    }
-
-
-type alias Sprite =
-    { x : Float
-    , y : Float
-    , texture : String
-    }

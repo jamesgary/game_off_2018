@@ -378,7 +378,7 @@ update msg session model =
                 |> collideBulletsWithEnemyTowers session delta
                 |> heroPickUpCompost session delta
                 |> checkGameOver session delta
-            , []
+            , [ DrawSprites (getSprites session model) ]
             )
 
         KeyUp str ->
@@ -1527,5 +1527,83 @@ drawGlass session model =
         []
 
 
+getSprites : Session -> Model -> List SpriteLayer
+getSprites session model =
+    let
+        mapLayer =
+            { name = "map"
+            , sprites =
+                model.map
+                    |> Dict.toList
+                    |> List.map
+                        (\( ( x, y ), tile ) ->
+                            { x = x |> toFloat
+                            , y = y |> toFloat
+                            , texture = tileToStr tile
+                            }
+                        )
+            }
+
+        --cursorLayer =
+        --    { name = "cursor"
+        --    , sprites =
+        --        case model.hoveringTile of
+        --            Just ( x, y ) ->
+        --                [ { x = x |> toFloat
+        --                  , y = y |> toFloat
+        --                  , texture = "selectedTile"
+        --                  }
+        --                ]
+        --            Nothing ->
+        --                []
+        --    }
+        heroLayer =
+            { name = "hero"
+            , sprites =
+                [ { x = Vec2.getX model.hero.pos
+                  , y = Vec2.getY model.hero.pos
+                  , texture = "hero"
+                  }
+                ]
+            }
+
+        buildingsLayer =
+            { name = "buildings"
+            , sprites =
+                [ case model.base.pos of
+                    ( x, y ) ->
+                        [ { x = x |> toFloat
+                          , y = y |> toFloat
+                          , texture = "tower"
+                          }
+                        ]
+                , model.enemyTowers
+                    |> List.map .pos
+                    |> List.map
+                        (\( etX, etY ) ->
+                            { x = etX |> toFloat
+                            , y = etY |> toFloat
+                            , texture = "enemyTower"
+                            }
+                        )
+                ]
+                    |> List.concat
+            }
+    in
+    [ mapLayer
+    , buildingsLayer
+    , heroLayer
+
+    --, cursorLayer
+    ]
+        |> List.indexedMap
+            (\i layer ->
+                { name = layer.name
+                , sprites = layer.sprites
+                , zOrder = i -- not used yet
+                }
+            )
+
+
 type Effect
-    = NoOp
+    = DrawSprites (List SpriteLayer)

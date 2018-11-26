@@ -317,9 +317,42 @@ performGameEffects session effects model =
         |> List.foldl
             (\effect ( updatingModel, updatingCmds ) ->
                 case effect of
-                    Game.NoOp ->
+                    Game.DrawSprites layers ->
                         ( updatingModel
-                        , updatingCmds
+                        , performEffects
+                            [ Json.Encode.object
+                                [ ( "id", Json.Encode.string "DRAW" )
+                                , ( "layers"
+                                  , layers
+                                        |> Json.Encode.list
+                                            (\{ name, zOrder, sprites } ->
+                                                Json.Encode.object
+                                                    [ ( "name", Json.Encode.string name )
+                                                    , ( "zOrder", Json.Encode.int zOrder ) -- not used yet
+                                                    , ( "sprites"
+                                                      , sprites
+                                                            |> List.map
+                                                                (\sprite ->
+                                                                    { x = sprite.x * 32
+                                                                    , y = sprite.y * 32
+                                                                    , texture = sprite.texture
+                                                                    }
+                                                                )
+                                                            |> Json.Encode.list
+                                                                (\{ x, y, texture } ->
+                                                                    Json.Encode.object
+                                                                        [ ( "x", Json.Encode.float x )
+                                                                        , ( "y", Json.Encode.float y )
+                                                                        , ( "texture", Json.Encode.string texture )
+                                                                        ]
+                                                                )
+                                                      )
+                                                    ]
+                                            )
+                                  )
+                                ]
+                            ]
+                            :: updatingCmds
                         )
             )
             ( model, [] )

@@ -1,4 +1,4 @@
-module Common exposing (Config, ConfigFloat, Key, Map, PlacementAvailability(..), SavedMap, Session, Texture(..), Tile(..), TilePos, heroDirInput, mapFromAscii, textureToStr, tilePosToFloats, tileToStr, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
+module Common exposing (Config, ConfigFloat, Key, Map, PlacementAvailability(..), SavedMap, Session, Sprite, SpriteLayer, Texture(..), Tile(..), TilePos, heroDirInput, mapFromAscii, textureToStr, tilePosToFloats, tileToStr, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
 
 import Dict exposing (Dict)
 import Math.Vector2 as Vec2 exposing (Vec2)
@@ -197,3 +197,17 @@ heroDirInput keysPressed =
             0
     }
         |> Vec2.fromRecord
+
+
+type alias SpriteLayer =
+    { name : String
+    , zOrder : Int
+    , sprites : List Sprite
+    }
+
+
+type alias Sprite =
+    { x : Float
+    , y : Float
+    , texture : String
+    }
