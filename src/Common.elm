@@ -1,4 +1,4 @@
-module Common exposing (Config, ConfigFloat, Key, Map, PlacementAvailability(..), SavedMap, Session, Texture(..), Tile(..), TilePos, mapFromAscii, textureToStr, tilePosToFloats, tileToStr, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
+module Common exposing (Config, ConfigFloat, Key, Map, PlacementAvailability(..), SavedMap, Session, Texture(..), Tile(..), TilePos, heroDirInput, mapFromAscii, textureToStr, tilePosToFloats, tileToStr, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
 
 import Dict exposing (Dict)
 import Math.Vector2 as Vec2 exposing (Vec2)
@@ -161,3 +161,39 @@ tileToStr tile =
 
         Poop ->
             "poop"
+
+
+heroDirInput : Set Key -> Vec2
+heroDirInput keysPressed =
+    { x =
+        if
+            Set.member "ArrowLeft" keysPressed
+                || Set.member "a" keysPressed
+        then
+            -1
+
+        else if
+            Set.member "ArrowRight" keysPressed
+                || Set.member "d" keysPressed
+        then
+            1
+
+        else
+            0
+    , y =
+        if
+            Set.member "ArrowUp" keysPressed
+                || Set.member "w" keysPressed
+        then
+            1
+
+        else if
+            Set.member "ArrowDown" keysPressed
+                || Set.member "s" keysPressed
+        then
+            -1
+
+        else
+            0
+    }
+        |> Vec2.fromRecord

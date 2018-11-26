@@ -1,4 +1,4 @@
-port module Game exposing (GameState(..), Model, initTryOut)
+port module Game exposing (Effect(..), GameState(..), Model, Msg(..), initTryOut, update, view)
 
 import AStar
 import Browser
@@ -37,27 +37,20 @@ initTryOut session savedMap =
       , particles = []
       , creeps = []
       , enemyTowers =
-            [ { pos = ( 12, -8 )
-              , timeSinceLastSpawn = 9999
-              , healthAmt = c.getFloat "towerHealthMax"
-              , healthMax = c.getFloat "towerHealthMax"
-              }
-
-            --, { pos = ( 11, -15 )
-            --  , timeSinceLastSpawn = 9999
-            --  , healthAmt = c.getFloat "towerHealthMax"
-            --  , healthMax = c.getFloat "towerHealthMax"
-            --  }
-            --, { pos = ( 14, -11 )
-            --  , timeSinceLastSpawn = 9999
-            --  , healthAmt = c.getFloat "towerHealthMax"
-            --  , healthMax = c.getFloat "towerHealthMax"
-            --  }
-            ]
+            savedMap.enemyTowers
+                |> Set.toList
+                |> List.map
+                    (\pos ->
+                        { pos = pos
+                        , timeSinceLastSpawn = 9999
+                        , healthAmt = c.getFloat "towerHealthMax"
+                        , healthMax = c.getFloat "towerHealthMax"
+                        }
+                    )
       , turrets = []
       , moneyCrops = []
       , base =
-            { pos = ( 13, -13 )
+            { pos = savedMap.base
             , healthAmt = c.getFloat "towerHealthMax"
             , healthMax = c.getFloat "towerHealthMax"
             }
@@ -70,62 +63,15 @@ initTryOut session savedMap =
             { compost = 0
             }
       , gameState = Playing
+      , isMouseDown = False
+      , mousePos = Vec2.vec2 -99 -99
+      , age = 0
       }
     , Cmd.none
     )
 
 
-port saveFlags : Persistence -> Cmd msg
-
-
 port hardReset : () -> Cmd msg
-
-
-defaultPesistence : Persistence
-defaultPesistence =
-    { isConfigOpen = False
-    , config =
-        [ ( "bulletDmg", { val = 15, min = 0, max = 20 } )
-        , ( "bulletMaxAge", { val = 2, min = 0, max = 5 } )
-        , ( "bulletSpeed", { val = 10, min = 5, max = 50 } )
-        , ( "canvasHeight", { val = 600, min = 300, max = 1200 } )
-        , ( "canvasWidth", { val = 800, min = 400, max = 1600 } )
-        , ( "creepDps", { val = 10, min = 0, max = 200 } )
-        , ( "creepHealth", { val = 100, min = 1, max = 200 } )
-        , ( "creepSpeed", { val = 1, min = 0, max = 2 } )
-        , ( "heroAcc", { val = 70, min = 10, max = 200 } )
-        , ( "heroHealthMax", { val = 100, min = 1, max = 10000 } )
-        , ( "heroMaxSpeed", { val = 20, min = 10, max = 100 } )
-        , ( "meterWidth", { val = 450, min = 10, max = 800 } )
-        , ( "refillRate", { val = 20, min = 0, max = 1000 } )
-        , ( "tilesToShowLengthwise", { val = 20, min = 10, max = 200 } )
-        , ( "towerHealthMax", { val = 1000, min = 100, max = 5000 } )
-        , ( "turretTimeToSprout", { val = 5, min = 0, max = 30 } )
-        , ( "waterBulletCost", { val = 5, min = 0, max = 25 } )
-        ]
-    }
-
-
-
---main =
---    Browser.element
---        { init = init
---        , view = \_ -> Html.text ""
---        , update = \_ -> update
---        , subscriptions = subscriptions
---        }
-
-
-type alias Flags =
-    { timestamp : Float
-    , persistence : Maybe Persistence
-    }
-
-
-type alias Persistence =
-    { isConfigOpen : Bool
-    , config : List ( String, ConfigVal )
-    }
 
 
 type alias Model =
@@ -156,6 +102,9 @@ type alias Model =
 
     -- state
     , gameState : GameState
+    , mousePos : Vec2
+    , isMouseDown : Bool
+    , age : Float
     }
 
 
@@ -275,9 +224,6 @@ type Msg
     | MouseUp
     | MouseMove ( Float, Float )
     | Tick Float
-    | ChangeConfig String String
-    | ToggleConfig Bool
-    | HardReset
 
 
 dlog : String -> a -> a
@@ -322,3 +268,1264 @@ tupleToVec2 : ( Float, Float ) -> Vec2
 tupleToVec2 ( x, y ) =
     { x = x, y = y }
         |> Vec2.fromRecord
+
+
+viewMeter : Float -> Float -> Float -> Html Msg
+viewMeter amt max meterWidth =
+    let
+        padding =
+            meterWidth * 0.005
+
+        ratio =
+            amt / max
+    in
+    Html.div
+        [ Html.Attributes.style "display" "inline-block"
+        , Html.Attributes.style "background" "#111"
+        , Html.Attributes.style "padding" (String.fromFloat (4 * padding) ++ "px")
+        , Html.Attributes.style "font-size" "0"
+        ]
+        [ Html.div
+            [ Html.Attributes.style "display" "inline-block"
+            , Html.Attributes.style "width" (px meterWidth)
+            , Html.Attributes.style "background" "#eee"
+            , Html.Attributes.style "height" (px (0.1 * meterWidth))
+            , Html.Attributes.style "border" (px (2 * padding) ++ " solid #eee")
+            , Html.Attributes.style "border-radius" (px (4 * padding))
+            ]
+            [ Html.div
+                (List.concat
+                    [ [ Html.Attributes.style "background" "#5fcde4"
+                      , Html.Attributes.style "border" "#5fcde4"
+                      , Html.Attributes.style "width" (pct (100 * ratio))
+                      , Html.Attributes.style "height" "100%"
+                      , Html.Attributes.style "border-radius" (px (4 * padding))
+                      ]
+                    , if amt >= (0.98 * max) then
+                        [ Html.Attributes.style "border-radius" (px (4 * padding)) ]
+
+                      else
+                        [ Html.Attributes.style "border-radius-right" "0" ]
+                    ]
+                )
+                []
+            ]
+
+        --, Html.span [] [ Html.text (String.fromFloat waterAmt) ]
+        --, Html.span [] [ Html.text "/" ]
+        --, Html.span [] [ Html.text (String.fromFloat waterMax) ]
+        ]
+
+
+vec2FromTurretPos : TilePos -> Vec2
+vec2FromTurretPos tilePos =
+    tilePos
+        |> tilePosToFloats
+        |> tupleToVec2
+        |> Vec2.add (Vec2.vec2 0.5 0.5)
+
+
+vec2FromCreep : Creep -> Vec2
+vec2FromCreep creep =
+    tilePosSub creep.nextPos creep.pos
+        |> tilePosToFloats
+        |> tupleToVec2
+        |> Vec2.scale creep.progress
+        |> Vec2.add (creep.pos |> tilePosToFloats |> tupleToVec2)
+        |> Vec2.add creep.offset
+        |> Vec2.add (Vec2.vec2 0.5 0.5)
+
+
+tilePosSub : TilePos -> TilePos -> TilePos
+tilePosSub ( a, b ) ( c, d ) =
+    ( a - c, b - d )
+
+
+tilePosToFloats : TilePos -> ( Float, Float )
+tilePosToFloats ( col, row ) =
+    ( toFloat col, toFloat row )
+
+
+currentCameraPos : Model -> Vec2
+currentCameraPos model =
+    -- TODO
+    Vec2.vec2 0 0
+
+
+update : Msg -> Session -> Model -> ( Model, List Effect )
+update msg session model =
+    case msg of
+        Tick d ->
+            let
+                delta =
+                    -- set max frame at 0.25 sec
+                    min (d / 1000) 0.25
+            in
+            ( model
+                |> ageSelf session delta
+                |> ageParticles session delta
+                |> moveHero session delta
+                |> refillWater session delta
+                |> makeTurretBullets session delta
+                |> makePlayerBullets session delta
+                |> ageCrops session delta
+                |> moveBullets session delta
+                |> spawnCreeps session delta
+                |> moveCreeps session delta
+                |> applyCreepDamageToBase session delta
+                |> applyCreepDamageToHero session delta
+                |> collideBulletsWithCreeps session delta
+                |> collideBulletsWithEnemyTowers session delta
+                |> heroPickUpCompost session delta
+                |> checkGameOver session delta
+            , []
+            )
+
+        KeyUp str ->
+            ( model |> applyKeyDown str
+            , []
+            )
+
+        KeyDown str ->
+            ( model |> applyKeyDown str
+            , []
+            )
+
+        MouseMove ( mouseX, mouseY ) ->
+            let
+                cameraPos =
+                    currentCameraPos model
+
+                mousePos =
+                    Vec2.vec2 mouseX mouseY
+            in
+            ( { model
+                | mousePos =
+                    mousePos
+                        |> Vec2.toRecord
+                        |> (\{ x, y } ->
+                                { x =
+                                    (x - (session.c.getFloat "canvasWidth" / 2))
+                                        / (session.c.getFloat "canvasWidth" / session.c.getFloat "tilesToShowLengthwise")
+                                , y =
+                                    (y - (session.c.getFloat "canvasHeight" / 2))
+                                        / (-(session.c.getFloat "canvasHeight") / tilesToShowHeightwise session.c)
+                                }
+                           )
+                        |> Vec2.fromRecord
+                        |> Vec2.add (currentCameraPos model)
+              }
+            , []
+            )
+
+        MouseDown ->
+            ( { model | isMouseDown = True }
+                |> (\m ->
+                        case canPlace model of
+                            Shouldnt ->
+                                m
+
+                            Cant ->
+                                m
+
+                            Can ->
+                                case m.equipped of
+                                    MoneyCropSeed ->
+                                        case hoveringTilePos m of
+                                            Just tilePos ->
+                                                { m
+                                                    | moneyCrops =
+                                                        { pos = tilePos
+                                                        , timeSinceLastGenerate = 0
+                                                        , healthAmt = session.c.getFloat "baseHealthMax"
+                                                        , healthMax = session.c.getFloat "baseHealthMax"
+                                                        , age = 0
+                                                        }
+                                                            :: m.moneyCrops
+                                                }
+
+                                            Nothing ->
+                                                m
+
+                                    TurretSeed ->
+                                        case hoveringTilePos m of
+                                            Just tilePos ->
+                                                { m
+                                                    | turrets =
+                                                        { pos = tilePos
+                                                        , timeSinceLastFire = 0
+                                                        , healthAmt = session.c.getFloat "baseHealthMax"
+                                                        , healthMax = session.c.getFloat "baseHealthMax"
+                                                        , age = 0
+                                                        }
+                                                            :: m.turrets
+                                                }
+
+                                            Nothing ->
+                                                m
+
+                                    Gun ->
+                                        m
+                   )
+            , []
+            )
+
+        MouseUp ->
+            ( { model
+                | isMouseDown = False
+              }
+            , []
+            )
+
+
+ageSelf : Session -> Float -> Model -> Model
+ageSelf session delta model =
+    { model | age = delta + model.age }
+
+
+hoveringTileAndPos : Model -> Maybe ( Tile, TilePos )
+hoveringTileAndPos model =
+    case hoveringTilePos model of
+        Just tilePos ->
+            Dict.get tilePos model.map
+                |> Maybe.map (\tile -> ( tile, tilePos ))
+
+        Nothing ->
+            Nothing
+
+
+hoveringTile : Model -> Maybe Tile
+hoveringTile model =
+    case hoveringTilePos model of
+        Just tile ->
+            Dict.get tile model.map
+
+        Nothing ->
+            Nothing
+
+
+applyKeyDown : String -> Model -> Model
+applyKeyDown str model =
+    case str of
+        "1" ->
+            { model | equipped = Gun }
+
+        "2" ->
+            { model | equipped = MoneyCropSeed }
+
+        "3" ->
+            { model | equipped = TurretSeed }
+
+        _ ->
+            model
+
+
+makePlayerBullets : Session -> Float -> Model -> Model
+makePlayerBullets session delta model =
+    let
+        _ =
+            Debug.log "hey" model.isMouseDown
+    in
+    if model.isMouseDown && model.equipped == Gun && model.waterAmt > session.c.getFloat "waterBulletCost" then
+        if model.timeSinceLastFire > 0.15 then
+            { model
+                | timeSinceLastFire = 0
+                , bullets =
+                    makeBullet PlayerBullet model.hero.pos model.mousePos
+                        :: model.bullets
+                , waterAmt = model.waterAmt - session.c.getFloat "waterBulletCost"
+            }
+
+        else
+            { model | timeSinceLastFire = model.timeSinceLastFire + delta }
+
+    else
+        { model | timeSinceLastFire = model.timeSinceLastFire + delta }
+
+
+ageCrops : Session -> Float -> Model -> Model
+ageCrops session delta model =
+    { model
+        | turrets =
+            model.turrets
+                |> List.map
+                    (\turret ->
+                        { turret
+                            | age = turret.age + delta
+                        }
+                    )
+        , moneyCrops =
+            model.moneyCrops
+                |> List.map
+                    (\crop ->
+                        { crop
+                            | age = crop.age + delta
+                        }
+                    )
+    }
+
+
+refillWater : Session -> Float -> Model -> Model
+refillWater session delta model =
+    { model
+        | waterAmt =
+            if nearbyWater model then
+                min (model.waterAmt + (delta * session.c.getFloat "refillRate")) model.waterMax
+
+            else
+                model.waterAmt
+    }
+
+
+nearbyWater : Model -> Bool
+nearbyWater model =
+    model.hero.pos
+        |> getTilesSurroundingVec2 model
+        |> List.any (\tile -> tile == Water)
+
+
+getTilesSurroundingVec2 : Model -> Vec2 -> List Tile
+getTilesSurroundingVec2 model pos =
+    pos
+        |> Vec2.add (Vec2.vec2 -0.5 -0.5)
+        |> vec2ToTuple
+        |> Tuple.mapBoth round round
+        |> (\( x, y ) ->
+                [ ( x - 1, y - 1 )
+                , ( x - 1, y )
+                , ( x - 1, y + 1 )
+                , ( x, y - 1 )
+                , ( x, y )
+                , ( x, y + 1 )
+                , ( x + 1, y - 1 )
+                , ( x + 1, y )
+                , ( x + 1, y + 1 )
+                ]
+           )
+        |> List.filterMap (\neighborPos -> Dict.get neighborPos model.map)
+
+
+getTilePosSurroundingVec2 : Model -> Vec2 -> List TilePos
+getTilePosSurroundingVec2 model pos =
+    pos
+        |> Vec2.add (Vec2.vec2 -0.5 -0.5)
+        |> vec2ToTuple
+        |> Tuple.mapBoth round round
+        |> (\( x, y ) ->
+                [ ( x - 1, y - 1 )
+                , ( x - 1, y )
+                , ( x - 1, y + 1 )
+                , ( x, y - 1 )
+                , ( x, y )
+                , ( x, y + 1 )
+                , ( x + 1, y - 1 )
+                , ( x + 1, y )
+                , ( x + 1, y + 1 )
+                ]
+           )
+
+
+makeTurretBullets : Session -> Float -> Model -> Model
+makeTurretBullets session delta model =
+    let
+        ( newBullets, newTurrets ) =
+            model.turrets
+                |> List.foldl
+                    (\turret ( bullets, turrets ) ->
+                        let
+                            shotBullet =
+                                if turret.age > session.c.getFloat "turretTimeToSprout" && turret.timeSinceLastFire > 0.5 then
+                                    model.creeps
+                                        |> List.Extra.minimumBy (\closestCreep -> Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurretPos turret.pos))
+                                        |> Maybe.andThen
+                                            (\closestCreep ->
+                                                if Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurretPos turret.pos) < 5 ^ 2 then
+                                                    Just (makeBullet PlantBullet (vec2FromTurretPos turret.pos) (vec2FromCreep closestCreep))
+
+                                                else
+                                                    Nothing
+                                            )
+
+                                else
+                                    Nothing
+                        in
+                        case shotBullet of
+                            Just bullet ->
+                                ( bullet :: bullets, { turret | timeSinceLastFire = 0 } :: turrets )
+
+                            Nothing ->
+                                ( bullets, { turret | timeSinceLastFire = turret.timeSinceLastFire + delta } :: turrets )
+                    )
+                    ( model.bullets, [] )
+    in
+    { model
+        | turrets = newTurrets
+        , bullets = newBullets
+    }
+
+
+moveCreeps : Session -> Float -> Model -> Model
+moveCreeps session delta model =
+    { model
+        | creeps =
+            model.creeps
+                |> List.map
+                    (\creep ->
+                        let
+                            newProgress =
+                                if creep.diagonal then
+                                    delta * session.c.getFloat "creepSpeed" + creep.progress
+
+                                else
+                                    sqrt 2 * delta * session.c.getFloat "creepSpeed" + creep.progress
+
+                            ( pos, nextPos, freshProgress ) =
+                                if newProgress > 1 then
+                                    ( creep.nextPos, findNextTileTowards model creep.nextPos model.base.pos, newProgress - 1 )
+
+                                else
+                                    ( creep.pos, creep.nextPos, newProgress )
+                        in
+                        if isCreepOnHero model.hero creep then
+                            creep
+
+                        else
+                            { creep
+                                | pos = pos
+                                , nextPos = nextPos
+                                , progress = freshProgress
+                                , diagonal = isDiagonal pos nextPos
+                            }
+                    )
+    }
+
+
+isCreepOnHero : Hero -> Creep -> Bool
+isCreepOnHero hero creep =
+    (creep
+        |> vec2FromCreep
+        |> Vec2.add (Vec2.vec2 0 -0.0)
+        |> Vec2.distanceSquared hero.pos
+    )
+        < (0.8 ^ 2)
+
+
+applyCreepDamageToBase : Session -> Float -> Model -> Model
+applyCreepDamageToBase session delta ({ base } as model) =
+    let
+        creepDps =
+            session.c.getFloat "creepDps"
+
+        dmg =
+            creepDps * delta
+
+        tilesToCheck =
+            base.pos
+                |> vec2FromTurretPos
+                |> getTilePosSurroundingVec2 model
+
+        numCreeps =
+            model.creeps
+                |> List.filter
+                    (\creep ->
+                        tilesToCheck
+                            |> List.member creep.pos
+                    )
+                |> List.length
+
+        newBase =
+            { base
+                | healthAmt =
+                    base.healthAmt - (dmg * toFloat numCreeps)
+            }
+    in
+    { model | base = newBase }
+
+
+applyCreepDamageToHero : Session -> Float -> Model -> Model
+applyCreepDamageToHero session delta ({ hero } as model) =
+    let
+        creepDps =
+            session.c.getFloat "creepDps"
+
+        dmg =
+            creepDps * delta
+
+        numCreeps =
+            model.creeps
+                |> List.filter (isCreepOnHero model.hero)
+                |> List.length
+
+        newHero =
+            { hero
+                | healthAmt =
+                    model.hero.healthAmt - (dmg * toFloat numCreeps)
+            }
+    in
+    { model | hero = newHero }
+
+
+collideBulletsWithCreeps : Session -> Float -> Model -> Model
+collideBulletsWithCreeps session delta model =
+    let
+        { particles, bullets, creeps, composts, seed } =
+            model.bullets
+                |> List.foldl
+                    (\bullet tmp ->
+                        case List.Extra.splitWhen (\creep -> collidesWith ( bullet.pos, 0.1 ) ( vec2FromCreep creep, 0.5 )) tmp.creeps of
+                            Just ( firstHalf, foundCreep :: secondHalf ) ->
+                                let
+                                    newCreep =
+                                        { foundCreep | healthAmt = foundCreep.healthAmt - session.c.getFloat "bulletDmg" }
+
+                                    ( angle, newSeed ) =
+                                        Random.step
+                                            (Random.float 0 (2 * pi))
+                                            tmp.seed
+                                in
+                                { particles = BulletHitCreep bullet.pos angle 0 :: tmp.particles
+                                , bullets = tmp.bullets
+                                , creeps =
+                                    if newCreep.healthAmt > 0 then
+                                        firstHalf ++ (newCreep :: secondHalf)
+
+                                    else
+                                        firstHalf ++ secondHalf
+                                , composts =
+                                    if newCreep.healthAmt > 0 then
+                                        tmp.composts
+
+                                    else
+                                        { pos = vec2FromCreep foundCreep, age = 0 } :: tmp.composts
+                                , seed = newSeed
+                                }
+
+                            _ ->
+                                { particles = tmp.particles
+                                , bullets = bullet :: tmp.bullets
+                                , creeps = tmp.creeps
+                                , composts = tmp.composts
+                                , seed = tmp.seed
+                                }
+                    )
+                    { particles = model.particles
+                    , bullets = []
+                    , creeps = model.creeps
+                    , composts = model.composts
+                    , seed = session.seed
+                    }
+    in
+    { model
+        | creeps = creeps
+        , bullets = bullets
+        , particles = particles
+        , composts = composts
+
+        --, seed = seed
+    }
+
+
+collideBulletsWithEnemyTowers : Session -> Float -> Model -> Model
+collideBulletsWithEnemyTowers session delta model =
+    let
+        { particles, bullets, enemyTowers, composts, seed } =
+            model.bullets
+                |> List.foldl
+                    (\bullet tmp ->
+                        case List.Extra.splitWhen (\enemyTower -> collidesWith ( bullet.pos, 0.1 ) ( vec2FromTurretPos enemyTower.pos, 0.5 )) tmp.enemyTowers of
+                            Just ( firstHalf, foundEnemyTower :: secondHalf ) ->
+                                let
+                                    newEnemyTower =
+                                        { foundEnemyTower | healthAmt = foundEnemyTower.healthAmt - session.c.getFloat "bulletDmg" }
+
+                                    ( angle, newSeed ) =
+                                        Random.step
+                                            (Random.float 0 (2 * pi))
+                                            tmp.seed
+                                in
+                                { particles = BulletHitCreep bullet.pos angle 0 :: tmp.particles
+                                , bullets = tmp.bullets
+                                , enemyTowers =
+                                    if newEnemyTower.healthAmt > 0 then
+                                        firstHalf ++ (newEnemyTower :: secondHalf)
+
+                                    else
+                                        firstHalf ++ secondHalf
+                                , composts =
+                                    if newEnemyTower.healthAmt > 0 then
+                                        tmp.composts
+
+                                    else
+                                        { pos = vec2FromTurretPos foundEnemyTower.pos, age = 0 } :: tmp.composts
+                                , seed = newSeed
+                                }
+
+                            _ ->
+                                { particles = tmp.particles
+                                , bullets = bullet :: tmp.bullets
+                                , enemyTowers = tmp.enemyTowers
+                                , composts = tmp.composts
+                                , seed = tmp.seed
+                                }
+                    )
+                    { particles = model.particles
+                    , bullets = []
+                    , enemyTowers = model.enemyTowers
+                    , composts = model.composts
+                    , seed = session.seed
+                    }
+    in
+    { model
+        | enemyTowers = enemyTowers
+        , bullets = bullets
+        , particles = particles
+        , composts = composts
+
+        --, seed = seed
+    }
+
+
+heroPickUpCompost : Session -> Float -> Model -> Model
+heroPickUpCompost session delta ({ inv } as model) =
+    let
+        newComposts =
+            model.composts
+                |> List.filter
+                    (\compost ->
+                        Vec2.distance compost.pos model.hero.pos > 1
+                    )
+
+        numPickedUp =
+            List.length model.composts - List.length newComposts
+
+        newInv =
+            { inv | compost = inv.compost + numPickedUp }
+    in
+    { model
+        | composts = newComposts
+        , inv = newInv
+    }
+
+
+checkGameOver : Session -> Float -> Model -> Model
+checkGameOver session tick model =
+    { model
+        | gameState =
+            if (model.hero.healthAmt <= 0) || (model.base.healthAmt <= 0) then
+                GameOver
+
+            else if List.length model.enemyTowers == 0 then
+                Win
+
+            else
+                Playing
+    }
+
+
+collidesWith : ( Vec2, Float ) -> ( Vec2, Float ) -> Bool
+collidesWith ( v1, rad1 ) ( v2, rad2 ) =
+    Vec2.distance v1 v2 <= rad1 + rad2
+
+
+moveBullets : Session -> Float -> Model -> Model
+moveBullets session delta model =
+    { model
+        | bullets =
+            model.bullets
+                |> List.map
+                    (\bullet ->
+                        { bullet
+                            | pos =
+                                Vec2.add
+                                    (tupleToVec2 (fromPolar ( session.c.getFloat "bulletSpeed" * delta, bullet.angle )))
+                                    bullet.pos
+                            , age = bullet.age + delta
+                        }
+                    )
+                |> List.filter (\bullet -> bullet.age < session.c.getFloat "bulletMaxAge")
+    }
+
+
+type PlacementAvailability
+    = Shouldnt
+    | Cant
+    | Can
+
+
+canPlace : Model -> PlacementAvailability
+canPlace model =
+    if
+        case model.equipped of
+            TurretSeed ->
+                True
+
+            MoneyCropSeed ->
+                True
+
+            Gun ->
+                False
+    then
+        case hoveringTilePos model of
+            Just tilePos ->
+                if
+                    Vec2.distanceSquared
+                        (tilePos
+                            |> tilePosToFloats
+                            |> tupleToVec2
+                            |> Vec2.add (Vec2.vec2 0.5 0.5)
+                        )
+                        model.hero.pos
+                        < (3 ^ 2)
+                then
+                    Can
+
+                else
+                    Shouldnt
+
+            Nothing ->
+                Cant
+
+    else
+        Shouldnt
+
+
+spawnCreeps : Session -> Float -> Model -> Model
+spawnCreeps session delta model =
+    let
+        ( newEnemyTowers, newCreeps ) =
+            --, newSeed ) =
+            model.enemyTowers
+                |> List.foldl
+                    (\enemyTower ( enemyTowers, creeps ) ->
+                        --, seed ) ->
+                        if enemyTower.timeSinceLastSpawn + delta > 1.8 then
+                            let
+                                nextPos =
+                                    findNextTileTowards model enemyTower.pos model.base.pos
+
+                                ( offset, newSeed2 ) =
+                                    Random.step (vec2OffsetGenerator -0.5 0.5) session.seed
+                            in
+                            ( { enemyTower | timeSinceLastSpawn = 0 } :: enemyTowers
+                            , { pos = enemyTower.pos
+                              , nextPos = nextPos
+                              , progress = 0
+                              , diagonal = isDiagonal enemyTower.pos nextPos
+                              , healthAmt = session.c.getFloat "creepHealth"
+                              , healthMax = session.c.getFloat "creepHealth"
+                              , offset = offset
+                              }
+                                :: creeps
+                              --, newSeed2
+                            )
+
+                        else
+                            ( { enemyTower | timeSinceLastSpawn = enemyTower.timeSinceLastSpawn + delta } :: enemyTowers
+                            , creeps
+                              --, seed
+                            )
+                    )
+                    -- ( [], [], model.seed )
+                    ( [], [] )
+    in
+    { model
+        | enemyTowers = newEnemyTowers
+        , creeps = List.append newCreeps model.creeps
+
+        --, seed = newSeed
+    }
+
+
+vec2OffsetGenerator : Float -> Float -> Random.Generator Vec2
+vec2OffsetGenerator min max =
+    Random.pair (Random.float min max) (Random.float min max)
+        |> Random.map tupleToVec2
+
+
+ageParticles : Session -> Float -> Model -> Model
+ageParticles session delta model =
+    let
+        newParticles =
+            model.particles
+                |> List.filterMap
+                    (\particle ->
+                        case particle of
+                            BulletHitCreep pos angle age ->
+                                if age + delta < 1 then
+                                    Just (BulletHitCreep pos angle (age + delta))
+
+                                else
+                                    Nothing
+                    )
+    in
+    { model | particles = newParticles }
+
+
+moveHero : Session -> Float -> Model -> Model
+moveHero session delta model =
+    let
+        hero =
+            model.hero
+
+        newAcc =
+            Vec2.scale (session.c.getFloat "heroAcc") (heroDirInput session.keysPressed)
+
+        newVelUncapped =
+            Vec2.add model.hero.vel (Vec2.scale delta newAcc)
+
+        percentBeyondCap =
+            Vec2.length newVelUncapped / session.c.getFloat "heroMaxSpeed"
+
+        newVel =
+            (if percentBeyondCap > 1.0 then
+                Vec2.scale (1 / percentBeyondCap) newVelUncapped
+
+             else
+                newVelUncapped
+            )
+                |> Vec2.scale 0.8
+
+        newPos =
+            Vec2.add model.hero.pos (Vec2.scale delta newVel)
+
+        ( newestPos, newestVel ) =
+            if not <| isHeroColliding model.map newPos then
+                ( newPos, newVel )
+                -- also check common x/y slides
+
+            else if not <| isHeroColliding model.map (Vec2.vec2 (Vec2.getX newPos) (Vec2.getY hero.pos)) then
+                ( Vec2.vec2 (Vec2.getX newPos) (Vec2.getY hero.pos)
+                , Vec2.vec2 (Vec2.getX newVel) 0
+                )
+
+            else if not <| isHeroColliding model.map (Vec2.vec2 (Vec2.getX hero.pos) (Vec2.getY newPos)) then
+                ( Vec2.vec2 (Vec2.getX hero.pos) (Vec2.getY newPos)
+                , Vec2.vec2 0 (Vec2.getY newVel)
+                )
+
+            else
+                ( hero.pos, Vec2.vec2 0 0 )
+
+        newHero =
+            { hero
+                | pos = newestPos
+                , vel = newestVel
+            }
+    in
+    { model | hero = newHero }
+
+
+isHeroColliding : Map -> Vec2 -> Bool
+isHeroColliding map heroPos =
+    -- TODO performance!
+    let
+        heroPoly =
+            polyFromSquare heroPos 0.45
+    in
+    heroPos
+        |> Vec2.add (Vec2.vec2 -0.5 -0.5)
+        |> vec2ToTuple
+        |> Tuple.mapBoth round round
+        |> (\( x, y ) ->
+                [ ( x - 1, y - 1 )
+                , ( x - 1, y )
+                , ( x - 1, y + 1 )
+                , ( x, y - 1 )
+                , ( x, y )
+                , ( x, y + 1 )
+                , ( x + 1, y - 1 )
+                , ( x + 1, y )
+                , ( x + 1, y + 1 )
+                ]
+           )
+        |> List.any
+            (\( x, y ) ->
+                case Dict.get ( x, y ) map |> Maybe.map (not << isPassable) of
+                    Just True ->
+                        Collision.collision 10
+                            ( heroPoly, polySupport )
+                            ( polyFromSquare (Vec2.vec2 (0.5 + toFloat x) (0.5 + toFloat y)) 0.5, polySupport )
+                            |> Maybe.withDefault False
+
+                    _ ->
+                        False
+            )
+
+
+polyFromSquare : Vec2 -> Float -> List Collision.Pt
+polyFromSquare center halfLength =
+    center
+        |> Vec2.toRecord
+        |> (\{ x, y } ->
+                [ ( x + halfLength, y - halfLength )
+                , ( x + halfLength, y + halfLength )
+                , ( x - halfLength, y + halfLength )
+                , ( x - halfLength, y - halfLength )
+                ]
+           )
+
+
+isPassable : Tile -> Bool
+isPassable tile =
+    case tile of
+        Water ->
+            False
+
+        Grass ->
+            True
+
+        Poop ->
+            False
+
+
+dot : Collision.Pt -> Collision.Pt -> Float
+dot ( x1, y1 ) ( x2, y2 ) =
+    (x1 * x2) + (y1 * y2)
+
+
+polySupport : List Collision.Pt -> Collision.Pt -> Maybe Collision.Pt
+polySupport list d =
+    let
+        dotList =
+            List.map (dot d) list
+
+        decorated =
+            List.map2 Tuple.pair dotList list
+
+        max =
+            List.maximum decorated
+    in
+    case max of
+        Just ( m, p ) ->
+            Just p
+
+        _ ->
+            Nothing
+
+
+findNextTileTowards : Model -> TilePos -> TilePos -> TilePos
+findNextTileTowards model origin destination =
+    AStar.findPath
+        pythagoreanCost
+        (possibleMoves model)
+        origin
+        destination
+        |> Maybe.andThen List.head
+        |> Maybe.withDefault origin
+
+
+pythagoreanCost : AStar.Position -> AStar.Position -> Float
+pythagoreanCost ( x1, y1 ) ( x2, y2 ) =
+    -- TODO randomize a bit to fix weird diagnoal-prioritizing bug
+    let
+        dx =
+            toFloat <| abs (x1 - x2)
+
+        dy =
+            toFloat <| abs (y1 - y2)
+    in
+    --abs <| (sqrt 2 * min dx dy) + abs (dy - dx)
+    sqrt ((dx ^ 2) + (dy ^ 2))
+
+
+isDiagonal : TilePos -> TilePos -> Bool
+isDiagonal ( posCol, posRow ) ( nextPosCol, nextPosRow ) =
+    (abs (posCol - nextPosCol) + abs (posRow - nextPosRow)) == 2
+
+
+possibleMoves : Model -> TilePos -> Set TilePos
+possibleMoves model ( col, row ) =
+    [ ( col - 1, row )
+    , ( col + 1, row )
+    , ( col, row - 1 )
+    , ( col, row + 1 )
+
+    --- diagonals
+    , ( col - 1, row - 1 )
+    , ( col - 1, row + 1 )
+    , ( col + 1, row - 1 )
+    , ( col + 1, row + 1 )
+    ]
+        |> List.filterMap (\pos -> Dict.get pos model.map |> Maybe.map (Tuple.pair pos))
+        |> List.filter
+            (\( _, tile ) ->
+                case tile of
+                    Grass ->
+                        True
+
+                    Water ->
+                        False
+
+                    Poop ->
+                        False
+            )
+        |> List.map Tuple.first
+        |> Set.fromList
+
+
+hoveringTilePos : Model -> Maybe TilePos
+hoveringTilePos model =
+    model.mousePos
+        |> Vec2.toRecord
+        |> (\{ x, y } ->
+                -- always return tilepos for now
+                -- return nothing once we have actually ui
+                Just
+                    ( -0.5 + x |> round
+                    , -0.5 + y |> round
+                    )
+           )
+
+
+makeBullet : BulletKind -> Vec2 -> Vec2 -> Bullet
+makeBullet kind heroPos aimPos =
+    { kind = kind
+    , pos = heroPos
+    , angle =
+        toPolar
+            (Vec2.sub aimPos heroPos |> vec2ToTuple)
+            |> Tuple.second
+    , age = 0
+    }
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.batch
+        [ Browser.Events.onKeyDown (Decode.map KeyDown (Decode.field "key" Decode.string))
+        , Browser.Events.onKeyUp (Decode.map KeyUp (Decode.field "key" Decode.string))
+        , Sub.batch
+            (case model.gameState of
+                Playing ->
+                    [ Browser.Events.onAnimationFrameDelta Tick
+                    ]
+
+                GameOver ->
+                    []
+
+                Win ->
+                    []
+            )
+        ]
+
+
+tilesToShowHeightwise : Config -> Float
+tilesToShowHeightwise c =
+    c.getFloat "tilesToShowLengthwise" * (c.getFloat "canvasHeight" / c.getFloat "canvasWidth")
+
+
+view : Session -> Model -> Html Msg
+view session model =
+    Html.div
+        [ Html.Attributes.style "height" "100%"
+        , Html.Attributes.style "width" "100%"
+        ]
+        [ Html.div
+            [ Html.Attributes.style "margin" "5px 20px 0"
+            , Html.Attributes.style "font-family" "sans-serif"
+            , Html.Attributes.style "font-size" "14px"
+            , Html.Attributes.style "background" "rgba(0,0,0,0.8)"
+            , Html.Attributes.style "margin" "0"
+            , Html.Attributes.style "padding" "0"
+            , Html.Attributes.style "top" "0"
+            , Html.Attributes.style "position" "absolute"
+            , Html.Attributes.style "width" "100%"
+            , Html.Attributes.style "color" "white"
+            ]
+            [ Html.div
+                [ Html.Attributes.style "margin" "5px 20px 0"
+                , Html.Attributes.style "font-family" "sans-serif"
+                , Html.Attributes.style "font-size" "14px"
+                ]
+                [ Html.text "WASD to move. 1 to switch to Gun, 2 to switch to MoneyCrop Seeds, 3 to switch to Turret Seeds."
+                ]
+            , Html.hr [] []
+            , Html.div
+                [ Html.Attributes.style "margin" "5px 20px 0"
+                , Html.Attributes.style "font-family" "monospace"
+                , Html.Attributes.style "font-size" "14px"
+                ]
+                [ Html.text "Currently equipped: "
+                , Html.strong [] [ Html.text (equippableStr model.equipped) ]
+                , Html.br [] []
+                , Html.text "Compost: "
+                , Html.strong [] [ Html.text (String.fromInt model.inv.compost) ]
+                , Html.br [] []
+                ]
+            , Html.hr [] []
+            , Html.div
+                [ Html.Attributes.style "margin" "5px 20px 0"
+                , Html.Attributes.style "font-family" "monospace"
+                , Html.Attributes.style "font-size" "14px"
+                ]
+                [ Html.text "--- DEBUG ---"
+                , Html.br [] []
+
+                --, Html.text "Map sprites (visible/total): "
+                --, Html.strong [] [ Html.text (String.fromInt (List.length map)) ]
+                --, Html.strong [] [ Html.text "/" ]
+                --, Html.strong [] [ Html.text (String.fromInt (Dict.size model.map)) ]
+                --, Html.br [] []
+                --, Html.br [] []
+                , Html.span [] [ Html.text "Water: " ]
+                , viewMeter model.waterAmt model.waterMax (session.c.getFloat "meterWidth")
+                ]
+            ]
+        , drawGlass session model
+        , Html.div []
+            [ case model.gameState of
+                GameOver ->
+                    Html.div
+                        [ Html.Attributes.style "position" "absolute"
+                        , Html.Attributes.style "top" "0"
+                        , Html.Attributes.style "left" "0"
+                        , Html.Attributes.style "width" "100%"
+                        , Html.Attributes.style "height" "100%"
+                        , Html.Attributes.style "background" "rgba(0,0,0,0.5)"
+                        ]
+                        [ Html.div
+                            [ Html.Attributes.style "font-size" "48px"
+                            , Html.Attributes.style "color" "white"
+                            , Html.Attributes.style "text-align" "center"
+                            , Html.Attributes.style "margin-top" "30%"
+                            , Html.Attributes.style "cursor" "default"
+                            ]
+                            [ Html.text "GAME OVER" ]
+                        ]
+
+                Win ->
+                    Html.div
+                        [ Html.Attributes.style "position" "absolute"
+                        , Html.Attributes.style "top" "0"
+                        , Html.Attributes.style "left" "0"
+                        , Html.Attributes.style "width" "100%"
+                        , Html.Attributes.style "height" "100%"
+                        , Html.Attributes.style "background" "rgba(0,0,0,0.5)"
+                        ]
+                        [ Html.div
+                            [ Html.Attributes.style "font-size" "48px"
+                            , Html.Attributes.style "color" "white"
+                            , Html.Attributes.style "text-align" "center"
+                            , Html.Attributes.style "margin-top" "30%"
+                            , Html.Attributes.style "cursor" "default"
+                            ]
+                            [ Html.text "A WINNER IS YOU" ]
+                        ]
+
+                Playing ->
+                    Html.text ""
+            ]
+        ]
+
+
+bulletHitFrag : WebGL.Shader a { b | age : Float, angle : Float } { vcoord : Vec2 }
+bulletHitFrag =
+    [glsl|
+      precision mediump float;
+
+      varying vec2 vcoord;
+      uniform float age;
+      uniform float angle;
+
+      void main () {
+        float maxAge = 0.4;
+        float ageProgress = age / maxAge;
+        float radius = 0.04 + (0.07 * ageProgress);
+        //vec2  pos = vec2(0.5, (0.5 + (0.2 * ageProgress)));
+        vec2  pos = vec2(0.5 + 0.2 * ageProgress * sin(angle), 0.5 + 0.2 * ageProgress * cos(angle));
+        float dist = length(pos - vcoord);
+
+        float alpha = smoothstep(radius - 0.01, radius, dist);
+        vec4 color = vec4(
+          (1.0 * ageProgress) + 0.4,
+          (1.0 * ageProgress) + 0.4,
+          (1.0 * ageProgress) + 1.0,
+          (1.0 - alpha) * (1.0 - age / maxAge)
+        );
+
+        gl_FragColor = color;
+      }
+    |]
+
+
+
+--viewHealthMeter : Float -> Vec2 -> Float -> Float -> List GameTwoDRender.Renderable
+--viewHealthMeter size pos amt max =
+--    let
+--        healthOffset =
+--            Vec2.vec2 0 -0.25
+--
+--        outlineAmt =
+--            0.8
+--
+--        ratio =
+--            -- Basics.max 0 (amt / max) -- can spot bugs faster without this
+--            amt / max
+--    in
+--    [ drawRect
+--        Color.black
+--        (pos |> Vec2.add healthOffset)
+--        (Vec2.scale size (Vec2.vec2 0.9 0.2))
+--    , drawRect
+--        Color.green
+--        (pos
+--            |> Vec2.add healthOffset
+--            |> Vec2.add (Vec2.vec2 (size * outlineAmt * -0.5 * (1 - ratio)) 0)
+--        )
+--        (Vec2.vec2 (outlineAmt * ratio) 0.1
+--            |> Vec2.scale size
+--        )
+--    ]
+
+
+px : Float -> String
+px length =
+    String.fromFloat length ++ "px"
+
+
+pct : Float -> String
+pct length =
+    String.fromFloat length ++ "%"
+
+
+formatConfigFloat : Float -> String
+formatConfigFloat val =
+    Round.round 1 val
+
+
+equippableStr : Equippable -> String
+equippableStr equippable =
+    case equippable of
+        Gun ->
+            "Gun"
+
+        MoneyCropSeed ->
+            "MoneyCrop Seed"
+
+        TurretSeed ->
+            "Turret Seed"
+
+
+drawGlass : Session -> Model -> Html Msg
+drawGlass session model =
+    Html.div
+        [ Html.Attributes.style "display" "inline-block"
+        , Html.Attributes.style "position" "relative"
+        , Html.Attributes.style "margin" "0"
+        , Html.Attributes.style "font-size" "0"
+        , Html.Attributes.style "width" "100%"
+        , Html.Attributes.style "height" "100%"
+        , Html.Attributes.style "cursor" "default"
+
+        --, Html.Attributes.style "background" "rgba(0,255,0,0.5)"
+        , Mouse.onDown (\_ -> MouseDown)
+        , Mouse.onUp (\_ -> MouseUp)
+
+        --, Mouse.onMove (\event -> MouseMove event.offsetPos)
+        --, Wheel.onWheel Zoom
+        ]
+        []
+
+
+type Effect
+    = NoOp

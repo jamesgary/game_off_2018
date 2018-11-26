@@ -35,8 +35,8 @@ type alias Persistence =
     }
 
 
-defaultPesistence : Persistence
-defaultPesistence =
+defaultPersistence : Persistence
+defaultPersistence =
     { isConfigOpen = False
     , configFloats =
         [ ( "bulletDmg", { val = 15, min = 0, max = 20 } )
@@ -107,6 +107,7 @@ type Msg
     | HardReset
       -- app msgs
     | MapEditorMsg MapEditor.Msg
+    | GameMsg Game.Msg
 
 
 makeC : Dict String ConfigFloat -> Config
@@ -138,7 +139,7 @@ sessionFromFlags flags =
     let
         persistence =
             flags.persistence
-                |> Maybe.withDefault defaultPesistence
+                |> Maybe.withDefault defaultPersistence
     in
     { configFloats = persistence.configFloats
     , c = makeC persistence.configFloats
@@ -246,8 +247,8 @@ update msg model =
                 | session =
                     { session
                         | isConfigOpen = True
-                        , configFloats = defaultPesistence.configFloats
-                        , c = makeC defaultPesistence.configFloats
+                        , configFloats = defaultPersistence.configFloats
+                        , c = makeC defaultPersistence.configFloats
                     }
               }
             , performEffects [ Json.Encode.object [ ( "id", Json.Encode.string "HARD_RESET" ) ] ]
@@ -266,8 +267,12 @@ update msg model =
                     }
                         |> performMapEffects newSession effects
 
-                _ ->
-                    ( model, Cmd.none )
+                Game gameModel ->
+                    let
+                        ( newModel, effects ) =
+                            Game.update (Game.Tick delta) session gameModel
+                    in
+                    ( { model | state = Game newModel }, Cmd.none )
 
         MapEditorMsg mapEditorMsg ->
             case model.state of
@@ -284,6 +289,41 @@ update msg model =
 
                 _ ->
                     ( model, Cmd.none )
+
+        GameMsg gameMsg ->
+            case model.state of
+                Game gameModel ->
+                    let
+                        ( newModel, effects ) =
+                            Game.update gameMsg session gameModel
+                    in
+                    ( { model
+                        | state = Game newModel
+
+                        --, session = newSession
+                      }
+                    , Cmd.none
+                    )
+
+                --|> performMapEffects newSession effects
+                --|> performMapEffects session effects
+                _ ->
+                    ( model, Cmd.none )
+
+
+performGameEffects : Session -> List Game.Effect -> Model -> ( Model, Cmd Msg )
+performGameEffects session effects model =
+    effects
+        |> List.foldl
+            (\effect ( updatingModel, updatingCmds ) ->
+                case effect of
+                    Game.NoOp ->
+                        ( updatingModel
+                        , updatingCmds
+                        )
+            )
+            ( model, [] )
+        |> Tuple.mapSecond Cmd.batch
 
 
 performMapEffects : Session -> List MapEditor.Effect -> Model -> ( Model, Cmd Msg )
@@ -605,8 +645,78 @@ view : Model -> Html Msg
 view model =
     case model.state of
         Game gameModel ->
-            Html.text "game!"
+            Game.view model.session gameModel
+                |> Html.map GameMsg
 
         MapEditor mapModel ->
             MapEditor.view model.session mapModel
                 |> Html.map MapEditorMsg
+
+
+
+--, Html.div
+--    [ Html.Attributes.style "position" "absolute"
+--    , Html.Attributes.style "top" "10px"
+--    , Html.Attributes.style "right" "10px"
+--    , Html.Attributes.style "background" "#eee"
+--    , Html.Attributes.style "border" "1px solid #333"
+--    , Html.Attributes.style "font-family" "sans-serif"
+--    , Html.Attributes.style "font-size" "18px"
+--    , Html.Attributes.style "padding" "8px"
+--    ]
+--   (if model.isConfigOpen then
+--       Html.button
+--           [ Html.Attributes.style "float" "left"
+--           , Html.Events.onClick HardReset
+--           ]
+--           [ Html.text "Hard Reset" ]
+--           :: Html.a
+--               [ Html.Events.onClick (ToggleConfig False)
+--               , Html.Attributes.style "float" "right"
+--               , Html.Attributes.style "display" "inline-block"
+--               ]
+--               [ Html.text "Collapse Config" ]
+--           :: Html.br [] []
+--           :: (model.config
+--                   |> Dict.toList
+--                   |> List.map
+--                       (\( name, { val, min, max } ) ->
+--                           Html.div
+--                               [ Html.Attributes.style "display" "flex"
+--                               , Html.Attributes.style "justify-content" "space-between"
+--                               , Html.Attributes.style "margin" "10px 10px"
+--                               ]
+--                               [ Html.div
+--                                   []
+--                                   [ Html.text name
+--                                   ]
+--                               , Html.div
+--                                   []
+--                                   [ Html.span [ Html.Attributes.style "margin" "0 10px" ] [ Html.text (formatConfigFloat val) ]
+--                                   , Html.input
+--                                       [ Html.Attributes.style "width" "40px"
+--                                       , Html.Attributes.value (formatConfigFloat min)
+--                                       ]
+--                                       []
+--                                   , Html.input
+--                                       [ Html.Attributes.type_ "range"
+--                                       , Html.Attributes.value (formatConfigFloat val)
+--                                       , Html.Attributes.min (formatConfigFloat min)
+--                                       , Html.Attributes.max (formatConfigFloat max)
+--                                       , Html.Attributes.step "any"
+--                                       , Html.Events.onInput (ChangeConfig name)
+--                                       ]
+--                                       []
+--                                   , Html.input
+--                                       [ Html.Attributes.style "width" "40px"
+--                                       , Html.Attributes.value (formatConfigFloat max)
+--                                       ]
+--                                       []
+--                                   ]
+--                               ]
+--                       )
+--              )
+--    else
+--       [ Html.a [ Html.Events.onClick (ToggleConfig True) ] [ Html.text "Expand Config" ] ]
+--   )
+--

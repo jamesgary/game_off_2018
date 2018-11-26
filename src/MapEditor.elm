@@ -341,6 +341,7 @@ update msg session model =
         SaveMap ->
             ( model
             , { session
+                --TODO should move savedMaps to persistence, then use function?
                 | savedMaps =
                     session.savedMaps
                         |> List.map
