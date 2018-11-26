@@ -390,41 +390,67 @@ heroDirInput keysPressed =
         |> Vec2.fromRecord
 
 
-getSprites : Session -> Model -> List Sprite
+getSprites : Session -> Model -> List SpriteLayer
 getSprites session model =
     let
-        mapSprites =
-            model.editingMap.map
-                |> Dict.toList
-                |> List.map
-                    (\( ( x, y ), tile ) ->
-                        { x = x |> toFloat
-                        , y = y |> toFloat
-                        , texture = tileToStr tile
-                        }
-                    )
+        mapLayer =
+            { name = "map"
+            , sprites =
+                model.editingMap.map
+                    |> Dict.toList
+                    |> List.map
+                        (\( ( x, y ), tile ) ->
+                            { x = x |> toFloat
+                            , y = y |> toFloat
+                            , texture = tileToStr tile
+                            }
+                        )
+            }
 
-        drawRectSprites =
-            rectSprites model
+        rectLayer =
+            { name = "rect"
+            , sprites = rectSprites model
+            }
 
-        drawSelectedOutline =
-            case model.hoveringTile of
-                Just ( x, y ) ->
-                    [ { x = x |> toFloat
-                      , y = y |> toFloat
-                      , texture = "selectedTile"
-                      }
-                    ]
+        cursorLayer =
+            { name = "cursor"
+            , sprites =
+                case model.hoveringTile of
+                    Just ( x, y ) ->
+                        [ { x = x |> toFloat
+                          , y = y |> toFloat
+                          , texture = "selectedTile"
+                          }
+                        ]
 
-                Nothing ->
-                    []
+                    Nothing ->
+                        []
+            }
+
+        heroLayer =
+            { name = "hero"
+            , sprites =
+                case model.editingMap.hero of
+                    ( x, y ) ->
+                        [ { x = x |> toFloat
+                          , y = y |> toFloat
+                          , texture = "hero"
+                          }
+                        ]
+            }
     in
-    [ mapSprites
-    , drawRectSprites
-    , drawSelectedOutline
+    [ mapLayer
+    , rectLayer
+    , heroLayer
+    , cursorLayer
     ]
-        |> List.reverse
-        |> List.concat
+        |> List.indexedMap
+            (\i layer ->
+                { name = layer.name
+                , sprites = layer.sprites
+                , zOrder = i -- not used yet
+                }
+            )
 
 
 view : Session -> Model -> Html Msg
@@ -450,31 +476,12 @@ drawGlass session model =
         , Html.Attributes.style "width" "100%"
         , Html.Attributes.style "height" "100%"
         , Html.Attributes.style "cursor" "default"
-
-        --, Html.Attributes.style "background" "rgba(255,0,0,0.5)"
         , Mouse.onDown (\_ -> MouseDown)
         , Mouse.onUp (\_ -> MouseUp)
         , Mouse.onMove (\event -> MouseMove event.offsetPos)
         , Wheel.onWheel Zoom
         ]
-        [-- GameTwoD.render
-         --   { time = 0
-         --   , size =
-         --       ( round session.windowWidth
-         --       , round session.windowHeight
-         --       )
-         --   , camera = getCamera session model
-         --   }
-         --   (List.concat
-         --       [ drawMap model.center session model
-         --       , drawRect session model
-         --       , drawBase session model
-         --       , drawHero session model
-         --       , drawEnemyTowers session model
-         --       , drawSelectedTileOutline session model
-         --       ]
-         --   )
-        ]
+        []
 
 
 drawDebug : Session -> Model -> Html Msg
@@ -728,7 +735,14 @@ type
     -- maybe should carry json?
     = SaveMapEffect SavedMap
     | MoveCamera Vec2
-    | DrawSprites (List Sprite)
+    | DrawSprites (List SpriteLayer)
+
+
+type alias SpriteLayer =
+    { name : String
+    , zOrder : Int
+    , sprites : List Sprite
+    }
 
 
 type alias Sprite =

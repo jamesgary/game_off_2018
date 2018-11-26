@@ -310,25 +310,35 @@ performMapEffects effects model =
                                 ]
                             ]
 
-                    MapEditor.DrawSprites sprites ->
+                    MapEditor.DrawSprites layers ->
                         performEffects
                             [ Json.Encode.object
                                 [ ( "id", Json.Encode.string "DRAW" )
-                                , ( "sprites"
-                                  , sprites
-                                        |> List.map
-                                            (\sprite ->
-                                                { x = sprite.x * 32
-                                                , y = sprite.y * 32
-                                                , texture = sprite.texture
-                                                }
-                                            )
+                                , ( "layers"
+                                  , layers
                                         |> Json.Encode.list
-                                            (\{ x, y, texture } ->
+                                            (\{ name, zOrder, sprites } ->
                                                 Json.Encode.object
-                                                    [ ( "x", Json.Encode.float x )
-                                                    , ( "y", Json.Encode.float y )
-                                                    , ( "texture", Json.Encode.string texture )
+                                                    [ ( "name", Json.Encode.string name )
+                                                    , ( "zOrder", Json.Encode.int zOrder ) -- not used yet
+                                                    , ( "sprites"
+                                                      , sprites
+                                                            |> List.map
+                                                                (\sprite ->
+                                                                    { x = sprite.x * 32
+                                                                    , y = sprite.y * 32
+                                                                    , texture = sprite.texture
+                                                                    }
+                                                                )
+                                                            |> Json.Encode.list
+                                                                (\{ x, y, texture } ->
+                                                                    Json.Encode.object
+                                                                        [ ( "x", Json.Encode.float x )
+                                                                        , ( "y", Json.Encode.float y )
+                                                                        , ( "texture", Json.Encode.string texture )
+                                                                        ]
+                                                                )
+                                                      )
                                                     ]
                                             )
                                   )

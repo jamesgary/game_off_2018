@@ -12,16 +12,16 @@
     <div id="stats"></div>
     <script src="./js/pixi.min.js"></script>
     <script src="./js/pixi-viewport.js"></script>
+    <script src="./js/pixi-layers.js"></script>
     <script src="./js/main.js"></script>
     <script>
       window.graphics = {};
 
       let app;
       let viewport;
-      let particleContainerContainer;
-      let particleContainersByTextureName;
-      let sprites = [];
-      let textureNameToParticleGroupCache = {};
+      //let particleContainerContainer;
+      //let textureNameToParticleGroupCache = {};
+      let nameToPixiLayer = {};
 
       graphics.init = function() {
         PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
@@ -46,9 +46,6 @@
         });
         app.stage.addChild(viewport);
 
-        particleContainerContainer = new PIXI.Container();
-        viewport.addChild(particleContainerContainer);
-
         // debug stuff
         //let rectangle = new PIXI.Graphics();
         //rectangle.beginFill(0xFFCCFF);
@@ -59,69 +56,67 @@
         // end debug stuff
       }
 
-      function addSprite(spriteData) {
-        let particleContainer = particleContainersByTextureName[spriteData.texture];
+      graphics.drawSprites = function(layerData) {
+        for (let l = 0; l < layerData.length; l++) {
+          let layer = layerData[l];
+          let pixiLayer = nameToPixiLayer[layer.name]
+          if (!pixiLayer) {
+            //pixiLayer = new PIXI.display.Layer();
+            pixiLayer = new PIXI.Container();
+            pixiLayer.particleContainerContainer = new PIXI.Container();
+            pixiLayer.textureNameToParticleGroupCache = {};
+            pixiLayer.addChild(pixiLayer.particleContainerContainer);
+            nameToPixiLayer[layer.name] = pixiLayer;
+            viewport.addChild(pixiLayer);
+          }
+          particleContainerContainer = pixiLayer.particleContainerContainer;
+          textureNameToParticleGroupCache = pixiLayer.textureNameToParticleGroupCache;
 
-        // make sure there's a particle container
-        if (!particleContainer) {
-          let particleContainer = new PIXI.particles.ParticleContainer();
-
-          // add to caches
-          particleContainersByTextureName[spriteData.texture] = particleContainer;
-          particleContainerContainer.addChild(particleContainer);
-        }
-
-        pixiSprite = particleContainer.addChild(
-          new PIXI.Sprite.fromImage('images/' + textureKey + '.png')
-        );
-
-        return pixiSprite;
-      }
-
-      graphics.drawSprites = function(spritesData) {
-        // reset numDrawnSprites for all particle containers
-        let allPcs = particleContainerContainer.children;
-        for (let i = 0; i < allPcs.length; i++) {
-          allPcs[i].numDrawnSprites = 0;
-        }
-
-        for (let i = 0; i < spritesData.length; i++) {
-          let spriteData = spritesData[i]
-
-          // get the particle container (add one of it doesn't exist)
-          let particleContainer = textureNameToParticleGroupCache[spriteData.texture];
-          if (!particleContainer) {
-            // make new particle container
-            particleContainer = new PIXI.particles.ParticleContainer();
-            particleContainer.numDrawnSprites = 0;
-            // add to particleContainerContainer
-            particleContainerContainer.addChild(particleContainer);
-            // add to textureNameToParticleGroupCache
-            textureNameToParticleGroupCache[spriteData.texture] = particleContainer;
+          // reset numDrawnSprites for all particle containers
+          let allPcs = particleContainerContainer.children;
+          for (let i = 0; i < allPcs.length; i++) {
+            allPcs[i].numDrawnSprites = 0;
           }
 
-          // update the first undrawn sprite (add one if it doesn't exist)
-          let sprite;
-          try {
-            sprite = particleContainer.getChildAt(particleContainer.numDrawnSprites);
-          } catch(e) {
-            sprite = new PIXI.Sprite.fromImage('images/' + spriteData.texture + '.png')
-            particleContainer.addChildAt(sprite, particleContainer.numDrawnSprites);
+          for (let i = 0; i < layer.sprites.length; i++) {
+            let spriteData = layer.sprites[i]
+
+            // get the particle container (add one of it doesn't exist)
+            let particleContainer = textureNameToParticleGroupCache[spriteData.texture];
+            if (!particleContainer) {
+              // make new particle container
+              particleContainer = new PIXI.particles.ParticleContainer();
+              particleContainer.numDrawnSprites = 0;
+              // add to particleContainerContainer
+              particleContainerContainer.addChild(particleContainer);
+              // add to textureNameToParticleGroupCache
+              textureNameToParticleGroupCache[spriteData.texture] = particleContainer;
+            }
+
+            // update the first undrawn sprite (add one if it doesn't exist)
+            let sprite;
+            try {
+              sprite = particleContainer.getChildAt(particleContainer.numDrawnSprites);
+            } catch(e) {
+              sprite = new PIXI.Sprite.fromImage('images/' + spriteData.texture + '.png')
+              particleContainer.addChildAt(sprite, particleContainer.numDrawnSprites);
+            }
+
+            sprite.x = spriteData.x;
+            sprite.y = spriteData.y;
+            particleContainer.numDrawnSprites++;
           }
 
-          sprite.x = spriteData.x;
-          sprite.y = spriteData.y;
-          particleContainer.numDrawnSprites++;
-        }
-
-        // lastly, remove any undrawn particles
-        allPcs = particleContainerContainer.children;
-        for (let i = 0; i < allPcs.length; i++) {
-          let particleContainer = allPcs[i];
-          for (let j = particleContainer.numDrawnSprites; j < particleContainer.children.length; j++) {
-            // TODO this is a little slow when removing a lot of sprites (like rect tool in editor)
-            // it takes a few frames to clear out all the sprites
-            particleContainer.removeChildAt(j);
+          // lastly, remove any undrawn particles
+          allPcs = particleContainerContainer.children;
+          for (let i = 0; i < allPcs.length; i++) {
+            let particleContainer = allPcs[i];
+            for (let j = particleContainer.numDrawnSprites; j < particleContainer.children.length; j++) {
+              // TODO this is a little slow when removing a lot of sprites (like rect tool in editor)
+              // it takes a few frames to clear out all the sprites
+              console.log("removin");
+              particleContainer.removeChildAt(j);
+            }
           }
         }
       };
@@ -171,7 +166,7 @@
                 viewport.moveCenter(effect.x, effect.y);
                 break;
               case "DRAW":
-                graphics.drawSprites(effect.sprites);
+                graphics.drawSprites(effect.layers);
                 break;
               default:
                 //console.error("unknown effect: " + JSON.stringify(effect));
