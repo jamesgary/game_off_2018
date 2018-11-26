@@ -175,18 +175,18 @@ init jsonFlags =
       , session = session
       }
     , Resources.loadTextures
-        [ "images/grass.png"
-        , "images/water.png"
-        , "images/selectedTile.png"
-        , "images/selectedTile-inactive.png"
-        , "images/enemyTower.png"
-        , "images/turret.png"
-        , "images/moneyCrop.png"
-        , "images/creep.png"
-        , "images/tower.png"
-        , "images/seedling.png"
-        , "images/compost.png"
-        , "images/hero.png"
+        [--[ "images/grass.png"
+         --, "images/water.png"
+         --, "images/selectedTile.png"
+         --, "images/selectedTile-inactive.png"
+         --, "images/enemyTower.png"
+         --, "images/turret.png"
+         --, "images/moneyCrop.png"
+         --, "images/creep.png"
+         --, "images/tower.png"
+         --, "images/seedling.png"
+         --, "images/compost.png"
+         --, "images/hero.png"
         ]
         |> Cmd.map Resources
     )
@@ -339,25 +339,50 @@ performMapEffects effects model =
                             ]
 
                     MapEditor.DrawMap map hoveringTile ->
+                        let
+                            sprites =
+                                map
+                                    |> Dict.toList
+                                    |> List.map
+                                        (\( ( x, y ), tile ) ->
+                                            { x = x * 32 |> toFloat
+                                            , y = y * 32 |> toFloat
+                                            , texture = tileToStr tile
+                                            }
+                                        )
+                        in
                         performEffects
                             [ Json.Encode.object
-                                [ ( "id", Json.Encode.string "DRAW_MAP" )
-                                , ( "map"
-                                  , map
-                                        |> Dict.toList
+                                [ ( "id", Json.Encode.string "DRAW" )
+                                , ( "sprites"
+                                  , sprites
                                         |> Json.Encode.list
-                                            (\( tilePos, tile ) ->
+                                            (\{ x, y, texture } ->
                                                 Json.Encode.object
-                                                    [ ( "pos", encodeTilePos tilePos )
-                                                    , ( "tile", encodeTile tile )
+                                                    [ ( "x", Json.Encode.float x )
+                                                    , ( "y", Json.Encode.float y )
+                                                    , ( "texture", Json.Encode.string texture )
                                                     ]
                                             )
-                                  )
-                                , ( "selectedTile"
-                                  , encodeTilePos
-                                        (hoveringTile
-                                            |> Maybe.withDefault ( -99, -99 )
-                                        )
+                                    --++ (Json.Encode.list <|
+                                    --        case ( model.maybeRectOrigin, model.hoveringTile ) of
+                                    --            ( Just ( x1, y1 ), Just ( x2, y2 ) ) ->
+                                    --                List.range (min x1 x2) (max x1 x2)
+                                    --                    |> List.map
+                                    --                        (\x ->
+                                    --                            List.range (min y1 y2) (max y1 y2)
+                                    --                                |> List.map
+                                    --                                    (\y ->
+                                    --                                        Json.Encode.object
+                                    --                                            [ ( "pos", encodeTilePos ( x, y ) )
+                                    --                                            , ( "tile", encodeTile model.currentTile )
+                                    --                                            ]
+                                    --                                    )
+                                    --                        )
+                                    --                    |> List.concat
+                                    --            _ ->
+                                    --                []
+                                    --   )
                                   )
                                 ]
                             ]
@@ -552,6 +577,19 @@ encodeTile tile =
             "poop"
     )
         |> Json.Encode.string
+
+
+tileToStr : Tile -> String
+tileToStr tile =
+    case tile of
+        Grass ->
+            "grass"
+
+        Water ->
+            "water"
+
+        Poop ->
+            "poop"
 
 
 encodeConfigFloat : ConfigFloat -> Json.Decode.Value
