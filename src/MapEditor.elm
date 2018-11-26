@@ -424,9 +424,22 @@ getSprites session model =
 
         drawRectSprites =
             rectSprites model
+
+        drawSelectedOutline =
+            case model.hoveringTile of
+                Just ( x, y ) ->
+                    [ { x = x |> toFloat
+                      , y = y |> toFloat
+                      , texture = "selectedTile"
+                      }
+                    ]
+
+                Nothing ->
+                    []
     in
     [ mapSprites
     , drawRectSprites
+    , drawSelectedOutline
     ]
         |> List.reverse
         |> List.concat
@@ -726,144 +739,6 @@ applyRect session model =
 
         _ ->
             model
-
-
-drawHero : Session -> Model -> List GameTwoDRender.Renderable
-drawHero session model =
-    [ GameTwoDRender.sprite
-        { position = tilePosToFloats model.editingMap.hero
-        , size = ( 1, 1 )
-        , texture = GameResources.getTexture "images/hero.png" session.resources
-        }
-    ]
-
-
-drawBase : Session -> Model -> List GameTwoDRender.Renderable
-drawBase session model =
-    [ GameTwoDRender.sprite
-        { position = tilePosToFloats model.editingMap.base
-        , size = ( 1, 1 )
-        , texture = GameResources.getTexture "images/tower.png" session.resources
-        }
-    ]
-
-
-drawEnemyTowers : Session -> Model -> List GameTwoDRender.Renderable
-drawEnemyTowers session model =
-    model.editingMap.enemyTowers
-        |> Set.toList
-        |> List.map
-            (\et ->
-                GameTwoDRender.sprite
-                    { position = tilePosToFloats et
-                    , size = ( 1, 1 )
-                    , texture = GameResources.getTexture "images/enemyTower.png" session.resources
-                    }
-            )
-
-
-drawTile : Session -> TilePos -> Tile -> GameTwoDRender.Renderable
-drawTile session tilePos tile =
-    case tile of
-        Grass ->
-            GameTwoDRender.sprite
-                { position = tilePosToFloats tilePos
-                , size = ( 1, 1 )
-                , texture = GameResources.getTexture "images/grass.png" session.resources
-                }
-
-        Water ->
-            GameTwoDRender.sprite
-                { position = tilePosToFloats tilePos
-                , size = ( 1, 1 )
-                , texture = GameResources.getTexture "images/water.png" session.resources
-                }
-
-        Poop ->
-            GameTwoDRender.sprite
-                { position = tilePosToFloats tilePos
-                , size = ( 1, 1 )
-                , texture = Nothing
-                }
-
-
-drawMap : Vec2 -> Session -> Model -> List GameTwoDRender.Renderable
-drawMap center session model =
-    let
-        tilesAcross =
-            session.windowWidth / zoomedTileSize model
-
-        tilesVert =
-            session.windowHeight / zoomedTileSize model
-
-        left =
-            (Vec2.getX center
-                - (0.5 * tilesAcross)
-                |> floor
-            )
-                - 1
-
-        right =
-            (Vec2.getX center
-                + (0.5 * tilesAcross)
-                |> ceiling
-            )
-                + 1
-
-        bot =
-            (Vec2.getY center
-                - (0.5 * tilesVert)
-                |> floor
-            )
-                - 1
-
-        top =
-            (Vec2.getY center
-                + (0.5 * tilesVert)
-                |> ceiling
-            )
-                + 1
-    in
-    List.range left right
-        |> List.map
-            (\x ->
-                List.range bot top
-                    |> List.map
-                        (\y ->
-                            case Dict.get ( x, y ) model.editingMap.map of
-                                Just Grass ->
-                                    Just
-                                        (GameTwoDRender.sprite
-                                            { position = tilePosToFloats ( x, y )
-                                            , size = ( 1, 1 )
-                                            , texture = GameResources.getTexture "images/grass.png" session.resources
-                                            }
-                                        )
-
-                                Just Water ->
-                                    Just
-                                        (GameTwoDRender.sprite
-                                            { position = tilePosToFloats ( x, y )
-                                            , size = ( 1, 1 )
-                                            , texture = GameResources.getTexture "images/water.png" session.resources
-                                            }
-                                        )
-
-                                Just Poop ->
-                                    Just
-                                        (GameTwoDRender.sprite
-                                            { position = tilePosToFloats ( x, y )
-                                            , size = ( 1, 1 )
-                                            , texture = Nothing
-                                            }
-                                        )
-
-                                Nothing ->
-                                    Nothing
-                        )
-                    |> List.filterMap identity
-            )
-        |> List.concat
 
 
 drawSelectedTileOutline : Session -> Model -> List GameTwoDRender.Renderable
