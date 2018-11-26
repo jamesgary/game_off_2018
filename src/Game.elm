@@ -1605,10 +1605,24 @@ getSprites session model =
                             }
                         )
             }
+
+        creepsLayer =
+            { name = "creeps"
+            , sprites =
+                model.creeps
+                    |> List.map
+                        (\creep ->
+                            { x = (creep |> vec2FromCreep |> Vec2.getX) - 0.5
+                            , y = (creep |> vec2FromCreep |> Vec2.getY) - 0.5
+                            , texture = "creep"
+                            }
+                        )
+            }
     in
     [ mapLayer
     , buildingsLayer
     , heroLayer
+    , creepsLayer
     , bulletsLayer
 
     --, cursorLayer
