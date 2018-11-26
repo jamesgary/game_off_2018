@@ -272,7 +272,8 @@ update msg model =
                         ( newModel, effects ) =
                             Game.update (Game.Tick delta) session gameModel
                     in
-                    ( { model | state = Game newModel }, Cmd.none )
+                    { model | state = Game newModel }
+                        |> performGameEffects session effects
 
         MapEditorMsg mapEditorMsg ->
             case model.state of
@@ -350,6 +351,18 @@ performGameEffects session effects model =
                                                     ]
                                             )
                                   )
+                                ]
+                            ]
+                            :: updatingCmds
+                        )
+
+                    Game.MoveCamera pos ->
+                        ( updatingModel
+                        , performEffects
+                            [ Json.Encode.object
+                                [ ( "id", Json.Encode.string "MOVE_CAMERA" )
+                                , ( "x", Json.Encode.float (Vec2.getX pos * 32) )
+                                , ( "y", Json.Encode.float (Vec2.getY pos * 32) )
                                 ]
                             ]
                             :: updatingCmds

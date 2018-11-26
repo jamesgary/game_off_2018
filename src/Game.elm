@@ -27,7 +27,10 @@ initTryOut session savedMap =
             session.c
     in
     ( { hero =
-            { pos = tilePosToFloats savedMap.hero |> tupleToVec2
+            { pos =
+                tilePosToFloats savedMap.hero
+                    |> tupleToVec2
+                    |> Vec2.add (Vec2.vec2 0.5 0.5)
             , vel = Vec2.vec2 0 0
             , healthAmt = c.getFloat "heroHealthMax"
             , healthMax = c.getFloat "heroHealthMax"
@@ -58,7 +61,7 @@ initTryOut session savedMap =
       , waterAmt = 75
       , waterMax = 100
       , equipped = Gun
-      , map = Dict.empty
+      , map = savedMap.map
       , inv =
             { compost = 0
             }
@@ -361,7 +364,7 @@ update msg session model =
                     -- set max frame at 0.25 sec
                     min (d / 1000) 0.25
             in
-            ( model
+            model
                 |> ageSelf session delta
                 |> ageParticles session delta
                 |> moveHero session delta
@@ -378,8 +381,13 @@ update msg session model =
                 |> collideBulletsWithEnemyTowers session delta
                 |> heroPickUpCompost session delta
                 |> checkGameOver session delta
-            , [ DrawSprites (getSprites session model) ]
-            )
+                |> (\updatedModel ->
+                        ( updatedModel
+                        , [ DrawSprites (getSprites session updatedModel)
+                          , MoveCamera updatedModel.hero.pos
+                          ]
+                        )
+                   )
 
         KeyUp str ->
             ( model |> applyKeyDown str
@@ -522,10 +530,6 @@ applyKeyDown str model =
 
 makePlayerBullets : Session -> Float -> Model -> Model
 makePlayerBullets session delta model =
-    let
-        _ =
-            Debug.log "hey" model.isMouseDown
-    in
     if model.isMouseDown && model.equipped == Gun && model.waterAmt > session.c.getFloat "waterBulletCost" then
         if model.timeSinceLastFire > 0.15 then
             { model
@@ -1068,7 +1072,13 @@ moveHero session delta model =
             model.hero
 
         newAcc =
-            Vec2.scale (session.c.getFloat "heroAcc") (heroDirInput session.keysPressed)
+            Vec2.scale (session.c.getFloat "heroAcc")
+                (heroDirInput session.keysPressed
+                    |> (\input ->
+                            input
+                                |> Vec2.setY (-1 * Vec2.getY input)
+                       )
+                )
 
         newVelUncapped =
             Vec2.add model.hero.vel (Vec2.scale delta newAcc)
@@ -1560,8 +1570,8 @@ getSprites session model =
         heroLayer =
             { name = "hero"
             , sprites =
-                [ { x = Vec2.getX model.hero.pos
-                  , y = Vec2.getY model.hero.pos
+                [ { x = Vec2.getX model.hero.pos - 0.5
+                  , y = Vec2.getY model.hero.pos - 0.5
                   , texture = "hero"
                   }
                 ]
@@ -1607,3 +1617,4 @@ getSprites session model =
 
 type Effect
     = DrawSprites (List SpriteLayer)
+    | MoveCamera Vec2
