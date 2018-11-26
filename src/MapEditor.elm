@@ -195,7 +195,6 @@ update msg session model =
                                     { em
                                         | enemyTowers =
                                             Set.remove tilePos model.editingMap.enemyTowers
-                                                |> Debug.log "HSDOUF"
                                     }
 
                                 _ ->
@@ -438,9 +437,33 @@ getSprites session model =
                           }
                         ]
             }
+
+        buildingsLayer =
+            { name = "buildings"
+            , sprites =
+                [ case model.editingMap.base of
+                    ( x, y ) ->
+                        [ { x = x |> toFloat
+                          , y = y |> toFloat
+                          , texture = "tower"
+                          }
+                        ]
+                , model.editingMap.enemyTowers
+                    |> Set.toList
+                    |> List.map
+                        (\( etX, etY ) ->
+                            { x = etX |> toFloat
+                            , y = etY |> toFloat
+                            , texture = "enemyTower"
+                            }
+                        )
+                ]
+                    |> List.concat
+            }
     in
     [ mapLayer
     , rectLayer
+    , buildingsLayer
     , heroLayer
     , cursorLayer
     ]
