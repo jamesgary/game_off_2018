@@ -165,6 +165,14 @@
               case "MOVE_CAMERA":
                 viewport.moveCenter(effect.x, effect.y);
                 break;
+              case "ZOOM":
+                viewport.snapZoom({
+                  width: effect.zoomLevel * 2 * 20 * 32,
+                  ease: "linear",
+                  time: 200,
+                  forceStart: true,
+                });
+                break;
               case "DRAW":
                 graphics.drawSprites(effect.layers);
                 break;

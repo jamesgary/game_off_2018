@@ -301,6 +301,14 @@ performMapEffects effects model =
                                 ]
                             ]
 
+                    MapEditor.ZoomEffect zoomLevel ->
+                        performEffects
+                            [ Json.Encode.object
+                                [ ( "id", Json.Encode.string "ZOOM" )
+                                , ( "zoomLevel", Json.Encode.float zoomLevel )
+                                ]
+                            ]
+
                     MapEditor.MoveCamera pos ->
                         performEffects
                             [ Json.Encode.object

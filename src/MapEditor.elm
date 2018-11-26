@@ -41,12 +41,16 @@ type alias Model =
 
 zoomedTileSize : Model -> Float
 zoomedTileSize model =
-    model.tileSize * Zipper.current model.zoomLevels
+    model.tileSize * (1 / Zipper.current model.zoomLevels)
 
 
 defaultZoomLevels : Zipper Float
 defaultZoomLevels =
-    [ 1 / 4, 1 / 2, 1, 2 ]
+    [ 1 / 4
+    , 1 / 2
+    , 1
+    , 2
+    ]
         |> Zipper.fromList
         |> Zipper.withDefault 99
         |> Zipper.findFirst (\lvl -> lvl == 1)
@@ -155,14 +159,14 @@ update msg session model =
                         |> Vec2.add
                             -- camera offset
                             (model.center
-                                |> Vec2.scale 32
+                                |> Vec2.scale (zoomedTileSize model)
                                 |> Vec2.add
                                     (Vec2.vec2
                                         (session.windowWidth * -0.5)
                                         (session.windowHeight * -0.5)
                                     )
                             )
-                        |> Vec2.scale (1 / 32)
+                        |> Vec2.scale (1 / zoomedTileSize model)
                         |> vec2ToTuple
                         |> Tuple.mapBoth floor floor
                         |> Just
@@ -302,26 +306,24 @@ update msg session model =
             )
 
         Zoom wheelEvent ->
-            ( if wheelEvent.deltaY < 0 then
-                { model
-                    | zoomLevels =
+            let
+                zoomLevels =
+                    if wheelEvent.deltaY > 0 then
                         model.zoomLevels
                             |> Zipper.next
                             |> Maybe.withDefault model.zoomLevels
-                }
 
-              else if wheelEvent.deltaY > 0 then
-                { model
-                    | zoomLevels =
+                    else if wheelEvent.deltaY < 0 then
                         model.zoomLevels
                             |> Zipper.previous
                             |> Maybe.withDefault model.zoomLevels
-                }
 
-              else
-                model
+                    else
+                        model.zoomLevels
+            in
+            ( { model | zoomLevels = zoomLevels }
             , session
-            , []
+            , [ ZoomEffect (Zipper.current zoomLevels) ]
             )
 
         LoadMap mapName ->
@@ -759,6 +761,7 @@ type
     = SaveMapEffect SavedMap
     | MoveCamera Vec2
     | DrawSprites (List SpriteLayer)
+    | ZoomEffect Float
 
 
 type alias SpriteLayer =
