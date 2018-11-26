@@ -349,10 +349,9 @@ tilePosToFloats ( col, row ) =
     ( toFloat col, toFloat row )
 
 
-currentCameraPos : Model -> Vec2
-currentCameraPos model =
-    -- TODO
-    Vec2.vec2 0 0
+zoomedTileSize : Model -> Float
+zoomedTileSize model =
+    32
 
 
 update : Msg -> Session -> Model -> ( Model, List Effect )
@@ -399,30 +398,24 @@ update msg session model =
             , []
             )
 
-        MouseMove ( mouseX, mouseY ) ->
+        MouseMove ( x, y ) ->
             let
-                cameraPos =
-                    currentCameraPos model
-
                 mousePos =
-                    Vec2.vec2 mouseX mouseY
+                    ( x, y )
+                        |> tupleToVec2
+                        |> Vec2.add
+                            -- camera offset
+                            (model.hero.pos
+                                |> Vec2.scale (zoomedTileSize model)
+                                |> Vec2.add
+                                    (Vec2.vec2
+                                        (session.windowWidth * -0.5)
+                                        (session.windowHeight * -0.5)
+                                    )
+                            )
+                        |> Vec2.scale (1 / zoomedTileSize model)
             in
-            ( { model
-                | mousePos =
-                    mousePos
-                        |> Vec2.toRecord
-                        |> (\{ x, y } ->
-                                { x =
-                                    (x - (session.c.getFloat "canvasWidth" / 2))
-                                        / (session.c.getFloat "canvasWidth" / session.c.getFloat "tilesToShowLengthwise")
-                                , y =
-                                    (y - (session.c.getFloat "canvasHeight" / 2))
-                                        / (-(session.c.getFloat "canvasHeight") / tilesToShowHeightwise session.c)
-                                }
-                           )
-                        |> Vec2.fromRecord
-                        |> Vec2.add (currentCameraPos model)
-              }
+            ( { model | mousePos = mousePos }
             , []
             )
 
@@ -1530,8 +1523,8 @@ drawGlass session model =
         --, Html.Attributes.style "background" "rgba(0,255,0,0.5)"
         , Mouse.onDown (\_ -> MouseDown)
         , Mouse.onUp (\_ -> MouseUp)
+        , Mouse.onMove (\event -> MouseMove event.offsetPos)
 
-        --, Mouse.onMove (\event -> MouseMove event.offsetPos)
         --, Wheel.onWheel Zoom
         ]
         []
@@ -1599,10 +1592,24 @@ getSprites session model =
                 ]
                     |> List.concat
             }
+
+        bulletsLayer =
+            { name = "bullets"
+            , sprites =
+                model.bullets
+                    |> List.map
+                        (\bullet ->
+                            { x = (bullet.pos |> Vec2.getX) - 0.5
+                            , y = (bullet.pos |> Vec2.getY) - 0.5
+                            , texture = "bullet"
+                            }
+                        )
+            }
     in
     [ mapLayer
     , buildingsLayer
     , heroLayer
+    , bulletsLayer
 
     --, cursorLayer
     ]
