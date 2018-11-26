@@ -2,6 +2,7 @@ module MapEditor exposing (Effect(..), Model, Msg(..), init, update, view)
 
 import Common exposing (..)
 import Dict exposing (Dict)
+import Dict.Extra
 import Game.Resources as GameResources exposing (Resources)
 import Game.TwoD as GameTwoD
 import Game.TwoD.Camera as GameTwoDCamera exposing (Camera)
@@ -22,7 +23,7 @@ type Msg
     | MouseDown
     | MouseUp
     | ChooseTool Tool
-    | ChooseTile Tile
+    | ChooseTile (Maybe Tile)
     | Tick Float
     | Zoom Wheel.Event
     | LoadMap String
@@ -36,7 +37,7 @@ type alias Model =
     , tileSize : Float
     , isMouseDown : Bool
     , currentTool : Tool
-    , currentTile : Tile
+    , currentTile : Maybe Tile
     , zoomLevels : Zipper Float
     , maybeRectOrigin : Maybe TilePos
     }
@@ -76,7 +77,7 @@ init session =
     , tileSize = 32
     , isMouseDown = False
     , currentTool = Pencil
-    , currentTile = Grass
+    , currentTile = Just Grass
     , zoomLevels = defaultZoomLevels
     , maybeRectOrigin = Nothing
     }
@@ -100,6 +101,34 @@ initMap =
     }
 
 
+rectSprites : Model -> List Sprite
+rectSprites model =
+    case ( model.maybeRectOrigin, model.hoveringTile ) of
+        ( Just ( x1, y1 ), Just ( x2, y2 ) ) ->
+            List.range (min x1 x2) (max x1 x2)
+                |> List.map
+                    (\x ->
+                        List.range (min y1 y2) (max y1 y2)
+                            |> List.map
+                                (\y ->
+                                    { x = x |> toFloat
+                                    , y = y |> toFloat
+                                    , texture =
+                                        case model.currentTile of
+                                            Just tile ->
+                                                tileToStr tile
+
+                                            Nothing ->
+                                                "x"
+                                    }
+                                )
+                    )
+                |> List.concat
+
+        _ ->
+            []
+
+
 update : Msg -> Session -> Model -> ( Model, Session, List Effect )
 update msg session model =
     case msg of
@@ -118,7 +147,7 @@ update msg session model =
               }
             , session
             , [ MoveCamera newCenter
-              , DrawMap model.editingMap.map model.hoveringTile
+              , DrawSprites (getSprites session model)
               ]
             )
 
@@ -153,10 +182,17 @@ update msg session model =
                                 Pencil ->
                                     { em
                                         | map =
-                                            Dict.insert
-                                                tilePos
-                                                model.currentTile
-                                                model.editingMap.map
+                                            case model.currentTile of
+                                                Just tile ->
+                                                    Dict.insert
+                                                        tilePos
+                                                        tile
+                                                        model.editingMap.map
+
+                                                Nothing ->
+                                                    Dict.remove
+                                                        tilePos
+                                                        model.editingMap.map
                                     }
 
                                 ClearTool ->
@@ -372,6 +408,30 @@ heroDirInput keysPressed =
         |> Vec2.fromRecord
 
 
+getSprites : Session -> Model -> List Sprite
+getSprites session model =
+    let
+        mapSprites =
+            model.editingMap.map
+                |> Dict.toList
+                |> List.map
+                    (\( ( x, y ), tile ) ->
+                        { x = x |> toFloat
+                        , y = y |> toFloat
+                        , texture = tileToStr tile
+                        }
+                    )
+
+        drawRectSprites =
+            rectSprites model
+    in
+    [ mapSprites
+    , drawRectSprites
+    ]
+        |> List.reverse
+        |> List.concat
+
+
 view : Session -> Model -> Html Msg
 view session model =
     Html.div
@@ -538,9 +598,11 @@ drawToolbox session model =
         , Html.br [] []
         , toolBtn model.currentTool Rect "Rect"
         , Html.hr [] []
-        , tileBtn model.currentTile Water "Water"
+        , tileBtn model.currentTile (Just Water) "Water"
         , Html.br [] []
-        , tileBtn model.currentTile Grass "Grass"
+        , tileBtn model.currentTile (Just Grass) "Grass"
+        , Html.br [] []
+        , tileBtn model.currentTile Nothing "Erase Tile"
         , Html.hr [] []
         , Html.hr [] []
         , toolBtn model.currentTool HeroTool "Hero"
@@ -567,12 +629,12 @@ toolBtn currentTool tool label =
         [ Html.text label ]
 
 
-tileBtn : Tile -> Tile -> String -> Html Msg
-tileBtn currentTile tile label =
+tileBtn : Maybe Tile -> Maybe Tile -> String -> Html Msg
+tileBtn currentTile maybeTile label =
     Html.button
-        [ Html.Events.onClick (ChooseTile tile)
+        [ Html.Events.onClick (ChooseTile maybeTile)
         , Html.Attributes.style "outline" "none"
-        , if currentTile == tile then
+        , if currentTile == maybeTile then
             Html.Attributes.style "background" "#ccc"
 
           else
@@ -589,7 +651,18 @@ applyPencil session model =
                 editingMap =
                     model.editingMap
             in
-            { model | editingMap = { editingMap | map = Dict.insert tilePos model.currentTile model.editingMap.map } }
+            { model
+                | editingMap =
+                    { editingMap
+                        | map =
+                            case model.currentTile of
+                                Just tile ->
+                                    Dict.insert tilePos tile model.editingMap.map
+
+                                Nothing ->
+                                    Dict.remove tilePos model.editingMap.map
+                    }
+            }
 
         Nothing ->
             model
@@ -599,46 +672,61 @@ applyRect : Session -> Model -> Model
 applyRect session model =
     case ( model.maybeRectOrigin, model.hoveringTile ) of
         ( Just ( x1, y1 ), Just ( x2, y2 ) ) ->
-            List.range (min x1 x2) (max x1 x2)
-                |> List.map
-                    (\x ->
-                        List.range (min y1 y2) (max y1 y2)
-                            |> List.map
-                                (\y ->
-                                    ( ( x, y ), model.currentTile )
-                                )
-                    )
-                |> List.concat
-                |> Dict.fromList
-                |> (\newTileDict ->
-                        let
-                            editingMap =
-                                model.editingMap
-                        in
-                        { model | editingMap = { editingMap | map = Dict.union newTileDict model.editingMap.map } }
-                   )
+            case model.currentTile of
+                Just tile ->
+                    List.range (min x1 x2) (max x1 x2)
+                        |> List.map
+                            (\x ->
+                                List.range (min y1 y2) (max y1 y2)
+                                    |> List.map
+                                        (\y ->
+                                            ( ( x, y ), tile )
+                                        )
+                            )
+                        |> List.concat
+                        |> Dict.fromList
+                        |> (\newTileDict ->
+                                let
+                                    editingMap =
+                                        model.editingMap
+                                in
+                                { model
+                                    | editingMap =
+                                        { editingMap
+                                            | map =
+                                                Dict.union newTileDict model.editingMap.map
+                                        }
+                                }
+                           )
+
+                Nothing ->
+                    List.range (min x1 x2) (max x1 x2)
+                        |> List.map
+                            (\x ->
+                                List.range (min y1 y2) (max y1 y2)
+                                    |> List.map
+                                        (\y ->
+                                            ( x, y )
+                                        )
+                            )
+                        |> List.concat
+                        |> Set.fromList
+                        |> (\tilesToRemove ->
+                                let
+                                    editingMap =
+                                        model.editingMap
+                                in
+                                { model
+                                    | editingMap =
+                                        { editingMap
+                                            | map =
+                                                Dict.Extra.removeMany tilesToRemove editingMap.map
+                                        }
+                                }
+                           )
 
         _ ->
             model
-
-
-drawRect : Session -> Model -> List GameTwoDRender.Renderable
-drawRect session model =
-    case ( model.maybeRectOrigin, model.hoveringTile ) of
-        ( Just ( x1, y1 ), Just ( x2, y2 ) ) ->
-            List.range (min x1 x2) (max x1 x2)
-                |> List.map
-                    (\x ->
-                        List.range (min y1 y2) (max y1 y2)
-                            |> List.map
-                                (\y ->
-                                    drawTile session ( x, y ) model.currentTile
-                                )
-                    )
-                |> List.concat
-
-        _ ->
-            []
 
 
 drawHero : Session -> Model -> List GameTwoDRender.Renderable
@@ -814,4 +902,11 @@ type
     -- maybe should carry json?
     = SaveMapEffect SavedMap
     | MoveCamera Vec2
-    | DrawMap Map (Maybe TilePos)
+    | DrawSprites (List Sprite)
+
+
+type alias Sprite =
+    { x : Float
+    , y : Float
+    , texture : String
+    }

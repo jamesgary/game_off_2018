@@ -88,6 +88,7 @@
         for (let i = 0; i < spritesData.length; i++) {
           let spriteData = spritesData[i]
 
+          // get the particle container (add one of it doesn't exist)
           let particleContainer = textureNameToParticleGroupCache[spriteData.texture];
           if (!particleContainer) {
             // make new particle container
@@ -99,6 +100,7 @@
             textureNameToParticleGroupCache[spriteData.texture] = particleContainer;
           }
 
+          // update the first undrawn sprite (add one if it doesn't exist)
           let sprite;
           try {
             sprite = particleContainer.getChildAt(particleContainer.numDrawnSprites);
@@ -110,54 +112,16 @@
           sprite.x = spriteData.x;
           sprite.y = spriteData.y;
           particleContainer.numDrawnSprites++;
-
-          // get the particle container (add one of it doesn't exist)
-          // update the first undrawn sprite (add one if it doesn't exist)
-          // lastly, remove 
         }
 
-        return;
-
-
-        // group sprites by texture
-        let textureNameToSprites = {};
-
-        for (let sprite of sprites) {
-          let spriteGroup = textureNameToSprites[sprite.texture];
-
-          if (!spriteGroup) {
-            let particleContainer = new PIXI.particles.ParticleContainer();
-            textureNameToSprites[sprite.texture] = [];
-            particleContainerContainer.addChild(particleContainer);
-          }
-
-          textureNameToSprites[sprite.texture].push(sprite);
-        }
-
-        // maybe remove from particleContainerContainer sprites not on map?
-
-        // then iterate over textures
-        for (let textureKey in textureNameToSprites) {
-          //let particleContainer = textureNameToSprites[textureKey];
-          //console.log(particleContainer);
-
-          // NOiterate over sprites to draw
-          let spritesToDraw = textureNameToSprites[textureKey];
-          for (let i = 0; i < spritesToDraw.length; i++) {
-            // filter in sprites for this texture
-            let spriteToDraw = spritesToDraw[i];
-
-            let particleContainer = particleContainerContainer.children[1];
-
-            if (!particleContainer.children[i]) {
-              particleContainer.addChildAt(
-                new PIXI.Sprite.fromImage('images/' + textureKey + '.png')
-              , i
-              );
-            }
-
-            particleContainer.children[i].x = spriteToDraw.x;
-            particleContainer.children[i].y = spriteToDraw.y;
+        // lastly, remove any undrawn particles
+        allPcs = particleContainerContainer.children;
+        for (let i = 0; i < allPcs.length; i++) {
+          let particleContainer = allPcs[i];
+          for (let j = particleContainer.numDrawnSprites; j < particleContainer.children.length; j++) {
+            // TODO this is a little slow when removing a lot of sprites (like rect tool in editor)
+            // it takes a few frames to clear out all the sprites
+            particleContainer.removeChildAt(j);
           }
         }
       };

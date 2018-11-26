@@ -338,24 +338,19 @@ performMapEffects effects model =
                                 ]
                             ]
 
-                    MapEditor.DrawMap map hoveringTile ->
-                        let
-                            sprites =
-                                map
-                                    |> Dict.toList
-                                    |> List.map
-                                        (\( ( x, y ), tile ) ->
-                                            { x = x * 32 |> toFloat
-                                            , y = y * 32 |> toFloat
-                                            , texture = tileToStr tile
-                                            }
-                                        )
-                        in
+                    MapEditor.DrawSprites sprites ->
                         performEffects
                             [ Json.Encode.object
                                 [ ( "id", Json.Encode.string "DRAW" )
                                 , ( "sprites"
                                   , sprites
+                                        |> List.map
+                                            (\sprite ->
+                                                { x = sprite.x * 32
+                                                , y = sprite.y * 32
+                                                , texture = sprite.texture
+                                                }
+                                            )
                                         |> Json.Encode.list
                                             (\{ x, y, texture } ->
                                                 Json.Encode.object
@@ -364,25 +359,6 @@ performMapEffects effects model =
                                                     , ( "texture", Json.Encode.string texture )
                                                     ]
                                             )
-                                    --++ (Json.Encode.list <|
-                                    --        case ( model.maybeRectOrigin, model.hoveringTile ) of
-                                    --            ( Just ( x1, y1 ), Just ( x2, y2 ) ) ->
-                                    --                List.range (min x1 x2) (max x1 x2)
-                                    --                    |> List.map
-                                    --                        (\x ->
-                                    --                            List.range (min y1 y2) (max y1 y2)
-                                    --                                |> List.map
-                                    --                                    (\y ->
-                                    --                                        Json.Encode.object
-                                    --                                            [ ( "pos", encodeTilePos ( x, y ) )
-                                    --                                            , ( "tile", encodeTile model.currentTile )
-                                    --                                            ]
-                                    --                                    )
-                                    --                        )
-                                    --                    |> List.concat
-                                    --            _ ->
-                                    --                []
-                                    --   )
                                   )
                                 ]
                             ]
@@ -577,19 +553,6 @@ encodeTile tile =
             "poop"
     )
         |> Json.Encode.string
-
-
-tileToStr : Tile -> String
-tileToStr tile =
-    case tile of
-        Grass ->
-            "grass"
-
-        Water ->
-            "water"
-
-        Poop ->
-            "poop"
 
 
 encodeConfigFloat : ConfigFloat -> Json.Decode.Value

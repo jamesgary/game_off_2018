@@ -1,4 +1,4 @@
-module Common exposing (Config, ConfigFloat, Key, Map, PlacementAvailability(..), SavedMap, Session, Tile(..), TilePos, mapFromAscii, tilePosToFloats, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
+module Common exposing (Config, ConfigFloat, Key, Map, PlacementAvailability(..), SavedMap, Session, Texture(..), Tile(..), TilePos, mapFromAscii, textureToStr, tilePosToFloats, tileToStr, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
 
 import Dict exposing (Dict)
 import Game.Resources as GameResources exposing (Resources)
@@ -127,3 +127,39 @@ mapFromAscii str =
             )
         |> List.concat
         |> Dict.fromList
+
+
+type Texture
+    = GrassTexture
+    | WaterTexture
+    | HoveringTexture
+    | XTexture
+
+
+textureToStr : Texture -> String
+textureToStr texture =
+    case texture of
+        GrassTexture ->
+            "grass"
+
+        WaterTexture ->
+            "water"
+
+        HoveringTexture ->
+            "hovering"
+
+        XTexture ->
+            "x"
+
+
+tileToStr : Tile -> String
+tileToStr tile =
+    case tile of
+        Grass ->
+            "grass"
+
+        Water ->
+            "water"
+
+        Poop ->
+            "poop"
