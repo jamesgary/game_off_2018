@@ -439,8 +439,7 @@ view session model =
         , Html.Attributes.style "height" "100%"
         ]
         [ drawGlass session model
-
-        --, drawSavedMaps session model
+        , drawSavedMaps session model
         , drawToolbox session model
         , drawDebug session model
         ]
