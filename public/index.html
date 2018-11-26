@@ -19,6 +19,9 @@
       let app;
       let viewport;
       let particleContainerContainer;
+      let particleContainersByTextureName;
+      let sprites = [];
+      let textureNameToParticleGroupCache = {};
 
       graphics.init = function() {
         PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
@@ -56,7 +59,66 @@
         // end debug stuff
       }
 
-      graphics.drawSprites = function(sprites) {
+      function addSprite(spriteData) {
+        let particleContainer = particleContainersByTextureName[spriteData.texture];
+
+        // make sure there's a particle container
+        if (!particleContainer) {
+          let particleContainer = new PIXI.particles.ParticleContainer();
+
+          // add to caches
+          particleContainersByTextureName[spriteData.texture] = particleContainer;
+          particleContainerContainer.addChild(particleContainer);
+        }
+
+        pixiSprite = particleContainer.addChild(
+          new PIXI.Sprite.fromImage('images/' + textureKey + '.png')
+        );
+
+        return pixiSprite;
+      }
+
+      graphics.drawSprites = function(spritesData) {
+        // reset numDrawnSprites for all particle containers
+        let allPcs = particleContainerContainer.children;
+        for (let i = 0; i < allPcs.length; i++) {
+          allPcs[i].numDrawnSprites = 0;
+        }
+
+        for (let i = 0; i < spritesData.length; i++) {
+          let spriteData = spritesData[i]
+
+          let particleContainer = textureNameToParticleGroupCache[spriteData.texture];
+          if (!particleContainer) {
+            // make new particle container
+            particleContainer = new PIXI.particles.ParticleContainer();
+            particleContainer.numDrawnSprites = 0;
+            // add to particleContainerContainer
+            particleContainerContainer.addChild(particleContainer);
+            // add to textureNameToParticleGroupCache
+            textureNameToParticleGroupCache[spriteData.texture] = particleContainer;
+          }
+
+          let sprite;
+          try {
+            sprite = particleContainer.getChildAt(particleContainer.numDrawnSprites);
+          } catch(e) {
+            sprite = new PIXI.Sprite.fromImage('images/' + spriteData.texture + '.png')
+            particleContainer.addChildAt(sprite, particleContainer.numDrawnSprites);
+          }
+
+          sprite.x = spriteData.x;
+          sprite.y = spriteData.y;
+          particleContainer.numDrawnSprites++;
+
+          // get the particle container (add one of it doesn't exist)
+          // update the first undrawn sprite (add one if it doesn't exist)
+          // lastly, remove 
+        }
+
+        return;
+
+
         // group sprites by texture
         let textureNameToSprites = {};
 
@@ -72,9 +134,10 @@
           textureNameToSprites[sprite.texture].push(sprite);
         }
 
+        // maybe remove from particleContainerContainer sprites not on map?
+
         // then iterate over textures
         for (let textureKey in textureNameToSprites) {
-          console.log(textureNameToSprites);
           //let particleContainer = textureNameToSprites[textureKey];
           //console.log(particleContainer);
 
@@ -84,20 +147,17 @@
             // filter in sprites for this texture
             let spriteToDraw = spritesToDraw[i];
 
-            let particleContainer = particleContainerContainer.children[0];
-            console.log(particleContainer);
+            let particleContainer = particleContainerContainer.children[1];
 
             if (!particleContainer.children[i]) {
               particleContainer.addChildAt(
                 new PIXI.Sprite.fromImage('images/' + textureKey + '.png')
               , i
               );
-              console.log("added!");
             }
 
             particleContainer.children[i].x = spriteToDraw.x;
             particleContainer.children[i].y = spriteToDraw.y;
-            console.log(particleContainer);
           }
         }
       };
