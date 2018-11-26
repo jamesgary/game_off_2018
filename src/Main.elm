@@ -65,7 +65,7 @@ defaultPesistence =
                 mapFromAscii
                     """
 0000000
-0111110
+0011110
 0111110
 0111110
 0000000
@@ -333,12 +333,12 @@ performMapEffects effects model =
                         performEffects
                             [ Json.Encode.object
                                 [ ( "id", Json.Encode.string "MOVE_CAMERA" )
-                                , ( "x", Json.Encode.float (Vec2.getX pos) )
-                                , ( "y", Json.Encode.float (Vec2.getY pos) )
+                                , ( "x", Json.Encode.float (Vec2.getX pos * 32) )
+                                , ( "y", Json.Encode.float (Vec2.getY pos * 32) )
                                 ]
                             ]
 
-                    MapEditor.DrawMap map ->
+                    MapEditor.DrawMap map hoveringTile ->
                         performEffects
                             [ Json.Encode.object
                                 [ ( "id", Json.Encode.string "DRAW_MAP" )
@@ -352,6 +352,12 @@ performMapEffects effects model =
                                                     , ( "tile", encodeTile tile )
                                                     ]
                                             )
+                                  )
+                                , ( "selectedTile"
+                                  , encodeTilePos
+                                        (hoveringTile
+                                            |> Maybe.withDefault ( -99, -99 )
+                                        )
                                   )
                                 ]
                             ]
@@ -586,11 +592,6 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
-    Html.text ""
-
-
-view2 : Model -> Html Msg
-view2 model =
     case model.state of
         Game gameModel ->
             Html.text "game!"

@@ -112,7 +112,7 @@ mapFromAscii str =
                     |> String.toList
                     |> List.indexedMap
                         (\col char ->
-                            ( ( col, -row )
+                            ( ( col, row )
                             , case char of
                                 '0' ->
                                     Grass

@@ -71,7 +71,7 @@ init session =
         session.savedMaps
             |> List.head
             |> Maybe.withDefault initMap
-    , center = Vec2.vec2 3 -3
+    , center = Vec2.vec2 0 0
     , hoveringTile = Nothing
     , tileSize = 32
     , isMouseDown = False
@@ -88,7 +88,7 @@ initMap =
     , map =
         """
 1111
-1001
+1101
 1001
 1111
 """
@@ -103,30 +103,43 @@ initMap =
 update : Msg -> Session -> Model -> ( Model, Session, List Effect )
 update msg session model =
     case msg of
-        Tick delta ->
+        Tick ms ->
             let
+                delta =
+                    ms / 1000
+
                 newCenter =
                     Vec2.add
                         model.center
-                        (Vec2.scale 2 (heroDirInput session.keysPressed))
+                        (Vec2.scale (delta * 20) (heroDirInput session.keysPressed))
             in
             ( { model
                 | center = newCenter
               }
             , session
             , [ MoveCamera newCenter
-              , DrawMap model.editingMap.map
+              , DrawMap model.editingMap.map model.hoveringTile
               ]
             )
 
         MouseMove ( x, y ) ->
             let
                 hoveringTile =
-                    GameTwoDCamera.viewportToGameCoordinates
-                        (getCamera session model)
-                        ( round session.windowWidth, round session.windowHeight )
-                        ( round x, round y )
-                        |> (\( xx, yy ) -> ( round <| xx - 0.5, round <| yy - 0.5 ))
+                    ( x, y )
+                        |> tupleToVec2
+                        |> Vec2.add
+                            -- camera offset
+                            (model.center
+                                |> Vec2.scale 32
+                                |> Vec2.add
+                                    (Vec2.vec2
+                                        (session.windowWidth * -0.5)
+                                        (session.windowHeight * -0.5)
+                                    )
+                            )
+                        |> Vec2.scale (1 / 32)
+                        |> vec2ToTuple
+                        |> Tuple.mapBoth floor floor
                         |> Just
 
                 editingMap =
@@ -345,13 +358,13 @@ heroDirInput keysPressed =
             Set.member "ArrowUp" keysPressed
                 || Set.member "w" keysPressed
         then
-            1
+            -1
 
         else if
             Set.member "ArrowDown" keysPressed
                 || Set.member "s" keysPressed
         then
-            -1
+            1
 
         else
             0
@@ -361,37 +374,78 @@ heroDirInput keysPressed =
 
 view : Session -> Model -> Html Msg
 view session model =
-    Html.div []
-        [ Html.div
-            [ Html.Attributes.style "display" "inline-block"
-            , Html.Attributes.style "position" "relative"
-            , Html.Attributes.style "margin" "0"
-            , Html.Attributes.style "font-size" "0"
-            , Mouse.onDown (\_ -> MouseDown)
-            , Mouse.onUp (\_ -> MouseUp)
-            , Mouse.onMove (\event -> MouseMove event.offsetPos)
-            , Wheel.onWheel Zoom
-            ]
-            [ GameTwoD.render
-                { time = 0
-                , size =
-                    ( round session.windowWidth
-                    , round session.windowHeight
-                    )
-                , camera = getCamera session model
-                }
-                (List.concat
-                    [ drawMap model.center session model
-                    , drawRect session model
-                    , drawBase session model
-                    , drawHero session model
-                    , drawEnemyTowers session model
-                    , drawSelectedTileOutline session model
-                    ]
-                )
-            ]
-        , drawSavedMaps session model
+    Html.div
+        [ Html.Attributes.style "width" "100%"
+        , Html.Attributes.style "height" "100%"
+        ]
+        [ drawGlass session model
+
+        --, drawSavedMaps session model
         , drawToolbox session model
+        , drawDebug session model
+        ]
+
+
+drawGlass : Session -> Model -> Html Msg
+drawGlass session model =
+    Html.div
+        [ Html.Attributes.style "display" "inline-block"
+        , Html.Attributes.style "position" "relative"
+        , Html.Attributes.style "margin" "0"
+        , Html.Attributes.style "font-size" "0"
+        , Html.Attributes.style "width" "100%"
+        , Html.Attributes.style "height" "100%"
+        , Html.Attributes.style "cursor" "default"
+
+        --, Html.Attributes.style "background" "rgba(255,0,0,0.5)"
+        , Mouse.onDown (\_ -> MouseDown)
+        , Mouse.onUp (\_ -> MouseUp)
+        , Mouse.onMove (\event -> MouseMove event.offsetPos)
+        , Wheel.onWheel Zoom
+        ]
+        [-- GameTwoD.render
+         --   { time = 0
+         --   , size =
+         --       ( round session.windowWidth
+         --       , round session.windowHeight
+         --       )
+         --   , camera = getCamera session model
+         --   }
+         --   (List.concat
+         --       [ drawMap model.center session model
+         --       , drawRect session model
+         --       , drawBase session model
+         --       , drawHero session model
+         --       , drawEnemyTowers session model
+         --       , drawSelectedTileOutline session model
+         --       ]
+         --   )
+        ]
+
+
+drawDebug : Session -> Model -> Html Msg
+drawDebug session model =
+    Html.div
+        [ Html.Attributes.style "font-family" "monospace"
+        , Html.Attributes.style "left" "0"
+        , Html.Attributes.style "bottom" "0"
+        , Html.Attributes.style "padding" "10px"
+        , Html.Attributes.style "margin" "5px"
+        , Html.Attributes.style "background" "#333"
+        , Html.Attributes.style "border" "2px outset #666"
+        , Html.Attributes.style "position" "fixed"
+        , Html.Attributes.style "color" "white"
+        ]
+        [ Html.div
+            [ Html.Attributes.style "font-size" "16px"
+            , Html.Attributes.style "display" "flex"
+            , Html.Attributes.style "flex-direction" "column"
+            , Html.Attributes.style "justify-content" "space-between"
+            , Html.Attributes.style "align-items" "stretch"
+            ]
+            [ Html.text "hoveringTile: "
+            , Html.text (model.hoveringTile |> Debug.toString)
+            ]
         ]
 
 
@@ -760,4 +814,4 @@ type
     -- maybe should carry json?
     = SaveMapEffect SavedMap
     | MoveCamera Vec2
-    | DrawMap Map
+    | DrawMap Map (Maybe TilePos)

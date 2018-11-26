@@ -5,26 +5,37 @@
     <link rel="stylesheet" type="text/css" href="./css/main.css">
   </head>
   <body>
-    <div id="elm"></div>
     <div id="pixi"></div>
+    <div id="elm-container">
+      <div id="elm"></div>
+    </div>
     <div id="stats"></div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/4.8.2/pixi.min.js"></script>
+    <script src="./js/pixi-viewport.js"></script>
     <script src="./js/main.js"></script>
     <script>
       function init() {
-
         // PIXIIIIIIIIIIIIIIIIIIIII
         // PIXIIIIIIIIIIIIIIIIIIIII
         // PIXIIIIIIIIIIIIIIIIIIIII
 
         // Some DOM setup
 
-        PIXI.SCALE_MODES.DEFAULT = PIXI.SCALE_MODES.NEAREST;
+        PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
         var app = new PIXI.Application({
           width: window.innerWidth,
           height: window.innerHeight,
           roundPixels: true,
           resolution: 1,
+        });
+
+        var viewport = new PIXI.extras.Viewport({
+          screenWidth: window.innerWidth,
+          screenHeight: window.innerHeight,
+          worldWidth: 20,
+          worldHeight: 20 * (window.innerHeight / window.innerWidth),
+
+          interaction: app.renderer.interaction // the interaction module is important for wheel() to work properly when renderer.view is placed or scaled
         });
         document.getElementById("pixi").appendChild(app.view);
 
@@ -32,6 +43,7 @@
 
         var waterTex = PIXI.Texture.fromImage('images/water.png');
         //var grassTex = PIXI.Texture.fromImage('images/grass.png');
+        var selectedTileTex = new PIXI.Sprite.fromImage('images/selectedTile.png');
 
         // Create sprites/containers
 
@@ -40,12 +52,18 @@
           app.screen.width,
           app.screen.height
         );
-        var mapTileContainer = new PIXI.particles.ParticleContainer();
-        var mapTileSprites = [];
+        var grassSprites = [];
+        var waterSprites = [];
+
+        var grassParticleContainer = new PIXI.particles.ParticleContainer();
+        var waterParticleContainer = new PIXI.particles.ParticleContainer();
 
         // Add sprites to stage
-        app.stage.addChild(oceanBgTilingSprite);
-        app.stage.addChild(mapTileContainer);
+        //viewport.addChild(oceanBgTilingSprite);
+        viewport.addChild(grassParticleContainer);
+        viewport.addChild(waterParticleContainer);
+        viewport.addChild(selectedTileTex);
+        app.stage.addChild(viewport);
 
         //app.ticker.add(function() {
         //  oceanBgTilingSprite.tileScale.x = 1;//2 + Math.sin(count);
@@ -53,6 +71,15 @@
         //  oceanBgTilingSprite.tilePosition.x += 0;
         //  oceanBgTilingSprite.tilePosition.y += 1.55;
         //});
+
+        // debug stuff
+        //let rectangle = new PIXI.Graphics();
+        //rectangle.beginFill(0xFFCCFF);
+        //rectangle.drawRect(-999, 0, 2000, 1); // x axis
+        //rectangle.drawRect(0, -999, 1, 2000); // y axis
+        //rectangle.endFill();
+        //viewport.addChild(rectangle);
+        // end debug stuff
 
         var persistence;
 
@@ -76,7 +103,8 @@
           }
         });
 
-        let center = {x: 0, y: 0};
+        //let center = {x: 0, y: 0};
+        let TILE_SIZE = 32;
 
         app.ports.performEffects.subscribe(function(effects) {
           for (let i = 0; i < effects.length; i++) {
@@ -94,27 +122,55 @@
                 localStorage.removeItem("persistence");
                 break;
               case "MOVE_CAMERA":
-                center.x = effect.x
-                center.y = effect.y
+                //console.log(effect);
+                //center.x = effect.x
+                //center.y = effect.y
+                viewport.moveCenter(effect.x, effect.y);
                 break;
               case "DRAW_MAP":
-                oceanBgTilingSprite.tilePosition.x = -center.x;
-                oceanBgTilingSprite.tilePosition.y = center.y;
+                //oceanBgTilingSprite.tilePosition.x = -center.x + (window.innerWidth);
+                //oceanBgTilingSprite.tilePosition.y = -center.y + (window.innerHeight);
 
+                let waterSpriteCount = 0;
+                let grassSpriteCount = 0;
                 for (let i = 0; i < effect.map.length; i++) {
                   let tile = effect.map[i]; // tile.pos, tile.tile
 
                   let sprite;
-                  if (mapTileSprites.length <= i) {
-                    sprite = new PIXI.Sprite.fromImage('images/grass.png');
-                    mapTileContainer.addChild(sprite);
-                    mapTileSprites[i] = sprite;
-                  } else {
-                    sprite = mapTileSprites[i];
+                  switch (tile.tile) {
+                    case "water":
+                      if (waterSprites[waterSpriteCount]) {
+                        sprite = waterSprites[waterSpriteCount];
+                      } else {
+                        sprite = new PIXI.Sprite.fromImage('images/water.png');
+                        waterParticleContainer.addChild(sprite);
+                        waterSprites[waterSpriteCount] = sprite;
+                      }
+                      waterSpriteCount++;
+                      break;
+                    case "grass":
+                      if (grassSprites[grassSpriteCount]) {
+                        sprite = grassSprites[grassSpriteCount];
+                      } else {
+                        sprite = new PIXI.Sprite.fromImage('images/grass.png');
+                        grassParticleContainer.addChild(sprite);
+                        grassSprites[grassSpriteCount] = sprite;
+                      }
+                      grassSpriteCount++;
+                      break;
+                    default:
+                      console.error("weird tile: " + tile.tile);
                   }
-                  sprite.x = -center.x + (tile.pos.x * 32);
-                  sprite.y = center.y + (tile.pos.y * 32);
+                  sprite.position.set(
+                    (tile.pos.x * TILE_SIZE),
+                    (tile.pos.y * TILE_SIZE)
+                  );
                 }
+
+                selectedTileTex.position.set(
+                  TILE_SIZE * effect.selectedTile.x,
+                  TILE_SIZE * effect.selectedTile.y,
+                );
                 break;
               default:
                 //console.error("unknown effect: " + JSON.stringify(effect));
