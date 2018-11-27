@@ -11,6 +11,7 @@ import Html.Events
 import Html.Events.Extra.Mouse as Mouse
 import Json.Decode
 import Json.Encode
+import List.Extra
 import MapEditor
 import Math.Vector2 as Vec2 exposing (Vec2)
 import Random
@@ -40,23 +41,67 @@ defaultPersistence : Persistence
 defaultPersistence =
     { isConfigOpen = False
     , configFloats =
-        [ ( "bulletDmg", { val = 15, min = 0, max = 20 } )
-        , ( "bulletMaxAge", { val = 2, min = 0, max = 5 } )
-        , ( "bulletSpeed", { val = 10, min = 5, max = 50 } )
-        , ( "canvasHeight", { val = 600, min = 300, max = 1200 } )
-        , ( "canvasWidth", { val = 800, min = 400, max = 1600 } )
-        , ( "creepDps", { val = 10, min = 0, max = 200 } )
-        , ( "creepHealth", { val = 100, min = 1, max = 200 } )
-        , ( "creepSpeed", { val = 1, min = 0, max = 2 } )
-        , ( "heroAcc", { val = 70, min = 10, max = 200 } )
-        , ( "heroHealthMax", { val = 100, min = 1, max = 10000 } )
-        , ( "heroMaxSpeed", { val = 20, min = 10, max = 100 } )
-        , ( "meterWidth", { val = 450, min = 10, max = 800 } )
-        , ( "refillRate", { val = 20, min = 0, max = 1000 } )
-        , ( "tilesToShowLengthwise", { val = 20, min = 10, max = 200 } )
-        , ( "towerHealthMax", { val = 1000, min = 100, max = 5000 } )
-        , ( "turretTimeToSprout", { val = 5, min = 0, max = 30 } )
-        , ( "waterBulletCost", { val = 5, min = 0, max = 25 } )
+        --[ ( "bulletDmg", { val = 15, min = 0, max = 20 } )
+        --, ( "bulletMaxAge", { val = 2, min = 0, max = 5 } )
+        --, ( "bulletSpeed", { val = 10, min = 5, max = 50 } )
+        --, ( "canvasHeight", { val = 600, min = 300, max = 1200 } )
+        --, ( "canvasWidth", { val = 800, min = 400, max = 1600 } )
+        --, ( "creepDps", { val = 10, min = 0, max = 200 } )
+        --, ( "creepHealth", { val = 100, min = 1, max = 200 } )
+        --, ( "creepSpeed", { val = 1, min = 0, max = 2 } )
+        --, ( "heroAcc", { val = 70, min = 10, max = 200 } )
+        --, ( "heroHealthMax", { val = 100, min = 1, max = 10000 } )
+        --, ( "heroMaxSpeed", { val = 20, min = 10, max = 100 } )
+        --, ( "meterWidth", { val = 450, min = 10, max = 800 } )
+        --, ( "refillRate", { val = 20, min = 0, max = 1000 } )
+        --, ( "tilesToShowLengthwise", { val = 20, min = 10, max = 200 } )
+        --, ( "towerHealthMax", { val = 1000, min = 100, max = 5000 } )
+        --, ( "turretTimeToSprout", { val = 5, min = 0, max = 30 } )
+        --, ( "waterBulletCost", { val = 5, min = 0, max = 25 } )
+        --]
+        [ ( "system:gameSpeed", { val = 5, min = 0, max = 25 } )
+
+        --
+        , ( "hero:velocity", { val = 5, min = 0, max = 25 } )
+        , ( "hero:acceleration", { val = 5, min = 0, max = 25 } )
+        , ( "hero:maxSpeed", { val = 5, min = 0, max = 25 } )
+        , ( "hero:healthMax", { val = 5, min = 0, max = 25 } )
+        , ( "hero:size", { val = 5, min = 0, max = 25 } )
+
+        --
+        , ( "waterGun:refillRate", { val = 5, min = 0, max = 25 } )
+        , ( "waterGun:ammoMax", { val = 5, min = 0, max = 25 } )
+        , ( "waterGun:fireRate", { val = 5, min = 0, max = 25 } )
+        , ( "waterGun:bulletDmg", { val = 5, min = 0, max = 25 } )
+        , ( "waterGun:bulletSpeed", { val = 5, min = 0, max = 25 } )
+        , ( "waterGun:bulletMaxAge", { val = 5, min = 0, max = 25 } )
+        , ( "waterGun:bulletCost", { val = 5, min = 0, max = 25 } )
+
+        --
+        , ( "globalCreep:speed", { val = 5, min = 0, max = 25 } )
+        , ( "globalCreep:health", { val = 5, min = 0, max = 25 } )
+        , ( "globalCreep:damage", { val = 5, min = 0, max = 25 } )
+        , ( "globalCreep:pathingVariation", { val = 5, min = 0, max = 25 } )
+
+        --
+        , ( "attackingCreep:melee:speed", { val = 5, min = 0, max = 25 } )
+        , ( "attackingCreep:melee:health", { val = 5, min = 0, max = 25 } )
+        , ( "attackingCreep:melee:damage", { val = 5, min = 0, max = 25 } )
+        , ( "attackingCreep:melee:attackPerSecond", { val = 5, min = 0, max = 25 } )
+        , ( "attackingCreep:melee:pathingVariation", { val = 5, min = 0, max = 25 } )
+
+        --
+        , ( "attackingCreep:melee:speed", { val = 5, min = 0, max = 25 } )
+        , ( "attackingCreep:melee:health", { val = 5, min = 0, max = 25 } )
+        , ( "attackingCreep:melee:damage", { val = 5, min = 0, max = 25 } )
+        , ( "attackingCreep:melee:attackPerSecond", { val = 5, min = 0, max = 25 } )
+        , ( "attackingCreep:melee:pathingVariation", { val = 5, min = 0, max = 25 } )
+
+        --
+        , ( "enemyBase:secondsBetweenSpawnsAtDay", { val = 5, min = 0, max = 25 } )
+        , ( "enemyBase:secondsBetweenSpawnsAtNight", { val = 5, min = 0, max = 25 } )
+        , ( "enemyBase:creepsPerSpawn", { val = 5, min = 0, max = 25 } )
+        , ( "enemyBase:healthMax", { val = 5, min = 0, max = 25 } )
         ]
             |> Dict.fromList
     , savedMaps =
@@ -796,45 +841,10 @@ viewConfig model =
                     ]
                     [ Html.text "Collapse Config" ]
                 :: Html.br [] []
-                :: (model.session.configFloats
+                :: [ model.session.configFloats
                         |> Dict.toList
-                        |> List.map
-                            (\( name, { val, min, max } ) ->
-                                Html.div
-                                    [ Html.Attributes.style "display" "flex"
-                                    , Html.Attributes.style "justify-content" "space-between"
-                                    , Html.Attributes.style "margin" "10px 10px"
-                                    ]
-                                    [ Html.div
-                                        []
-                                        [ Html.text name
-                                        ]
-                                    , Html.div
-                                        []
-                                        [ Html.span [ Html.Attributes.style "margin" "0 10px" ] [ Html.text (formatConfigFloat val) ]
-                                        , Html.input
-                                            [ Html.Attributes.style "width" "40px"
-                                            , Html.Attributes.value (formatConfigFloat min)
-                                            ]
-                                            []
-                                        , Html.input
-                                            [ Html.Attributes.type_ "range"
-                                            , Html.Attributes.value (formatConfigFloat val)
-                                            , Html.Attributes.min (formatConfigFloat min)
-                                            , Html.Attributes.max (formatConfigFloat max)
-                                            , Html.Attributes.step "any"
-                                            , Html.Events.onInput (ChangeConfig name)
-                                            ]
-                                            []
-                                        , Html.input
-                                            [ Html.Attributes.style "width" "40px"
-                                            , Html.Attributes.value (formatConfigFloat max)
-                                            ]
-                                            []
-                                        ]
-                                    ]
-                            )
-                   )
+                        |> groupConfigFloats
+                   ]
 
          else
             [ Html.a [ Html.Events.onClick (ToggleConfig True) ] [ Html.text "Expand Config" ] ]
@@ -844,3 +854,113 @@ viewConfig model =
 formatConfigFloat : Float -> String
 formatConfigFloat val =
     Round.round 1 val
+
+
+groupConfigFloats : List ( String, ConfigFloat ) -> Html Msg
+groupConfigFloats configFloats =
+    Html.div []
+        (configValsToConfigAccordion configFloats
+            |> viewConfigAccordion
+        )
+
+
+viewConfigAccordion : List ConfigAccordion -> List (Html Msg)
+viewConfigAccordion configAccordions =
+    configAccordions
+        |> List.map
+            (\configAccordion ->
+                case configAccordion of
+                    Leaf name { val, min, max } ->
+                        [ Html.div
+                            [ Html.Attributes.style "display" "flex"
+                            , Html.Attributes.style "justify-content" "space-between"
+                            , Html.Attributes.style "margin" "10px 10px"
+
+                            --, Html.Attributes.style "border" "1px solid black"
+                            --, Html.Attributes.style "padding" "1px"
+                            --, Html.Attributes.style "margin" "1px"
+                            ]
+                            [ Html.div
+                                []
+                                [ Html.text name
+                                ]
+                            , Html.div
+                                []
+                                [ Html.span [ Html.Attributes.style "margin" "0 10px" ] [ Html.text (formatConfigFloat val) ]
+                                , Html.input
+                                    [ Html.Attributes.style "width" "40px"
+                                    , Html.Attributes.value (formatConfigFloat min)
+                                    ]
+                                    []
+                                , Html.input
+                                    [ Html.Attributes.type_ "range"
+                                    , Html.Attributes.value (formatConfigFloat val)
+                                    , Html.Attributes.min (formatConfigFloat min)
+                                    , Html.Attributes.max (formatConfigFloat max)
+                                    , Html.Attributes.step "any"
+                                    , Html.Events.onInput (ChangeConfig name)
+                                    ]
+                                    []
+                                , Html.input
+                                    [ Html.Attributes.style "width" "40px"
+                                    , Html.Attributes.value (formatConfigFloat max)
+                                    ]
+                                    []
+                                ]
+                            ]
+                        ]
+
+                    Group name accordions ->
+                        [ Html.div
+                            [ Html.Attributes.style "border" "1px solid black"
+                            , Html.Attributes.style "padding" "1px"
+                            , Html.Attributes.style "margin" "1px"
+                            ]
+                            (Html.text ("**" ++ name ++ "**")
+                                :: viewConfigAccordion accordions
+                            )
+                        ]
+            )
+        |> List.concat
+
+
+configValsToConfigAccordion : List ( String, ConfigFloat ) -> List ConfigAccordion
+configValsToConfigAccordion configFloats =
+    configFloats
+        |> List.Extra.gatherEqualsBy
+            (\( name, configFloat ) ->
+                String.split ":" name
+                    |> List.head
+                    |> Maybe.withDefault name
+            )
+        |> List.map
+            (\( ( firstName, firstConfigFloat ), rest ) ->
+                let
+                    all =
+                        if List.isEmpty rest then
+                            [ ( firstName, firstConfigFloat ) ]
+
+                        else
+                            ( firstName, firstConfigFloat ) :: rest
+                in
+                case String.split ":" firstName |> List.filter (String.isEmpty >> not) of
+                    prefix :: _ ->
+                        Group prefix
+                            (all
+                                |> List.map
+                                    (\( name, configFloat ) ->
+                                        ( String.dropLeft (String.length prefix + 1) name
+                                        , configFloat
+                                        )
+                                    )
+                                |> configValsToConfigAccordion
+                            )
+
+                    leafyName ->
+                        Leaf firstName firstConfigFloat
+            )
+
+
+type ConfigAccordion
+    = Leaf String ConfigFloat
+    | Group String (List ConfigAccordion)
