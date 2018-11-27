@@ -14,6 +14,7 @@ import Json.Encode
 import MapEditor
 import Math.Vector2 as Vec2 exposing (Vec2)
 import Random
+import Round
 import Set exposing (Set)
 
 
@@ -274,7 +275,12 @@ update msg model =
             in
             --( newModel, performEffects (modelToPersistence newModel |> encodePersistence) )
             ( newModel
-            , performEffects [ Json.Encode.object [ ( "id", Json.Encode.string "SAVE" ) ] ]
+            , performEffects
+                [ Json.Encode.object
+                    [ ( "id", Json.Encode.string "SAVE" )
+                    , ( "persistence", modelToPersistence newModel |> encodePersistence )
+                    ]
+                ]
             )
 
         HardReset ->
@@ -738,80 +744,103 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
-    case model.state of
-        Game gameModel ->
-            Game.view model.session gameModel
-                |> Html.map GameMsg
+    Html.div
+        [ Html.Attributes.style "position" "absolute"
+        , Html.Attributes.style "width" "100%"
+        , Html.Attributes.style "height" "100%"
+        ]
+        [ case model.state of
+            Game gameModel ->
+                Game.view model.session gameModel
+                    |> Html.map GameMsg
 
-        MapEditor mapModel ->
-            MapEditor.view model.session mapModel
-                |> Html.map MapEditorMsg
+            MapEditor mapModel ->
+                MapEditor.view model.session mapModel
+                    |> Html.map MapEditorMsg
+        , viewConfig model
+        ]
 
 
+viewConfig : Model -> Html Msg
+viewConfig model =
+    Html.div
+        ([ Html.Attributes.style "position" "absolute"
+         , Html.Attributes.style "top" "10px"
+         , Html.Attributes.style "right" "10px"
+         , Html.Attributes.style "background" "#eee"
+         , Html.Attributes.style "border" "1px solid #333"
+         , Html.Attributes.style "font-family" "sans-serif"
+         , Html.Attributes.style "font-size" "18px"
+         , Html.Attributes.style "padding" "8px"
+         ]
+            ++ (if model.session.isConfigOpen then
+                    [ Html.Attributes.style "height" "90%"
+                    , Html.Attributes.style "overflow-y" "scroll"
+                    ]
 
---, Html.div
---    [ Html.Attributes.style "position" "absolute"
---    , Html.Attributes.style "top" "10px"
---    , Html.Attributes.style "right" "10px"
---    , Html.Attributes.style "background" "#eee"
---    , Html.Attributes.style "border" "1px solid #333"
---    , Html.Attributes.style "font-family" "sans-serif"
---    , Html.Attributes.style "font-size" "18px"
---    , Html.Attributes.style "padding" "8px"
---    ]
---   (if model.isConfigOpen then
---       Html.button
---           [ Html.Attributes.style "float" "left"
---           , Html.Events.onClick HardReset
---           ]
---           [ Html.text "Hard Reset" ]
---           :: Html.a
---               [ Html.Events.onClick (ToggleConfig False)
---               , Html.Attributes.style "float" "right"
---               , Html.Attributes.style "display" "inline-block"
---               ]
---               [ Html.text "Collapse Config" ]
---           :: Html.br [] []
---           :: (model.config
---                   |> Dict.toList
---                   |> List.map
---                       (\( name, { val, min, max } ) ->
---                           Html.div
---                               [ Html.Attributes.style "display" "flex"
---                               , Html.Attributes.style "justify-content" "space-between"
---                               , Html.Attributes.style "margin" "10px 10px"
---                               ]
---                               [ Html.div
---                                   []
---                                   [ Html.text name
---                                   ]
---                               , Html.div
---                                   []
---                                   [ Html.span [ Html.Attributes.style "margin" "0 10px" ] [ Html.text (formatConfigFloat val) ]
---                                   , Html.input
---                                       [ Html.Attributes.style "width" "40px"
---                                       , Html.Attributes.value (formatConfigFloat min)
---                                       ]
---                                       []
---                                   , Html.input
---                                       [ Html.Attributes.type_ "range"
---                                       , Html.Attributes.value (formatConfigFloat val)
---                                       , Html.Attributes.min (formatConfigFloat min)
---                                       , Html.Attributes.max (formatConfigFloat max)
---                                       , Html.Attributes.step "any"
---                                       , Html.Events.onInput (ChangeConfig name)
---                                       ]
---                                       []
---                                   , Html.input
---                                       [ Html.Attributes.style "width" "40px"
---                                       , Html.Attributes.value (formatConfigFloat max)
---                                       ]
---                                       []
---                                   ]
---                               ]
---                       )
---              )
---    else
---       [ Html.a [ Html.Events.onClick (ToggleConfig True) ] [ Html.text "Expand Config" ] ]
---   )
---
+                else
+                    [ Html.Attributes.style "" ""
+                    ]
+               )
+        )
+        (if model.session.isConfigOpen then
+            Html.button
+                [ Html.Attributes.style "float" "left"
+                , Html.Events.onClick HardReset
+                ]
+                [ Html.text "Hard Reset" ]
+                :: Html.a
+                    [ Html.Events.onClick (ToggleConfig False)
+                    , Html.Attributes.style "float" "right"
+                    , Html.Attributes.style "display" "inline-block"
+                    ]
+                    [ Html.text "Collapse Config" ]
+                :: Html.br [] []
+                :: (model.session.configFloats
+                        |> Dict.toList
+                        |> List.map
+                            (\( name, { val, min, max } ) ->
+                                Html.div
+                                    [ Html.Attributes.style "display" "flex"
+                                    , Html.Attributes.style "justify-content" "space-between"
+                                    , Html.Attributes.style "margin" "10px 10px"
+                                    ]
+                                    [ Html.div
+                                        []
+                                        [ Html.text name
+                                        ]
+                                    , Html.div
+                                        []
+                                        [ Html.span [ Html.Attributes.style "margin" "0 10px" ] [ Html.text (formatConfigFloat val) ]
+                                        , Html.input
+                                            [ Html.Attributes.style "width" "40px"
+                                            , Html.Attributes.value (formatConfigFloat min)
+                                            ]
+                                            []
+                                        , Html.input
+                                            [ Html.Attributes.type_ "range"
+                                            , Html.Attributes.value (formatConfigFloat val)
+                                            , Html.Attributes.min (formatConfigFloat min)
+                                            , Html.Attributes.max (formatConfigFloat max)
+                                            , Html.Attributes.step "any"
+                                            , Html.Events.onInput (ChangeConfig name)
+                                            ]
+                                            []
+                                        , Html.input
+                                            [ Html.Attributes.style "width" "40px"
+                                            , Html.Attributes.value (formatConfigFloat max)
+                                            ]
+                                            []
+                                        ]
+                                    ]
+                            )
+                   )
+
+         else
+            [ Html.a [ Html.Events.onClick (ToggleConfig True) ] [ Html.text "Expand Config" ] ]
+        )
+
+
+formatConfigFloat : Float -> String
+formatConfigFloat val =
+    Round.round 1 val
