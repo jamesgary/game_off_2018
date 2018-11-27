@@ -31,6 +31,7 @@
           height: window.innerHeight,
           roundPixels: true,
           resolution: 1,
+          antialias: true, // needed to fix health bars
         });
         document.getElementById("pixi").appendChild(app.view);
 
@@ -59,6 +60,7 @@
       graphics.drawSprites = function(layerData) {
         for (let l = 0; l < layerData.length; l++) {
           let layer = layerData[l];
+
           let pixiLayer = nameToPixiLayer[layer.name]
           if (!pixiLayer) {
             //pixiLayer = new PIXI.display.Layer();
@@ -69,6 +71,8 @@
             nameToPixiLayer[layer.name] = pixiLayer;
             viewport.addChild(pixiLayer);
           }
+
+          // SPRITES (maybe start above and refactor?)
           particleContainerContainer = pixiLayer.particleContainerContainer;
           textureNameToParticleGroupCache = pixiLayer.textureNameToParticleGroupCache;
 
@@ -118,8 +122,47 @@
               particleContainer.removeChildAt(j);
             }
           }
+
+          // GRAPHICS
+          // get the graphics container (add one of it doesn't exist)
+          let pixiGraphics = pixiLayer.daGraphicZone;
+          if (!pixiGraphics) {
+            // make new particle container
+            pixiGraphics = new PIXI.Graphics({
+              nativeLines: true
+            });
+            pixiLayer.addChild(pixiGraphics);
+            pixiLayer.daGraphicZone = pixiGraphics;
+            console.log('creating');
+          } else {
+            pixiGraphics.clear();
+          }
+
+          // draw it!
+          for (let k = 0; k < layer.graphics.length; k++) {
+            graphic = layer.graphics[k];
+            if (graphic.shape === "rect") {
+              pixiGraphics.beginFill(
+                toColor(graphic.bgColor),
+                1.0
+              );
+              pixiGraphics.drawRect(
+                graphic.x,
+                graphic.y,
+                graphic.width,
+                graphic.height
+              );
+            } else {
+              console.error("Wrong shape! ", graphics.shape);
+            }
+          }
         }
       };
+
+      function toColor(str) {
+        //console.log(str.substring(1), 16);
+        return parseInt(str.substring(1), 16);
+      }
     </script>
     <script>
       function init() {

@@ -59,8 +59,8 @@ defaultZoomLevels =
 
 
 type Tool
-    = Pencil
-    | Rect
+    = PencilTool
+    | RectTool
     | HeroTool
     | BaseTool
     | EnemyTowerTool
@@ -77,7 +77,7 @@ init session =
     , hoveringTile = Nothing
     , tileSize = 32
     , isMouseDown = False
-    , currentTool = Pencil
+    , currentTool = PencilTool
     , currentTile = Just Grass
     , zoomLevels = defaultZoomLevels
     , maybeRectOrigin = Nothing
@@ -180,7 +180,7 @@ update msg session model =
                                     model.editingMap
                             in
                             case model.currentTool of
-                                Pencil ->
+                                PencilTool ->
                                     { em
                                         | map =
                                             case model.currentTile of
@@ -221,10 +221,10 @@ update msg session model =
                 | isMouseDown = True
                 , maybeRectOrigin =
                     case model.currentTool of
-                        Pencil ->
+                        PencilTool ->
                             Nothing
 
-                        Rect ->
+                        RectTool ->
                             model.hoveringTile
 
                         _ ->
@@ -414,11 +414,13 @@ getSprites session model =
                             , texture = tileToStr tile
                             }
                         )
+            , graphics = []
             }
 
         rectLayer =
             { name = "rect"
             , sprites = rectSprites model
+            , graphics = []
             }
 
         cursorLayer =
@@ -434,6 +436,7 @@ getSprites session model =
 
                     Nothing ->
                         []
+            , graphics = []
             }
 
         heroLayer =
@@ -446,6 +449,48 @@ getSprites session model =
                           , texture = "hero"
                           }
                         ]
+            , graphics =
+                let
+                    ( healthX, healthY ) =
+                        case model.editingMap.hero of
+                            ( x, y ) ->
+                                ( toFloat x + 0.5 - (width / 2)
+                                , toFloat y + 1.2
+                                )
+
+                    width =
+                        1.2
+
+                    height =
+                        0.2
+
+                    outlineRatio =
+                        0.05
+
+                    offset =
+                        outlineRatio * width
+                in
+                [ { x = healthX - offset
+                  , y = healthY - offset
+                  , width = width + (offset * 2)
+                  , height = height + (offset * 2)
+                  , bgColor = "#000000"
+                  , lineStyleWidth = 0
+                  , lineStyleColor = "#000000"
+                  , lineStyleAlpha = 1
+                  , shape = Rect
+                  }
+                , { x = healthX
+                  , y = healthY
+                  , width = width
+                  , height = height
+                  , bgColor = "#00ff00"
+                  , lineStyleWidth = 0
+                  , lineStyleColor = "#000000"
+                  , lineStyleAlpha = 1
+                  , shape = Rect
+                  }
+                ]
             }
 
         buildingsLayer =
@@ -469,6 +514,7 @@ getSprites session model =
                         )
                 ]
                     |> List.concat
+            , graphics = []
             }
     in
     [ mapLayer
@@ -482,6 +528,7 @@ getSprites session model =
                 { name = layer.name
                 , sprites = layer.sprites
                 , zOrder = i -- not used yet
+                , graphics = layer.graphics
                 }
             )
 
@@ -636,9 +683,9 @@ drawToolbox session model =
         , Html.Attributes.style "background" "#eee"
         , Html.Attributes.style "border" "2px outset white"
         ]
-        [ toolBtn model.currentTool Pencil "Pencil"
+        [ toolBtn model.currentTool PencilTool "Pencil"
         , Html.br [] []
-        , toolBtn model.currentTool Rect "Rect"
+        , toolBtn model.currentTool RectTool "Rect"
         , Html.hr [] []
         , tileBtn model.currentTile (Just Water) "Water"
         , Html.br [] []

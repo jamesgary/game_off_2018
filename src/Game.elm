@@ -1545,6 +1545,7 @@ getSprites session model =
                             , texture = tileToStr tile
                             }
                         )
+            , graphics = []
             }
 
         --cursorLayer =
@@ -1566,6 +1567,18 @@ getSprites session model =
                 [ { x = Vec2.getX model.hero.pos - 0.5
                   , y = Vec2.getY model.hero.pos - 0.5
                   , texture = "hero"
+                  }
+                ]
+            , graphics =
+                [ { x = Vec2.getX model.hero.pos - 0.5
+                  , y = Vec2.getY model.hero.pos - 0.5
+                  , width = 1.8
+                  , height = 1.1
+                  , bgColor = "#000000"
+                  , lineStyleWidth = 2
+                  , lineStyleColor = "#ff00ff"
+                  , lineStyleAlpha = 1
+                  , shape = Rect
                   }
                 ]
             }
@@ -1591,6 +1604,7 @@ getSprites session model =
                         )
                 ]
                     |> List.concat
+            , graphics = []
             }
 
         bulletsLayer =
@@ -1604,6 +1618,7 @@ getSprites session model =
                             , texture = "bullet"
                             }
                         )
+            , graphics = []
             }
 
         creepsLayer =
@@ -1615,6 +1630,21 @@ getSprites session model =
                             { x = (creep |> vec2FromCreep |> Vec2.getX) - 0.5
                             , y = (creep |> vec2FromCreep |> Vec2.getY) - 0.5
                             , texture = "creep"
+                            }
+                        )
+            , graphics =
+                model.creeps
+                    |> List.map
+                        (\creep ->
+                            { x = (creep |> vec2FromCreep |> Vec2.getX) - 0.5
+                            , y = (creep |> vec2FromCreep |> Vec2.getY) - 0.5
+                            , width = 0.8
+                            , height = 0.1
+                            , bgColor = "#000000"
+                            , lineStyleWidth = 2
+                            , lineStyleColor = "#ff00ff"
+                            , lineStyleAlpha = 1
+                            , shape = Rect
                             }
                         )
             }
@@ -1631,6 +1661,7 @@ getSprites session model =
             (\i layer ->
                 { name = layer.name
                 , sprites = layer.sprites
+                , graphics = layer.graphics
                 , zOrder = i -- not used yet
                 }
             )

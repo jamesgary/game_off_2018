@@ -325,31 +325,7 @@ performGameEffects session effects model =
                                 [ ( "id", Json.Encode.string "DRAW" )
                                 , ( "layers"
                                   , layers
-                                        |> Json.Encode.list
-                                            (\{ name, zOrder, sprites } ->
-                                                Json.Encode.object
-                                                    [ ( "name", Json.Encode.string name )
-                                                    , ( "zOrder", Json.Encode.int zOrder ) -- not used yet
-                                                    , ( "sprites"
-                                                      , sprites
-                                                            |> List.map
-                                                                (\sprite ->
-                                                                    { x = sprite.x * 32
-                                                                    , y = sprite.y * 32
-                                                                    , texture = sprite.texture
-                                                                    }
-                                                                )
-                                                            |> Json.Encode.list
-                                                                (\{ x, y, texture } ->
-                                                                    Json.Encode.object
-                                                                        [ ( "x", Json.Encode.float x )
-                                                                        , ( "y", Json.Encode.float y )
-                                                                        , ( "texture", Json.Encode.string texture )
-                                                                        ]
-                                                                )
-                                                      )
-                                                    ]
-                                            )
+                                        |> Json.Encode.list encodeSpriteLayer
                                   )
                                 ]
                             ]
@@ -370,6 +346,69 @@ performGameEffects session effects model =
             )
             ( model, [] )
         |> Tuple.mapSecond Cmd.batch
+
+
+encodeSpriteLayer : SpriteLayer -> Json.Decode.Value
+encodeSpriteLayer layer =
+    Json.Encode.object
+        [ ( "name", Json.Encode.string layer.name )
+        , ( "zOrder", Json.Encode.int layer.zOrder ) -- not used yet
+        , ( "sprites"
+          , layer.sprites
+                |> List.map
+                    (\sprite ->
+                        { x = sprite.x * 32
+                        , y = sprite.y * 32
+                        , texture = sprite.texture
+                        }
+                    )
+                |> Json.Encode.list
+                    (\{ x, y, texture } ->
+                        Json.Encode.object
+                            [ ( "x", Json.Encode.float x )
+                            , ( "y", Json.Encode.float y )
+                            , ( "texture", Json.Encode.string texture )
+                            ]
+                    )
+          )
+        , ( "graphics"
+          , layer.graphics
+                |> List.map
+                    (\graphic ->
+                        { x = graphic.x * 32
+                        , y = graphic.y * 32
+                        , width = graphic.width * 32
+                        , height = graphic.height * 32
+                        , bgColor = graphic.bgColor
+                        , lineStyleWidth = graphic.lineStyleWidth * 32
+                        , lineStyleColor = graphic.lineStyleColor
+                        , lineStyleAlpha = graphic.lineStyleAlpha
+                        , shape = graphic.shape
+                        }
+                    )
+                |> Json.Encode.list
+                    (\graphic ->
+                        Json.Encode.object
+                            [ ( "x", Json.Encode.float graphic.x )
+                            , ( "y", Json.Encode.float graphic.y )
+                            , ( "width", Json.Encode.float graphic.width )
+                            , ( "height", Json.Encode.float graphic.height )
+                            , ( "bgColor", Json.Encode.string graphic.bgColor )
+                            , ( "lineStyleWidth", Json.Encode.float graphic.lineStyleWidth )
+                            , ( "lineStyleColor", Json.Encode.string graphic.lineStyleColor )
+                            , ( "lineStyleAlpha", Json.Encode.float graphic.lineStyleAlpha )
+                            , ( "shape", encodeShape graphic.shape )
+                            ]
+                    )
+          )
+        ]
+
+
+encodeShape : Shape -> Json.Decode.Value
+encodeShape shape =
+    case shape of
+        Rect ->
+            Json.Encode.string "rect"
 
 
 performMapEffects : Session -> List MapEditor.Effect -> Model -> ( Model, Cmd Msg )
@@ -428,31 +467,7 @@ performMapEffects session effects model =
                                 [ ( "id", Json.Encode.string "DRAW" )
                                 , ( "layers"
                                   , layers
-                                        |> Json.Encode.list
-                                            (\{ name, zOrder, sprites } ->
-                                                Json.Encode.object
-                                                    [ ( "name", Json.Encode.string name )
-                                                    , ( "zOrder", Json.Encode.int zOrder ) -- not used yet
-                                                    , ( "sprites"
-                                                      , sprites
-                                                            |> List.map
-                                                                (\sprite ->
-                                                                    { x = sprite.x * 32
-                                                                    , y = sprite.y * 32
-                                                                    , texture = sprite.texture
-                                                                    }
-                                                                )
-                                                            |> Json.Encode.list
-                                                                (\{ x, y, texture } ->
-                                                                    Json.Encode.object
-                                                                        [ ( "x", Json.Encode.float x )
-                                                                        , ( "y", Json.Encode.float y )
-                                                                        , ( "texture", Json.Encode.string texture )
-                                                                        ]
-                                                                )
-                                                      )
-                                                    ]
-                                            )
+                                        |> Json.Encode.list encodeSpriteLayer
                                   )
                                 ]
                             ]

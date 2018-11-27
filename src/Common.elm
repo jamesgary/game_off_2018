@@ -1,4 +1,4 @@
-module Common exposing (Config, ConfigFloat, Key, Map, PlacementAvailability(..), SavedMap, Session, Sprite, SpriteLayer, Texture(..), Tile(..), TilePos, heroDirInput, mapFromAscii, textureToStr, tilePosToFloats, tileToStr, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
+module Common exposing (Config, ConfigFloat, Graphic, Key, Map, PlacementAvailability(..), SavedMap, Session, Shape(..), Sprite, SpriteLayer, Texture(..), Tile(..), TilePos, heroDirInput, mapFromAscii, textureToStr, tilePosToFloats, tileToStr, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
 
 import Dict exposing (Dict)
 import Math.Vector2 as Vec2 exposing (Vec2)
@@ -203,6 +203,7 @@ type alias SpriteLayer =
     { name : String
     , zOrder : Int
     , sprites : List Sprite
+    , graphics : List Graphic
     }
 
 
@@ -211,3 +212,20 @@ type alias Sprite =
     , y : Float
     , texture : String
     }
+
+
+type alias Graphic =
+    { x : Float
+    , y : Float
+    , width : Float
+    , height : Float
+    , bgColor : String
+    , lineStyleWidth : Float
+    , lineStyleColor : String
+    , lineStyleAlpha : Float
+    , shape : Shape
+    }
+
+
+type Shape
+    = Rect
