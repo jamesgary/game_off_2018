@@ -1,4 +1,4 @@
-module Common exposing (Config, ConfigFloat, Graphic, Key, Map, PlacementAvailability(..), SavedMap, Session, Shape(..), Sprite, SpriteLayer, Texture(..), Tile(..), TilePos, drawHealth, heroDirInput, mapFromAscii, textureToStr, tilePosToFloats, tileToStr, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
+module Common exposing (Config, ConfigFloat, Graphic, Key, Map, PlacementAvailability(..), SavedMap, Session, Shape(..), Sprite, SpriteLayer, Texture(..), Tile(..), TilePos, drawHealth, heroDirInput, mapFromAscii, textureToStr, tilePosToFloats, tileToStr, tupleToVec2, vec2ToTuple)
 
 import Dict exposing (Dict)
 import Math.Vector2 as Vec2 exposing (Vec2)
@@ -58,11 +58,6 @@ type Tile
 
 type alias TilePos =
     ( Int, Int )
-
-
-tilesToShowHeightwise : Config -> Float
-tilesToShowHeightwise c =
-    c.getFloat "tilesToShowLengthwise" * (c.getFloat "canvasHeight" / c.getFloat "canvasWidth")
 
 
 tilePosToFloats : TilePos -> ( Float, Float )

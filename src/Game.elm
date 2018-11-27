@@ -40,8 +40,8 @@ init session =
                 |> tupleToVec2
                 |> Vec2.add (Vec2.vec2 0.5 0.5)
         , vel = Vec2.vec2 0 0
-        , healthAmt = c.getFloat "heroHealthMax"
-        , healthMax = c.getFloat "heroHealthMax"
+        , healthAmt = c.getFloat "hero:healthMax"
+        , healthMax = c.getFloat "hero:healthMax"
         }
     , bullets = []
     , composts = []
@@ -54,16 +54,16 @@ init session =
                 (\pos ->
                     { pos = pos
                     , timeSinceLastSpawn = 9999
-                    , healthAmt = c.getFloat "towerHealthMax"
-                    , healthMax = c.getFloat "towerHealthMax"
+                    , healthAmt = c.getFloat "enemyBase:healthMax"
+                    , healthMax = c.getFloat "enemyBase:healthMax"
                     }
                 )
     , turrets = []
     , moneyCrops = []
     , base =
         { pos = savedMap.base
-        , healthAmt = c.getFloat "towerHealthMax"
-        , healthMax = c.getFloat "towerHealthMax"
+        , healthAmt = c.getFloat "base:healthMax"
+        , healthMax = c.getFloat "base:healthMax"
         }
     , timeSinceLastFire = 0
     , waterAmt = 75
@@ -92,8 +92,8 @@ initTryOut session savedMap =
                     |> tupleToVec2
                     |> Vec2.add (Vec2.vec2 0.5 0.5)
             , vel = Vec2.vec2 0 0
-            , healthAmt = c.getFloat "heroHealthMax"
-            , healthMax = c.getFloat "heroHealthMax"
+            , healthAmt = c.getFloat "hero:healthMax"
+            , healthMax = c.getFloat "hero:healthMax"
             }
       , bullets = []
       , composts = []
@@ -106,16 +106,16 @@ initTryOut session savedMap =
                     (\pos ->
                         { pos = pos
                         , timeSinceLastSpawn = 9999
-                        , healthAmt = c.getFloat "towerHealthMax"
-                        , healthMax = c.getFloat "towerHealthMax"
+                        , healthAmt = c.getFloat "enemyBase:healthMax"
+                        , healthMax = c.getFloat "enemyBase:healthMax"
                         }
                     )
       , turrets = []
       , moneyCrops = []
       , base =
             { pos = savedMap.base
-            , healthAmt = c.getFloat "towerHealthMax"
-            , healthMax = c.getFloat "towerHealthMax"
+            , healthAmt = c.getFloat "base:healthMax"
+            , healthMax = c.getFloat "base:healthMax"
             }
       , timeSinceLastFire = 0
       , waterAmt = 75
@@ -498,8 +498,8 @@ update msg session model =
                                                     | moneyCrops =
                                                         { pos = tilePos
                                                         , timeSinceLastGenerate = 0
-                                                        , healthAmt = session.c.getFloat "baseHealthMax"
-                                                        , healthMax = session.c.getFloat "baseHealthMax"
+                                                        , healthAmt = session.c.getFloat "crops:moneyCrop:healthMax"
+                                                        , healthMax = session.c.getFloat "crops:moneyCrop:healthMax"
                                                         , age = 0
                                                         }
                                                             :: m.moneyCrops
@@ -515,8 +515,8 @@ update msg session model =
                                                     | turrets =
                                                         { pos = tilePos
                                                         , timeSinceLastFire = 0
-                                                        , healthAmt = session.c.getFloat "baseHealthMax"
-                                                        , healthMax = session.c.getFloat "baseHealthMax"
+                                                        , healthAmt = session.c.getFloat "crops:turrent:healthMax"
+                                                        , healthMax = session.c.getFloat "crops:turrent:healthMax"
                                                         , age = 0
                                                         }
                                                             :: m.turrets
@@ -583,14 +583,14 @@ applyKeyDown str model =
 
 makePlayerBullets : Session -> Float -> Model -> Model
 makePlayerBullets session delta model =
-    if model.isMouseDown && model.equipped == Gun && model.waterAmt > session.c.getFloat "waterBulletCost" then
+    if model.isMouseDown && model.equipped == Gun && model.waterAmt > session.c.getFloat "waterGun:bulletCost" then
         if model.timeSinceLastFire > 0.15 then
             { model
                 | timeSinceLastFire = 0
                 , bullets =
                     makeBullet PlayerBullet model.hero.pos model.mousePos
                         :: model.bullets
-                , waterAmt = model.waterAmt - session.c.getFloat "waterBulletCost"
+                , waterAmt = model.waterAmt - session.c.getFloat "waterGun:bulletCost"
             }
 
         else
@@ -627,7 +627,7 @@ refillWater session delta model =
     { model
         | waterAmt =
             if nearbyWater model then
-                min (model.waterAmt + (delta * session.c.getFloat "refillRate")) model.waterMax
+                min (model.waterAmt + (delta * session.c.getFloat "waterGun:refillRate")) model.waterMax
 
             else
                 model.waterAmt
@@ -691,7 +691,7 @@ makeTurretBullets session delta model =
                     (\turret ( bullets, turrets ) ->
                         let
                             shotBullet =
-                                if turret.age > session.c.getFloat "turretTimeToSprout" && turret.timeSinceLastFire > 0.5 then
+                                if turret.age > session.c.getFloat "crops:turret:timeToSprout" && turret.timeSinceLastFire > 0.5 then
                                     model.creeps
                                         |> List.Extra.minimumBy (\closestCreep -> Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurretPos turret.pos))
                                         |> Maybe.andThen
@@ -731,10 +731,17 @@ moveCreeps session delta model =
                         let
                             newProgress =
                                 if creep.diagonal then
-                                    delta * session.c.getFloat "creepSpeed" + creep.progress
+                                    delta
+                                        * session.c.getFloat "creeps:global:speed"
+                                        * session.c.getFloat "creeps:melee:speed"
+                                        + creep.progress
 
                                 else
-                                    sqrt 2 * delta * session.c.getFloat "creepSpeed" + creep.progress
+                                    sqrt 2
+                                        * delta
+                                        * session.c.getFloat "creeps:global:speed"
+                                        * session.c.getFloat "creeps:melee:speed"
+                                        + creep.progress
 
                             ( pos, nextPos, freshProgress ) =
                                 if newProgress > 1 then
@@ -771,7 +778,7 @@ applyCreepDamageToBase : Session -> Float -> Model -> Model
 applyCreepDamageToBase session delta ({ base } as model) =
     let
         creepDps =
-            session.c.getFloat "creepDps"
+            session.c.getFloat "creeps:attacking:melee:damage"
 
         dmg =
             creepDps * delta
@@ -803,7 +810,7 @@ applyCreepDamageToHero : Session -> Float -> Model -> Model
 applyCreepDamageToHero session delta ({ hero } as model) =
     let
         creepDps =
-            session.c.getFloat "creepDps"
+            session.c.getFloat "creeps:attacking:melee:damage"
 
         dmg =
             creepDps * delta
@@ -833,7 +840,8 @@ collideBulletsWithCreeps session delta model =
                             Just ( firstHalf, foundCreep :: secondHalf ) ->
                                 let
                                     newCreep =
-                                        { foundCreep | healthAmt = foundCreep.healthAmt - session.c.getFloat "bulletDmg" }
+                                        -- TODO different bullet dmgs
+                                        { foundCreep | healthAmt = foundCreep.healthAmt - session.c.getFloat "waterGun:bulletDmg" }
 
                                     ( angle, newSeed ) =
                                         Random.step
@@ -893,7 +901,7 @@ collideBulletsWithEnemyTowers session delta model =
                             Just ( firstHalf, foundEnemyTower :: secondHalf ) ->
                                 let
                                     newEnemyTower =
-                                        { foundEnemyTower | healthAmt = foundEnemyTower.healthAmt - session.c.getFloat "bulletDmg" }
+                                        { foundEnemyTower | healthAmt = foundEnemyTower.healthAmt - session.c.getFloat "waterGun:bulletDmg" }
 
                                     ( angle, newSeed ) =
                                         Random.step
@@ -994,12 +1002,13 @@ moveBullets session delta model =
                         { bullet
                             | pos =
                                 Vec2.add
-                                    (tupleToVec2 (fromPolar ( session.c.getFloat "bulletSpeed" * delta, bullet.angle )))
+                                    -- TODO different bullet types
+                                    (tupleToVec2 (fromPolar ( session.c.getFloat "waterGun:bulletSpeed" * delta, bullet.angle )))
                                     bullet.pos
                             , age = bullet.age + delta
                         }
                     )
-                |> List.filter (\bullet -> bullet.age < session.c.getFloat "bulletMaxAge")
+                |> List.filter (\bullet -> bullet.age < session.c.getFloat "waterGun:bulletMaxAge")
     }
 
 
@@ -1068,8 +1077,12 @@ spawnCreeps session delta model =
                               , nextPos = nextPos
                               , progress = 0
                               , diagonal = isDiagonal enemyTower.pos nextPos
-                              , healthAmt = session.c.getFloat "creepHealth"
-                              , healthMax = session.c.getFloat "creepHealth"
+                              , healthAmt =
+                                    session.c.getFloat "creeps:global:health"
+                                        * session.c.getFloat "creeps:attacker:melee:health"
+                              , healthMax =
+                                    session.c.getFloat "creeps:global:health"
+                                        * session.c.getFloat "creeps:attacker:melee:health"
                               , offset = offset
                               }
                                 :: creeps
@@ -1125,7 +1138,7 @@ moveHero session delta model =
             model.hero
 
         newAcc =
-            Vec2.scale (session.c.getFloat "heroAcc")
+            Vec2.scale (session.c.getFloat "hero:acceleration")
                 (heroDirInput session.keysPressed
                     |> (\input ->
                             input
@@ -1137,7 +1150,7 @@ moveHero session delta model =
             Vec2.add model.hero.vel (Vec2.scale delta newAcc)
 
         percentBeyondCap =
-            Vec2.length newVelUncapped / session.c.getFloat "heroMaxSpeed"
+            Vec2.length newVelUncapped / session.c.getFloat "hero:maxSpeed"
 
         newVel =
             (if percentBeyondCap > 1.0 then
@@ -1372,11 +1385,6 @@ subscriptions model =
         ]
 
 
-tilesToShowHeightwise : Config -> Float
-tilesToShowHeightwise c =
-    c.getFloat "tilesToShowLengthwise" * (c.getFloat "canvasHeight" / c.getFloat "canvasWidth")
-
-
 view : Session -> Model -> Html Msg
 view session model =
     Html.div
@@ -1431,7 +1439,7 @@ view session model =
                 --, Html.br [] []
                 --, Html.br [] []
                 , Html.span [] [ Html.text "Water: " ]
-                , viewMeter model.waterAmt model.waterMax (session.c.getFloat "meterWidth")
+                , viewMeter model.waterAmt model.waterMax (session.c.getFloat "ui:meterWidth")
                 ]
             ]
         , drawGlass session model
@@ -1727,7 +1735,7 @@ getSprites session model =
                                             (Vec2.vec2 (toFloat etX + 0.5) (toFloat etY + 0.5))
                                             1
                                             turret.age
-                                            (session.c.getFloat "turretTimeToSprout")
+                                            (session.c.getFloat "crops:turret:timeToSprout")
                         )
                     |> List.concat
                 ]
@@ -1791,7 +1799,7 @@ getSprites session model =
 
 isTurretGrown : Session -> Turret -> Bool
 isTurretGrown session turret =
-    turret.age > session.c.getFloat "turretTimeToSprout"
+    turret.age > session.c.getFloat "crops:turret:timeToSprout"
 
 
 type Effect

@@ -60,6 +60,7 @@ defaultPersistence =
         --, ( "waterBulletCost", { val = 5, min = 0, max = 25 } )
         --]
         [ ( "system:gameSpeed", { val = 5, min = 0, max = 25 } )
+        , ( "ui:meterWidth", { val = 5, min = 0, max = 25 } )
 
         --
         , ( "hero:velocity", { val = 5, min = 0, max = 25 } )
@@ -78,25 +79,33 @@ defaultPersistence =
         , ( "waterGun:bulletCost", { val = 5, min = 0, max = 25 } )
 
         --
-        , ( "globalCreep:speed", { val = 5, min = 0, max = 25 } )
-        , ( "globalCreep:health", { val = 5, min = 0, max = 25 } )
-        , ( "globalCreep:damage", { val = 5, min = 0, max = 25 } )
-        , ( "globalCreep:pathingVariation", { val = 5, min = 0, max = 25 } )
+        , ( "base:healthMax", { val = 5, min = 0, max = 25 } )
 
         --
-        , ( "attackingCreep:melee:speed", { val = 5, min = 0, max = 25 } )
-        , ( "attackingCreep:melee:health", { val = 5, min = 0, max = 25 } )
-        , ( "attackingCreep:melee:damage", { val = 5, min = 0, max = 25 } )
-        , ( "attackingCreep:melee:attackPerSecond", { val = 5, min = 0, max = 25 } )
-        , ( "attackingCreep:melee:pathingVariation", { val = 5, min = 0, max = 25 } )
+        , ( "crops:turret:timeToSprout", { val = 5, min = 0, max = 25 } )
+        , ( "crops:turret:healthMax", { val = 5, min = 0, max = 25 } )
+        , ( "crops:moneyCrop:healthMax", { val = 5, min = 0, max = 25 } )
 
         --
-        , ( "attackingCreep:melee:speed", { val = 5, min = 0, max = 25 } )
-        , ( "attackingCreep:melee:health", { val = 5, min = 0, max = 25 } )
-        , ( "attackingCreep:melee:damage", { val = 5, min = 0, max = 25 } )
-        , ( "attackingCreep:melee:attackPerSecond", { val = 5, min = 0, max = 25 } )
-        , ( "attackingCreep:melee:pathingVariation", { val = 5, min = 0, max = 25 } )
+        , ( "creeps:global:speed", { val = 5, min = 0, max = 25 } )
+        , ( "creeps:global:health", { val = 5, min = 0, max = 25 } )
+        , ( "creeps:global:damage", { val = 5, min = 0, max = 25 } )
+        , ( "creeps:global:pathingVariation", { val = 5, min = 0, max = 25 } )
 
+        --
+        , ( "creeps:attacker:melee:speed", { val = 5, min = 0, max = 25 } )
+        , ( "creeps:attacker:melee:health", { val = 5, min = 0, max = 25 } )
+        , ( "creeps:attacker:melee:damage", { val = 5, min = 0, max = 25 } )
+        , ( "creeps:attacker:melee:attackPerSecond", { val = 5, min = 0, max = 25 } )
+        , ( "creeps:attacker:melee:pathingVariation", { val = 5, min = 0, max = 25 } )
+
+        --
+        --, ( "creeps:attacking:ranged:speed", { val = 5, min = 0, max = 25 } )
+        --, ( "creeps:attacking:ranged:health", { val = 5, min = 0, max = 25 } )
+        --, ( "creeps:attacking:ranged:damage", { val = 5, min = 0, max = 25 } )
+        --, ( "creeps:attacking:ranged:attackPerSecond", { val = 5, min = 0, max = 25 } )
+        --, ( "creeps:attacking:ranged:pathingVariation", { val = 5, min = 0, max = 25 } )
+        --, ( "creeps:attacking:ranged:range", { val = 5, min = 0, max = 25 } )
         --
         , ( "enemyBase:secondsBetweenSpawnsAtDay", { val = 5, min = 0, max = 25 } )
         , ( "enemyBase:secondsBetweenSpawnsAtNight", { val = 5, min = 0, max = 25 } )
@@ -862,12 +871,12 @@ groupConfigFloats configFloats =
         [ Html.Attributes.style "font-size" "12px"
         ]
         (configValsToConfigAccordion configFloats
-            |> viewConfigAccordion
+            |> viewConfigAccordion []
         )
 
 
-viewConfigAccordion : List ConfigAccordion -> List (Html Msg)
-viewConfigAccordion configAccordions =
+viewConfigAccordion : List String -> List ConfigAccordion -> List (Html Msg)
+viewConfigAccordion prefixes configAccordions =
     configAccordions
         |> List.map
             (\configAccordion ->
@@ -897,7 +906,8 @@ viewConfigAccordion configAccordions =
                                     , Html.Attributes.min (formatConfigFloat min)
                                     , Html.Attributes.max (formatConfigFloat max)
                                     , Html.Attributes.step "any"
-                                    , Html.Events.onInput (ChangeConfig name)
+                                    , Html.Events.onInput
+                                        (ChangeConfig (String.join ":" (prefixes ++ [ name ])))
                                     ]
                                     []
                                 , Html.input
@@ -930,7 +940,7 @@ viewConfigAccordion configAccordions =
                                 , Html.Attributes.style "margin-left" "12px"
                                 , Html.Attributes.style "padding-left" "5px"
                                 ]
-                                (viewConfigAccordion accordions)
+                                (viewConfigAccordion (prefixes ++ [ name ]) accordions)
                             ]
                         ]
             )
@@ -958,13 +968,6 @@ configValsToConfigAccordion configFloats =
                 in
                 case String.split ":" firstName |> List.filter (String.isEmpty >> not) of
                     prefix :: _ ->
-                        let
-                            _ =
-                                Debug.log "fn" firstName
-
-                            _ =
-                                Debug.log "prefix so group: " prefix
-                        in
                         if List.isEmpty rest && not (String.contains ":" firstName) then
                             Leaf firstName firstConfigFloat
 
