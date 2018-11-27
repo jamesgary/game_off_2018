@@ -1,4 +1,4 @@
-port module Game exposing (Effect(..), GameState(..), Model, Msg(..), initTryOut, update, view)
+port module Game exposing (Effect(..), GameState(..), Model, Msg(..), init, initTryOut, update, view)
 
 import AStar
 import Browser
@@ -18,6 +18,66 @@ import Random
 import Round
 import Set exposing (Set)
 import WebGL
+
+
+init : Session -> Model
+init session =
+    let
+        c =
+            session.c
+
+        savedMap =
+            case List.head session.savedMaps of
+                Just map ->
+                    map
+
+                Nothing ->
+                    Debug.todo "whut you doin"
+    in
+    { hero =
+        { pos =
+            tilePosToFloats savedMap.hero
+                |> tupleToVec2
+                |> Vec2.add (Vec2.vec2 0.5 0.5)
+        , vel = Vec2.vec2 0 0
+        , healthAmt = c.getFloat "heroHealthMax"
+        , healthMax = c.getFloat "heroHealthMax"
+        }
+    , bullets = []
+    , composts = []
+    , particles = []
+    , creeps = []
+    , enemyTowers =
+        savedMap.enemyTowers
+            |> Set.toList
+            |> List.map
+                (\pos ->
+                    { pos = pos
+                    , timeSinceLastSpawn = 9999
+                    , healthAmt = c.getFloat "towerHealthMax"
+                    , healthMax = c.getFloat "towerHealthMax"
+                    }
+                )
+    , turrets = []
+    , moneyCrops = []
+    , base =
+        { pos = savedMap.base
+        , healthAmt = c.getFloat "towerHealthMax"
+        , healthMax = c.getFloat "towerHealthMax"
+        }
+    , timeSinceLastFire = 0
+    , waterAmt = 75
+    , waterMax = 100
+    , equipped = Gun
+    , map = savedMap.map
+    , inv =
+        { compost = 0
+        }
+    , gameState = Playing
+    , isMouseDown = False
+    , mousePos = Vec2.vec2 -99 -99
+    , age = 0
+    }
 
 
 initTryOut : Session -> SavedMap -> ( Model, Cmd Msg )
@@ -1570,13 +1630,41 @@ getSprites session model =
                   }
                 ]
             , graphics =
-                [ { x = Vec2.getX model.hero.pos - 0.5
-                  , y = Vec2.getY model.hero.pos - 0.5
-                  , width = 1.8
-                  , height = 1.1
+                let
+                    ( healthX, healthY ) =
+                        ( Vec2.getX model.hero.pos - (width / 2)
+                        , Vec2.getY model.hero.pos + 0.7
+                        )
+
+                    width =
+                        1.2
+
+                    height =
+                        0.2
+
+                    outlineRatio =
+                        0.05
+
+                    offset =
+                        outlineRatio * width
+                in
+                [ { x = healthX - offset
+                  , y = healthY - offset
+                  , width = width + (offset * 2)
+                  , height = height + (offset * 2)
                   , bgColor = "#000000"
-                  , lineStyleWidth = 2
-                  , lineStyleColor = "#ff00ff"
+                  , lineStyleWidth = 0
+                  , lineStyleColor = "#000000"
+                  , lineStyleAlpha = 1
+                  , shape = Rect
+                  }
+                , { x = healthX
+                  , y = healthY
+                  , width = width * (model.hero.healthAmt / model.hero.healthMax)
+                  , height = height
+                  , bgColor = "#00ff00"
+                  , lineStyleWidth = 0
+                  , lineStyleColor = "#000000"
                   , lineStyleAlpha = 1
                   , shape = Rect
                   }

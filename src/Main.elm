@@ -161,7 +161,13 @@ sessionFromFlags flags =
 
 
 init : Json.Decode.Value -> ( Model, Cmd Msg )
-init jsonFlags =
+init =
+    --initMapEditor
+    initGame
+
+
+initMapEditor : Json.Decode.Value -> ( Model, Cmd Msg )
+initMapEditor jsonFlags =
     let
         flags =
             jsonToFlags jsonFlags
@@ -169,7 +175,23 @@ init jsonFlags =
         session =
             sessionFromFlags flags
     in
-    ( { state = MapEditor (MapEditor.init session) --Game.init session
+    ( { state = MapEditor (MapEditor.init session)
+      , session = session
+      }
+    , Cmd.none
+    )
+
+
+initGame : Json.Decode.Value -> ( Model, Cmd Msg )
+initGame jsonFlags =
+    let
+        flags =
+            jsonToFlags jsonFlags
+
+        session =
+            sessionFromFlags flags
+    in
+    ( { state = Game (Game.init session)
       , session = session
       }
     , Cmd.none
