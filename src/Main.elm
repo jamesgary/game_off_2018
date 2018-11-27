@@ -858,7 +858,9 @@ formatConfigFloat val =
 
 groupConfigFloats : List ( String, ConfigFloat ) -> Html Msg
 groupConfigFloats configFloats =
-    Html.div []
+    Html.div
+        [ Html.Attributes.style "font-size" "12px"
+        ]
         (configValsToConfigAccordion configFloats
             |> viewConfigAccordion
         )
@@ -874,11 +876,8 @@ viewConfigAccordion configAccordions =
                         [ Html.div
                             [ Html.Attributes.style "display" "flex"
                             , Html.Attributes.style "justify-content" "space-between"
-                            , Html.Attributes.style "margin" "10px 10px"
-
-                            --, Html.Attributes.style "border" "1px solid black"
-                            --, Html.Attributes.style "padding" "1px"
-                            --, Html.Attributes.style "margin" "1px"
+                            , Html.Attributes.style "align-items" "center"
+                            , Html.Attributes.style "margin" "0px 0px"
                             ]
                             [ Html.div
                                 []
@@ -912,13 +911,27 @@ viewConfigAccordion configAccordions =
 
                     Group name accordions ->
                         [ Html.div
-                            [ Html.Attributes.style "border" "1px solid black"
-                            , Html.Attributes.style "padding" "1px"
-                            , Html.Attributes.style "margin" "1px"
+                            [--, Html.Attributes.style "display" "flex"
                             ]
-                            (Html.text ("**" ++ name ++ "**")
-                                :: viewConfigAccordion accordions
-                            )
+                            [ Html.div
+                                [ Html.Attributes.style "font-weight" "bold"
+                                ]
+                                [ Html.button
+                                    [ Html.Attributes.style "height" "20px"
+                                    , Html.Attributes.style "border-radius" "5px"
+                                    , Html.Attributes.style "margin" "2px 0"
+                                    ]
+                                    [ Html.text "+"
+                                    ]
+                                , Html.text (" " ++ name)
+                                ]
+                            , Html.div
+                                [ Html.Attributes.style "border-left" "1px solid #ccc"
+                                , Html.Attributes.style "margin-left" "12px"
+                                , Html.Attributes.style "padding-left" "5px"
+                                ]
+                                (viewConfigAccordion accordions)
+                            ]
                         ]
             )
         |> List.concat
@@ -945,16 +958,27 @@ configValsToConfigAccordion configFloats =
                 in
                 case String.split ":" firstName |> List.filter (String.isEmpty >> not) of
                     prefix :: _ ->
-                        Group prefix
-                            (all
-                                |> List.map
-                                    (\( name, configFloat ) ->
-                                        ( String.dropLeft (String.length prefix + 1) name
-                                        , configFloat
+                        let
+                            _ =
+                                Debug.log "fn" firstName
+
+                            _ =
+                                Debug.log "prefix so group: " prefix
+                        in
+                        if List.isEmpty rest && not (String.contains ":" firstName) then
+                            Leaf firstName firstConfigFloat
+
+                        else
+                            Group prefix
+                                (all
+                                    |> List.map
+                                        (\( name, configFloat ) ->
+                                            ( String.dropLeft (String.length prefix + 1) name
+                                            , configFloat
+                                            )
                                         )
-                                    )
-                                |> configValsToConfigAccordion
-                            )
+                                    |> configValsToConfigAccordion
+                                )
 
                     leafyName ->
                         Leaf firstName firstConfigFloat
