@@ -1608,19 +1608,22 @@ getSprites session model =
             , graphics = []
             }
 
-        --cursorLayer =
-        --    { name = "cursor"
-        --    , sprites =
-        --        case model.hoveringTile of
-        --            Just ( x, y ) ->
-        --                [ { x = x |> toFloat
-        --                  , y = y |> toFloat
-        --                  , texture = "selectedTile"
-        --                  }
-        --                ]
-        --            Nothing ->
-        --                []
-        --    }
+        cursorLayer =
+            { name = "cursor"
+            , sprites =
+                case hoveringTilePos model of
+                    Just ( x, y ) ->
+                        [ { x = x |> toFloat
+                          , y = y |> toFloat
+                          , texture = "selectedTile"
+                          }
+                        ]
+
+                    Nothing ->
+                        []
+            , graphics = []
+            }
+
         heroLayer =
             { name = "hero"
             , sprites =
@@ -1648,17 +1651,42 @@ getSprites session model =
                           }
                         ]
                 , model.enemyTowers
-                    |> List.map .pos
                     |> List.map
-                        (\( etX, etY ) ->
-                            { x = etX |> toFloat
-                            , y = etY |> toFloat
-                            , texture = "enemyTower"
-                            }
+                        (\enemyTower ->
+                            case enemyTower.pos of
+                                ( etX, etY ) ->
+                                    { x = etX |> toFloat
+                                    , y = etY |> toFloat
+                                    , texture = "enemyTower"
+                                    }
                         )
                 ]
                     |> List.concat
-            , graphics = []
+            , graphics =
+                [ (case model.base.pos of
+                    ( x, y ) ->
+                        [ drawHealth
+                            (Vec2.vec2 (toFloat x + 0.5) (toFloat y + 0.5))
+                            2
+                            model.base.healthAmt
+                            model.base.healthMax
+                        ]
+                  )
+                    |> List.concat
+                , model.enemyTowers
+                    |> List.map
+                        (\enemyTower ->
+                            case enemyTower.pos of
+                                ( etX, etY ) ->
+                                    drawHealth
+                                        (Vec2.vec2 (toFloat etX + 0.5) (toFloat etY + 0.5))
+                                        2
+                                        enemyTower.healthAmt
+                                        enemyTower.healthMax
+                        )
+                    |> List.concat
+                ]
+                    |> List.concat
             }
 
         bulletsLayer =
@@ -1704,8 +1732,7 @@ getSprites session model =
     , heroLayer
     , creepsLayer
     , bulletsLayer
-
-    --, cursorLayer
+    , cursorLayer
     ]
         |> List.indexedMap
             (\i layer ->

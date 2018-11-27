@@ -219,7 +219,20 @@ update msg model =
             )
 
         KeyDown str ->
-            ( { model | session = { session | keysPressed = Set.insert str session.keysPressed } }
+            ( { model
+                | session =
+                    { session
+                        | keysPressed = Set.insert str session.keysPressed
+                    }
+                , state =
+                    case model.state of
+                        Game gameModel ->
+                            Game.update (Game.KeyDown str) session gameModel
+                                |> (\( m, es ) -> Game m)
+
+                        MapEditor _ ->
+                            model.state
+              }
             , Cmd.none
             )
 
@@ -701,7 +714,6 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ Browser.Events.onKeyDown (Json.Decode.map KeyDown (Json.Decode.field "key" Json.Decode.string))
-        , Browser.Events.onKeyUp (Json.Decode.map KeyUp (Json.Decode.field "key" Json.Decode.string))
         , Browser.Events.onKeyUp (Json.Decode.map KeyUp (Json.Decode.field "key" Json.Decode.string))
         , Sub.batch
             (case model.state of
