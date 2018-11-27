@@ -1660,6 +1660,21 @@ getSprites session model =
                                     , texture = "enemyTower"
                                     }
                         )
+                , model.turrets
+                    |> List.map
+                        (\turret ->
+                            case turret.pos of
+                                ( etX, etY ) ->
+                                    { x = etX |> toFloat
+                                    , y = etY |> toFloat
+                                    , texture =
+                                        if isTurretGrown session turret then
+                                            "turret"
+
+                                        else
+                                            "seedling"
+                                    }
+                        )
                 ]
                     |> List.concat
             , graphics =
@@ -1683,6 +1698,26 @@ getSprites session model =
                                         2
                                         enemyTower.healthAmt
                                         enemyTower.healthMax
+                        )
+                    |> List.concat
+                , model.turrets
+                    |> List.map
+                        (\turret ->
+                            case turret.pos of
+                                ( etX, etY ) ->
+                                    if isTurretGrown session turret then
+                                        drawHealth
+                                            (Vec2.vec2 (toFloat etX + 0.5) (toFloat etY + 0.5))
+                                            1
+                                            turret.healthAmt
+                                            turret.healthMax
+
+                                    else
+                                        drawHealth
+                                            (Vec2.vec2 (toFloat etX + 0.5) (toFloat etY + 0.5))
+                                            1
+                                            turret.age
+                                            (session.c.getFloat "turretTimeToSprout")
                         )
                     |> List.concat
                 ]
@@ -1742,6 +1777,11 @@ getSprites session model =
                 , zOrder = i -- not used yet
                 }
             )
+
+
+isTurretGrown : Session -> Turret -> Bool
+isTurretGrown session turret =
+    turret.age > session.c.getFloat "turretTimeToSprout"
 
 
 type Effect
