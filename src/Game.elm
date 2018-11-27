@@ -1660,6 +1660,16 @@ getSprites session model =
                                     , texture = "enemyTower"
                                     }
                         )
+                , model.moneyCrops
+                    |> List.map
+                        (\moneyCrop ->
+                            case moneyCrop.pos of
+                                ( etX, etY ) ->
+                                    { x = etX |> toFloat
+                                    , y = etY |> toFloat
+                                    , texture = "moneyCrop"
+                                    }
+                        )
                 , model.turrets
                     |> List.map
                         (\turret ->
