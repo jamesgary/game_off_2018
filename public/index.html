@@ -201,7 +201,7 @@
                 break;
               case "HARD_RESET":
                 console.log("hard resetin");
-                localStorage.removeItem("persistence");
+                //localStorage.removeItem("persistence"); // TOO DANGEROUS
                 break;
               case "MOVE_CAMERA":
                 viewport.moveCenter(effect.x, effect.y);

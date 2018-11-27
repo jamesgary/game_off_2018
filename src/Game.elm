@@ -733,14 +733,14 @@ moveCreeps session delta model =
                                 if creep.diagonal then
                                     delta
                                         * session.c.getFloat "creeps:global:speed"
-                                        * session.c.getFloat "creeps:melee:speed"
+                                        * session.c.getFloat "creeps:attacker:melee:speed"
                                         + creep.progress
 
                                 else
                                     sqrt 2
                                         * delta
                                         * session.c.getFloat "creeps:global:speed"
-                                        * session.c.getFloat "creeps:melee:speed"
+                                        * session.c.getFloat "creeps:attacker:melee:speed"
                                         + creep.progress
 
                             ( pos, nextPos, freshProgress ) =
@@ -778,7 +778,7 @@ applyCreepDamageToBase : Session -> Float -> Model -> Model
 applyCreepDamageToBase session delta ({ base } as model) =
     let
         creepDps =
-            session.c.getFloat "creeps:attacking:melee:damage"
+            session.c.getFloat "creeps:attacker:melee:damage"
 
         dmg =
             creepDps * delta
@@ -810,7 +810,7 @@ applyCreepDamageToHero : Session -> Float -> Model -> Model
 applyCreepDamageToHero session delta ({ hero } as model) =
     let
         creepDps =
-            session.c.getFloat "creeps:attacking:melee:damage"
+            session.c.getFloat "creeps:attacker:melee:damage"
 
         dmg =
             creepDps * delta

@@ -34,6 +34,7 @@ type alias Persistence =
     { isConfigOpen : Bool
     , configFloats : Dict String ConfigFloat
     , savedMaps : List SavedMap
+    , openConfigAccordions : Set String
     }
 
 
@@ -100,12 +101,12 @@ defaultPersistence =
         , ( "creeps:attacker:melee:pathingVariation", { val = 5, min = 0, max = 25 } )
 
         --
-        --, ( "creeps:attacking:ranged:speed", { val = 5, min = 0, max = 25 } )
-        --, ( "creeps:attacking:ranged:health", { val = 5, min = 0, max = 25 } )
-        --, ( "creeps:attacking:ranged:damage", { val = 5, min = 0, max = 25 } )
-        --, ( "creeps:attacking:ranged:attackPerSecond", { val = 5, min = 0, max = 25 } )
-        --, ( "creeps:attacking:ranged:pathingVariation", { val = 5, min = 0, max = 25 } )
-        --, ( "creeps:attacking:ranged:range", { val = 5, min = 0, max = 25 } )
+        --, ( "creeps:attacker:ranged:speed", { val = 5, min = 0, max = 25 } )
+        --, ( "creeps:attacker:ranged:health", { val = 5, min = 0, max = 25 } )
+        --, ( "creeps:attacker:ranged:damage", { val = 5, min = 0, max = 25 } )
+        --, ( "creeps:attacker:ranged:attackPerSecond", { val = 5, min = 0, max = 25 } )
+        --, ( "creeps:attacker:ranged:pathingVariation", { val = 5, min = 0, max = 25 } )
+        --, ( "creeps:attacker:ranged:range", { val = 5, min = 0, max = 25 } )
         --
         , ( "enemyBase:secondsBetweenSpawnsAtDay", { val = 5, min = 0, max = 25 } )
         , ( "enemyBase:secondsBetweenSpawnsAtNight", { val = 5, min = 0, max = 25 } )
@@ -113,6 +114,7 @@ defaultPersistence =
         , ( "enemyBase:healthMax", { val = 5, min = 0, max = 25 } )
         ]
             |> Dict.fromList
+    , openConfigAccordions = [] |> Set.fromList
     , savedMaps =
         [ { name = "New Map"
           , map =
@@ -157,9 +159,12 @@ type Msg
     = KeyDown String
     | KeyUp String
     | Tick Float
-    | ChangeConfig String String
+    | ChangeConfigVal String String
+    | ChangeConfigMin String String
+    | ChangeConfigMax String String
     | ToggleConfig Bool
-    | HardReset
+    | ToggleConfigAccordion Bool String
+    | ResetConfig
       -- app msgs
     | MapEditorMsg MapEditor.Msg
     | GameMsg Game.Msg
@@ -185,8 +190,7 @@ makeC configFloats =
 
 dlog : String -> a -> a
 dlog str val =
-    --Debug.log str val
-    val
+    Debug.log str val
 
 
 sessionFromFlags : Flags -> Session
@@ -199,6 +203,7 @@ sessionFromFlags flags =
     { configFloats = persistence.configFloats
     , c = makeC persistence.configFloats
     , isConfigOpen = persistence.isConfigOpen
+    , openConfigAccordions = persistence.openConfigAccordions
 
     -- input
     , keysPressed = Set.empty
@@ -291,7 +296,7 @@ update msg model =
             , Cmd.none
             )
 
-        ChangeConfig name inputStr ->
+        ChangeConfigVal name inputStr ->
             let
                 newConfigFloats =
                     session.configFloats
@@ -299,6 +304,68 @@ update msg model =
                                 case String.toFloat inputStr of
                                     Just val ->
                                         Dict.update name (Maybe.map (\cv -> { cv | val = val })) configFloats
+
+                                    Nothing ->
+                                        configFloats
+                           )
+
+                newModel =
+                    { model
+                        | session =
+                            { session
+                                | configFloats = newConfigFloats
+                                , c = makeC newConfigFloats
+                            }
+                    }
+            in
+            ( newModel
+            , performEffects
+                [ Json.Encode.object
+                    [ ( "id", Json.Encode.string "SAVE" )
+                    , ( "persistence", modelToPersistence newModel |> encodePersistence )
+                    ]
+                ]
+            )
+
+        ChangeConfigMin name inputStr ->
+            let
+                newConfigFloats =
+                    session.configFloats
+                        |> (\configFloats ->
+                                case String.toFloat inputStr of
+                                    Just min ->
+                                        Dict.update name (Maybe.map (\cv -> { cv | min = min })) configFloats
+
+                                    Nothing ->
+                                        configFloats
+                           )
+
+                newModel =
+                    { model
+                        | session =
+                            { session
+                                | configFloats = newConfigFloats
+                                , c = makeC newConfigFloats
+                            }
+                    }
+            in
+            ( newModel
+            , performEffects
+                [ Json.Encode.object
+                    [ ( "id", Json.Encode.string "SAVE" )
+                    , ( "persistence", modelToPersistence newModel |> encodePersistence )
+                    ]
+                ]
+            )
+
+        ChangeConfigMax name inputStr ->
+            let
+                newConfigFloats =
+                    session.configFloats
+                        |> (\configFloats ->
+                                case String.toFloat inputStr of
+                                    Just max ->
+                                        Dict.update name (Maybe.map (\cv -> { cv | max = max })) configFloats
 
                                     Nothing ->
                                         configFloats
@@ -337,16 +404,49 @@ update msg model =
                 ]
             )
 
-        HardReset ->
-            ( { model
-                | session =
-                    { session
-                        | isConfigOpen = True
-                        , configFloats = defaultPersistence.configFloats
-                        , c = makeC defaultPersistence.configFloats
+        ToggleConfigAccordion shouldOpen name ->
+            let
+                newModel =
+                    { model
+                        | session =
+                            { session
+                                | openConfigAccordions =
+                                    if shouldOpen then
+                                        Set.insert name model.session.openConfigAccordions
+
+                                    else
+                                        Set.remove name model.session.openConfigAccordions
+                            }
                     }
-              }
-            , performEffects [ Json.Encode.object [ ( "id", Json.Encode.string "HARD_RESET" ) ] ]
+            in
+            --( newModel, performEffects (modelToPersistence newModel |> encodePersistence) )
+            ( newModel
+            , performEffects
+                [ Json.Encode.object
+                    [ ( "id", Json.Encode.string "SAVE" )
+                    , ( "persistence", modelToPersistence newModel |> encodePersistence )
+                    ]
+                ]
+            )
+
+        ResetConfig ->
+            let
+                newModel =
+                    { model
+                        | session =
+                            { session
+                                | configFloats = defaultPersistence.configFloats
+                                , c = makeC defaultPersistence.configFloats
+                            }
+                    }
+            in
+            ( newModel
+            , performEffects
+                [ Json.Encode.object
+                    [ ( "id", Json.Encode.string "SAVE" )
+                    , ( "persistence", modelToPersistence newModel |> encodePersistence )
+                    ]
+                ]
             )
 
         Tick delta ->
@@ -576,6 +676,7 @@ performMapEffects session effects model =
 modelToPersistence : Model -> Persistence
 modelToPersistence model =
     { isConfigOpen = model.session.isConfigOpen
+    , openConfigAccordions = model.session.openConfigAccordions
     , configFloats = model.session.configFloats
     , savedMaps = model.session.savedMaps
     }
@@ -599,10 +700,15 @@ flagsDecoder =
         (Json.Decode.field "windowHeight" Json.Decode.float)
         (Json.Decode.field "persistence"
             (Json.Decode.nullable
-                (Json.Decode.map3 Persistence
+                (Json.Decode.map4 Persistence
                     (Json.Decode.field "isConfigOpen" Json.Decode.bool)
                     (Json.Decode.field "configFloats" (Json.Decode.dict configFloatDecoder))
                     (Json.Decode.field "savedMaps" (Json.Decode.list savedMapDecoder))
+                    (Json.Decode.field "openConfigAccordions"
+                        (Json.Decode.list Json.Decode.string
+                            |> Json.Decode.map Set.fromList
+                        )
+                    )
                 )
             )
         )
@@ -699,6 +805,11 @@ encodePersistence persistence =
           , Json.Encode.list
                 encodeSavedMap
                 persistence.savedMaps
+          )
+        , ( "openConfigAccordions"
+          , Json.Encode.list
+                Json.Encode.string
+                (persistence.openConfigAccordions |> Set.toList)
           )
         ]
 
@@ -840,9 +951,9 @@ viewConfig model =
         (if model.session.isConfigOpen then
             Html.button
                 [ Html.Attributes.style "float" "left"
-                , Html.Events.onClick HardReset
+                , Html.Events.onClick ResetConfig
                 ]
-                [ Html.text "Hard Reset" ]
+                [ Html.text "Reset Configs" ]
                 :: Html.a
                     [ Html.Events.onClick (ToggleConfig False)
                     , Html.Attributes.style "float" "right"
@@ -852,7 +963,7 @@ viewConfig model =
                 :: Html.br [] []
                 :: [ model.session.configFloats
                         |> Dict.toList
-                        |> groupConfigFloats
+                        |> groupConfigFloats model.session.openConfigAccordions
                    ]
 
          else
@@ -862,21 +973,21 @@ viewConfig model =
 
 formatConfigFloat : Float -> String
 formatConfigFloat val =
-    Round.round 1 val
+    Round.round 2 val
 
 
-groupConfigFloats : List ( String, ConfigFloat ) -> Html Msg
-groupConfigFloats configFloats =
+groupConfigFloats : Set String -> List ( String, ConfigFloat ) -> Html Msg
+groupConfigFloats openConfigAccordions configFloats =
     Html.div
         [ Html.Attributes.style "font-size" "12px"
         ]
         (configValsToConfigAccordion configFloats
-            |> viewConfigAccordion []
+            |> viewConfigAccordion openConfigAccordions []
         )
 
 
-viewConfigAccordion : List String -> List ConfigAccordion -> List (Html Msg)
-viewConfigAccordion prefixes configAccordions =
+viewConfigAccordion : Set String -> List String -> List ConfigAccordion -> List (Html Msg)
+viewConfigAccordion openConfigAccordions prefixes configAccordions =
     configAccordions
         |> List.map
             (\configAccordion ->
@@ -898,6 +1009,8 @@ viewConfigAccordion prefixes configAccordions =
                                 , Html.input
                                     [ Html.Attributes.style "width" "40px"
                                     , Html.Attributes.value (formatConfigFloat min)
+                                    , Html.Events.onInput
+                                        (ChangeConfigMin (String.join ":" (prefixes ++ [ name ])))
                                     ]
                                     []
                                 , Html.input
@@ -907,12 +1020,14 @@ viewConfigAccordion prefixes configAccordions =
                                     , Html.Attributes.max (formatConfigFloat max)
                                     , Html.Attributes.step "any"
                                     , Html.Events.onInput
-                                        (ChangeConfig (String.join ":" (prefixes ++ [ name ])))
+                                        (ChangeConfigVal (String.join ":" (prefixes ++ [ name ])))
                                     ]
                                     []
                                 , Html.input
                                     [ Html.Attributes.style "width" "40px"
                                     , Html.Attributes.value (formatConfigFloat max)
+                                    , Html.Events.onInput
+                                        (ChangeConfigMax (String.join ":" (prefixes ++ [ name ])))
                                     ]
                                     []
                                 ]
@@ -920,28 +1035,49 @@ viewConfigAccordion prefixes configAccordions =
                         ]
 
                     Group name accordions ->
-                        [ Html.div
-                            [--, Html.Attributes.style "display" "flex"
-                            ]
-                            [ Html.div
-                                [ Html.Attributes.style "font-weight" "bold"
+                        [ if Set.member (String.join ":" (prefixes ++ [ name ])) openConfigAccordions then
+                            Html.div
+                                [--, Html.Attributes.style "display" "flex"
                                 ]
-                                [ Html.button
-                                    [ Html.Attributes.style "height" "20px"
-                                    , Html.Attributes.style "border-radius" "5px"
-                                    , Html.Attributes.style "margin" "2px 0"
+                                [ Html.div
+                                    [ Html.Attributes.style "font-weight" "bold"
                                     ]
-                                    [ Html.text "+"
+                                    [ Html.button
+                                        [ Html.Attributes.style "height" "20px"
+                                        , Html.Attributes.style "border-radius" "5px"
+                                        , Html.Attributes.style "margin" "2px 0"
+                                        , Html.Events.onClick
+                                            (ToggleConfigAccordion False (String.join ":" (prefixes ++ [ name ])))
+                                        ]
+                                        [ Html.text "-" ]
+                                    , Html.text (" " ++ name)
                                     ]
-                                , Html.text (" " ++ name)
+                                , Html.div
+                                    [ Html.Attributes.style "border-left" "1px solid #ccc"
+                                    , Html.Attributes.style "margin-left" "12px"
+                                    , Html.Attributes.style "padding-left" "5px"
+                                    ]
+                                    (viewConfigAccordion openConfigAccordions (prefixes ++ [ name ]) accordions)
                                 ]
-                            , Html.div
-                                [ Html.Attributes.style "border-left" "1px solid #ccc"
-                                , Html.Attributes.style "margin-left" "12px"
-                                , Html.Attributes.style "padding-left" "5px"
+
+                          else
+                            Html.div
+                                [--, Html.Attributes.style "display" "flex"
                                 ]
-                                (viewConfigAccordion (prefixes ++ [ name ]) accordions)
-                            ]
+                                [ Html.div
+                                    [ Html.Attributes.style "font-weight" "bold"
+                                    ]
+                                    [ Html.button
+                                        [ Html.Attributes.style "height" "20px"
+                                        , Html.Attributes.style "border-radius" "5px"
+                                        , Html.Attributes.style "margin" "2px 0"
+                                        , Html.Events.onClick
+                                            (ToggleConfigAccordion True (String.join ":" (prefixes ++ [ name ])))
+                                        ]
+                                        [ Html.text "+" ]
+                                    , Html.text (" " ++ name)
+                                    ]
+                                ]
                         ]
             )
         |> List.concat

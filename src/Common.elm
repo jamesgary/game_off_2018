@@ -10,6 +10,7 @@ type alias Session =
     { configFloats : Dict String ConfigFloat
     , c : Config
     , isConfigOpen : Bool
+    , openConfigAccordions : Set String
 
     -- input
     , keysPressed : Set Key
