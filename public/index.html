@@ -19,8 +19,6 @@
 
       let app;
       let viewport;
-      //let particleContainerContainer;
-      //let textureNameToParticleGroupCache = {};
       let nameToPixiLayer = {};
 
       graphics.init = function() {
@@ -106,8 +104,8 @@
               particleContainer.addChildAt(sprite, particleContainer.numDrawnSprites);
             }
 
-            sprite.x = spriteData.x;
-            sprite.y = spriteData.y;
+            sprite.x = spriteData.x + 0.5;
+            sprite.y = spriteData.y + 0.5;
             particleContainer.numDrawnSprites++;
           }
 
@@ -147,8 +145,8 @@
                 1.0
               );
               pixiGraphics.drawRect(
-                graphic.x,
-                graphic.y,
+                graphic.x + 0.5,
+                graphic.y + 0.5,
                 graphic.width,
                 graphic.height
               );

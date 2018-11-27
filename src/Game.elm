@@ -1630,45 +1630,11 @@ getSprites session model =
                   }
                 ]
             , graphics =
-                let
-                    ( healthX, healthY ) =
-                        ( Vec2.getX model.hero.pos - (width / 2)
-                        , Vec2.getY model.hero.pos + 0.7
-                        )
-
-                    width =
-                        1.2
-
-                    height =
-                        0.2
-
-                    outlineRatio =
-                        0.05
-
-                    offset =
-                        outlineRatio * width
-                in
-                [ { x = healthX - offset
-                  , y = healthY - offset
-                  , width = width + (offset * 2)
-                  , height = height + (offset * 2)
-                  , bgColor = "#000000"
-                  , lineStyleWidth = 0
-                  , lineStyleColor = "#000000"
-                  , lineStyleAlpha = 1
-                  , shape = Rect
-                  }
-                , { x = healthX
-                  , y = healthY
-                  , width = width * (model.hero.healthAmt / model.hero.healthMax)
-                  , height = height
-                  , bgColor = "#00ff00"
-                  , lineStyleWidth = 0
-                  , lineStyleColor = "#000000"
-                  , lineStyleAlpha = 1
-                  , shape = Rect
-                  }
-                ]
+                drawHealth
+                    model.hero.pos
+                    1.4
+                    model.hero.healthAmt
+                    model.hero.healthMax
             }
 
         buildingsLayer =
@@ -1716,7 +1682,7 @@ getSprites session model =
                     |> List.map
                         (\creep ->
                             { x = (creep |> vec2FromCreep |> Vec2.getX) - 0.5
-                            , y = (creep |> vec2FromCreep |> Vec2.getY) - 0.5
+                            , y = (creep |> vec2FromCreep |> Vec2.getY) - 0.25
                             , texture = "creep"
                             }
                         )
@@ -1724,17 +1690,13 @@ getSprites session model =
                 model.creeps
                     |> List.map
                         (\creep ->
-                            { x = (creep |> vec2FromCreep |> Vec2.getX) - 0.5
-                            , y = (creep |> vec2FromCreep |> Vec2.getY) - 0.5
-                            , width = 0.8
-                            , height = 0.1
-                            , bgColor = "#000000"
-                            , lineStyleWidth = 2
-                            , lineStyleColor = "#ff00ff"
-                            , lineStyleAlpha = 1
-                            , shape = Rect
-                            }
+                            drawHealth
+                                (creep |> vec2FromCreep)
+                                1
+                                creep.healthAmt
+                                creep.healthMax
                         )
+                    |> List.concat
             }
     in
     [ mapLayer

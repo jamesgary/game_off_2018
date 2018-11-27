@@ -1,4 +1,4 @@
-module Common exposing (Config, ConfigFloat, Graphic, Key, Map, PlacementAvailability(..), SavedMap, Session, Shape(..), Sprite, SpriteLayer, Texture(..), Tile(..), TilePos, heroDirInput, mapFromAscii, textureToStr, tilePosToFloats, tileToStr, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
+module Common exposing (Config, ConfigFloat, Graphic, Key, Map, PlacementAvailability(..), SavedMap, Session, Shape(..), Sprite, SpriteLayer, Texture(..), Tile(..), TilePos, drawHealth, heroDirInput, mapFromAscii, textureToStr, tilePosToFloats, tileToStr, tilesToShowHeightwise, tupleToVec2, vec2ToTuple)
 
 import Dict exposing (Dict)
 import Math.Vector2 as Vec2 exposing (Vec2)
@@ -229,3 +229,43 @@ type alias Graphic =
 
 type Shape
     = Rect
+
+
+drawHealth : Vec2 -> Float -> Float -> Float -> List Graphic
+drawHealth pos width amt max =
+    let
+        ( healthX, healthY ) =
+            ( Vec2.getX pos - (width / 2)
+            , Vec2.getY pos + 0.7
+            )
+
+        height =
+            0.1 * width
+
+        outlineRatio =
+            0.05
+
+        offset =
+            outlineRatio * width
+    in
+    [ { x = healthX - offset
+      , y = healthY - offset
+      , width = width + (offset * 2)
+      , height = height + (offset * 2)
+      , bgColor = "#000000"
+      , lineStyleWidth = 0
+      , lineStyleColor = "#000000"
+      , lineStyleAlpha = 1
+      , shape = Rect
+      }
+    , { x = healthX
+      , y = healthY
+      , width = width * (amt / max)
+      , height = height
+      , bgColor = "#00ff00"
+      , lineStyleWidth = 0
+      , lineStyleColor = "#000000"
+      , lineStyleAlpha = 1
+      , shape = Rect
+      }
+    ]
