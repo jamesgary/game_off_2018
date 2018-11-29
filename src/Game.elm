@@ -1491,9 +1491,6 @@ view session model =
                 ]
                 [ Html.text "--- DEBUG ---"
                 , Html.br [] []
-                , Html.text "Time: "
-                , Html.text (formatTime model)
-                , Html.br [] []
 
                 --, Html.text "Map sprites (visible/total): "
                 --, Html.strong [] [ Html.text (String.fromInt (List.length map)) ]
@@ -1588,13 +1585,35 @@ drawClock session model =
         , Html.Attributes.style "padding" padding
         , Html.Attributes.style "border-width" borderWidth
         ]
-        [ Html.div [ Html.Attributes.class "outer-clock-face" ]
+        [ Html.div
+            [ Html.Attributes.class "outer-clock-face"
+            , Html.Attributes.style "background" "#fafafa"
+            ]
             [ Html.div [ Html.Attributes.class "marking marking-one" ] []
             , Html.div [ Html.Attributes.class "marking marking-two" ] []
             , Html.div [ Html.Attributes.class "marking marking-three" ] []
             , Html.div [ Html.Attributes.class "marking marking-four" ] []
-            , Html.div [ Html.Attributes.class "inner-clock-face" ]
+            , Html.div
+                [ Html.Attributes.class "inner-clock-face"
+                , Html.Attributes.style "background" "#fafafa"
+                ]
                 [ Html.div
+                    [ Html.Attributes.style "font-size" "16px"
+                    , Html.Attributes.style "font-family" "monospace"
+                    , Html.Attributes.style "position" "absolute"
+                    , Html.Attributes.style "bottom" "30px"
+                    , Html.Attributes.style "text-align" "center"
+                    , Html.Attributes.style "width" "100%"
+                    ]
+                    [ Html.span
+                        [ Html.Attributes.style "background" "white"
+                        , Html.Attributes.style "border" "2px inset #ddd"
+                        , Html.Attributes.style "padding" "3px 8px"
+                        ]
+                        [ Html.text (formatTime model)
+                        ]
+                    ]
+                , Html.div
                     [ Html.Attributes.class "hand hour-hand"
                     , Html.Attributes.style "transform" ("rotate(" ++ hourDegrees ++ "deg)")
                     ]
