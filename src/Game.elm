@@ -211,13 +211,13 @@ type Equippable
 
 
 type alias Creep =
-    { pos : TilePos
-    , nextPos : TilePos
-    , progress : Float
-    , diagonal : Bool
+    { pos : Vec2
+    , nextPos : Vec2
+
+    --, target : Target -- use for hero
+    , timeSinceLastHop : Float
     , healthAmt : Float
     , healthMax : Float
-    , offset : Vec2
     }
 
 
@@ -381,22 +381,11 @@ viewMeter amt max meterWidth =
         ]
 
 
-vec2FromTurretPos : TilePos -> Vec2
-vec2FromTurretPos tilePos =
+vec2FromTilePos : TilePos -> Vec2
+vec2FromTilePos tilePos =
     tilePos
         |> tilePosToFloats
         |> tupleToVec2
-        |> Vec2.add (Vec2.vec2 0.5 0.5)
-
-
-vec2FromCreep : Creep -> Vec2
-vec2FromCreep creep =
-    tilePosSub creep.nextPos creep.pos
-        |> tilePosToFloats
-        |> tupleToVec2
-        |> Vec2.scale creep.progress
-        |> Vec2.add (creep.pos |> tilePosToFloats |> tupleToVec2)
-        |> Vec2.add creep.offset
         |> Vec2.add (Vec2.vec2 0.5 0.5)
 
 
@@ -694,11 +683,11 @@ makeTurretBullets session delta model =
                             shotBullet =
                                 if turret.age > session.c.getFloat "crops:turret:timeToSprout" && turret.timeSinceLastFire > 0.5 then
                                     model.creeps
-                                        |> List.Extra.minimumBy (\closestCreep -> Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurretPos turret.pos))
+                                        |> List.Extra.minimumBy (\closestCreep -> Vec2.distanceSquared closestCreep.pos (vec2FromTilePos turret.pos))
                                         |> Maybe.andThen
                                             (\closestCreep ->
-                                                if Vec2.distanceSquared (vec2FromCreep closestCreep) (vec2FromTurretPos turret.pos) < 5 ^ 2 then
-                                                    Just (makeBullet PlantBullet (vec2FromTurretPos turret.pos) (vec2FromCreep closestCreep))
+                                                if Vec2.distanceSquared closestCreep.pos (vec2FromTilePos turret.pos) < 5 ^ 2 then
+                                                    Just (makeBullet PlantBullet (vec2FromTilePos turret.pos) closestCreep.pos)
 
                                                 else
                                                     Nothing
@@ -727,48 +716,64 @@ moveCreeps session delta model =
     { model
         | creeps =
             model.creeps
-                |> List.map
-                    (\creep ->
-                        let
-                            newProgress =
-                                if creep.diagonal then
-                                    delta
-                                        * session.c.getFloat "creeps:global:speed"
-                                        * session.c.getFloat "creeps:attacker:melee:speed"
-                                        + creep.progress
-
-                                else
-                                    sqrt 2
-                                        * delta
-                                        * session.c.getFloat "creeps:global:speed"
-                                        * session.c.getFloat "creeps:attacker:melee:speed"
-                                        + creep.progress
-
-                            ( pos, nextPos, freshProgress ) =
-                                if newProgress > 1 then
-                                    ( creep.nextPos, findNextTileTowards model creep.nextPos model.base.pos, newProgress - 1 )
-
-                                else
-                                    ( creep.pos, creep.nextPos, newProgress )
-                        in
-                        if isCreepOnHero model.hero creep then
-                            creep
-
-                        else
-                            { creep
-                                | pos = pos
-                                , nextPos = nextPos
-                                , progress = freshProgress
-                                , diagonal = isDiagonal pos nextPos
-                            }
-                    )
+                |> List.map (moveCreep session model delta)
     }
+
+
+moveCreep : Session -> Model -> Float -> Creep -> Creep
+moveCreep session model delta creep =
+    let
+        speed =
+            session.c.getFloat "creeps:global:speed"
+                * session.c.getFloat "creeps:attacker:melee:speed"
+
+        distToTravel =
+            Vec2.distance creep.pos creep.nextPos
+
+        deltaNeededToTravel =
+            distToTravel / speed
+    in
+    if deltaNeededToTravel < delta then
+        -- can go to next tile this tick
+        -- go naively to next pos, assuming you're not going faster than 1 tile per tick
+        let
+            nextPos =
+                findNextPosTowards model creep.nextPos (model.base.pos |> vec2FromTilePos)
+        in
+        -- todo not great
+        if Vec2.distance creep.nextPos nextPos < 0.1 then
+            { creep
+                | pos = nextPos
+                , nextPos = nextPos
+
+                --, timeSinceLastHop = creep.timeSinceLastHop + delta
+            }
+
+        else
+            { creep
+                | pos =
+                    Vec2.direction creep.pos creep.nextPos
+                        |> Vec2.scale (-delta * speed)
+                        |> Vec2.add creep.pos
+                , nextPos = nextPos
+
+                --, timeSinceLastHop = creep.timeSinceLastHop + delta
+            }
+
+    else
+        { creep
+            | pos =
+                Vec2.direction creep.pos creep.nextPos
+                    |> Vec2.scale (-delta * speed)
+                    |> Vec2.add creep.pos
+
+            --, timeSinceLastHop = creep.timeSinceLastHop + delta
+        }
 
 
 isCreepOnHero : Hero -> Creep -> Bool
 isCreepOnHero hero creep =
-    (creep
-        |> vec2FromCreep
+    (creep.pos
         |> Vec2.add (Vec2.vec2 0 -0.0)
         |> Vec2.distanceSquared hero.pos
     )
@@ -784,17 +789,12 @@ applyCreepDamageToBase session delta ({ base } as model) =
         dmg =
             creepDps * delta
 
-        tilesToCheck =
-            base.pos
-                |> vec2FromTurretPos
-                |> getTilePosSurroundingVec2 model
-
         numCreeps =
             model.creeps
                 |> List.filter
                     (\creep ->
-                        tilesToCheck
-                            |> List.member creep.pos
+                        Vec2.distance creep.pos (vec2FromTilePos base.pos) < 1
+                     -- todo use session.c.getFloat "creeps:attacker:melee:range"
                     )
                 |> List.length
 
@@ -837,7 +837,7 @@ collideBulletsWithCreeps session delta model =
             model.bullets
                 |> List.foldl
                     (\bullet tmp ->
-                        case List.Extra.splitWhen (\creep -> collidesWith ( bullet.pos, 0.1 ) ( vec2FromCreep creep, 0.5 )) tmp.creeps of
+                        case List.Extra.splitWhen (\creep -> collidesWith ( bullet.pos, 0.1 ) ( creep.pos, 0.5 )) tmp.creeps of
                             Just ( firstHalf, foundCreep :: secondHalf ) ->
                                 let
                                     newCreep =
@@ -861,11 +861,9 @@ collideBulletsWithCreeps session delta model =
                                         tmp.composts
 
                                     else
-                                        { pos = vec2FromCreep foundCreep, age = 0 } :: tmp.composts
+                                        { pos = foundCreep.pos, age = 0 } :: tmp.composts
                                 , seed = newSeed
-
-                                --, fx = DrawFx bullet.pos Splash :: tmp.fx
-                                , fx = DrawFx (vec2FromCreep foundCreep) Splash :: tmp.fx
+                                , fx = DrawFx foundCreep.pos Splash :: tmp.fx
                                 }
 
                             _ ->
@@ -900,7 +898,7 @@ collideBulletsWithEnemyTowers session delta model =
             model.bullets
                 |> List.foldl
                     (\bullet tmp ->
-                        case List.Extra.splitWhen (\enemyTower -> collidesWith ( bullet.pos, 0.1 ) ( vec2FromTurretPos enemyTower.pos, 0.5 )) tmp.enemyTowers of
+                        case List.Extra.splitWhen (\enemyTower -> collidesWith ( bullet.pos, 0.1 ) ( vec2FromTilePos enemyTower.pos, 0.5 )) tmp.enemyTowers of
                             Just ( firstHalf, foundEnemyTower :: secondHalf ) ->
                                 let
                                     newEnemyTower =
@@ -923,7 +921,7 @@ collideBulletsWithEnemyTowers session delta model =
                                         tmp.composts
 
                                     else
-                                        { pos = vec2FromTurretPos foundEnemyTower.pos, age = 0 } :: tmp.composts
+                                        { pos = vec2FromTilePos foundEnemyTower.pos, age = 0 } :: tmp.composts
                                 , seed = newSeed
                                 , fx = DrawFx bullet.pos Splash :: tmp.fx
                                 }
@@ -1070,23 +1068,23 @@ spawnCreeps session delta model =
                         if enemyTower.timeSinceLastSpawn + delta > 1.8 then
                             let
                                 nextPos =
-                                    findNextTileTowards model enemyTower.pos model.base.pos
+                                    findNextPosTowards model
+                                        (enemyTower.pos |> vec2FromTilePos)
+                                        (model.base.pos |> vec2FromTilePos)
 
                                 ( offset, newSeed2 ) =
                                     Random.step (vec2OffsetGenerator -0.5 0.5) session.seed
                             in
                             ( { enemyTower | timeSinceLastSpawn = 0 } :: enemyTowers
-                            , { pos = enemyTower.pos
+                            , { pos = enemyTower.pos |> vec2FromTilePos
                               , nextPos = nextPos
-                              , progress = 0
-                              , diagonal = isDiagonal enemyTower.pos nextPos
+                              , timeSinceLastHop = 0 -- todo perhaps half default?
                               , healthAmt =
                                     session.c.getFloat "creeps:global:health"
                                         * session.c.getFloat "creeps:attacker:melee:health"
                               , healthMax =
                                     session.c.getFloat "creeps:global:health"
                                         * session.c.getFloat "creeps:attacker:melee:health"
-                              , offset = offset
                               }
                                 :: creeps
                               --, newSeed2
@@ -1263,6 +1261,25 @@ polySupport list d =
 
         _ ->
             Nothing
+
+
+findNextPosTowards : Model -> Vec2 -> Vec2 -> Vec2
+findNextPosTowards model origin destination =
+    let
+        originTilePos =
+            origin |> Vec2.toRecord |> (\{ x, y } -> ( floor x, floor y ))
+
+        destinationTilePos =
+            destination |> Vec2.toRecord |> (\{ x, y } -> ( floor x, floor y ))
+    in
+    AStar.findPath
+        pythagoreanCost
+        (possibleMoves model)
+        originTilePos
+        destinationTilePos
+        |> Maybe.andThen List.head
+        |> Maybe.map vec2FromTilePos
+        |> Maybe.withDefault origin
 
 
 findNextTileTowards : Model -> TilePos -> TilePos -> TilePos
@@ -1768,8 +1785,8 @@ getSprites session model =
                 model.creeps
                     |> List.map
                         (\creep ->
-                            { x = (creep |> vec2FromCreep |> Vec2.getX) - 0.5
-                            , y = (creep |> vec2FromCreep |> Vec2.getY) - 0.25
+                            { x = (creep.pos |> Vec2.getX) - 0.5
+                            , y = (creep.pos |> Vec2.getY) - 0.25
                             , texture = "creep"
                             }
                         )
@@ -1778,7 +1795,7 @@ getSprites session model =
                     |> List.map
                         (\creep ->
                             drawHealth
-                                (creep |> vec2FromCreep)
+                                creep.pos
                                 1
                                 creep.healthAmt
                                 creep.healthMax
