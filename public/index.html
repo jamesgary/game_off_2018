@@ -160,9 +160,13 @@
       };
 
       graphics.drawFx = function(effect) {
-        console.log(effect.x, effect.y);
-        window.emitter = makeEmitter(viewport, effect.x, effect.y);
-        window.emitter.playOnceAndDestroy(function() { console.log("DONE") });
+        if (effect.kind === "SPLASH") {
+          console.log("splash!");
+          window.emitter = makeEmitter(viewport, effect.x, effect.y);
+          window.emitter.playOnceAndDestroy(function() { console.log("DONE") });
+        } else {
+          console.log("nosplash!");
+        }
       }
 
       function toColor(str) {

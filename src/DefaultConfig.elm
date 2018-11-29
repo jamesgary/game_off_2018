@@ -127,6 +127,11 @@ json =
     "min": 0,
     "max": 25
   },
+  "system:tiles:grass:friction": {
+    "val": 97,
+    "min": 0,
+    "max": 100
+  },
   "ui:meterWidth": {
     "val": 225,
     "min": 0,
@@ -153,6 +158,11 @@ json =
     "max": 25
   },
   "waterGun:bulletSpeed": {
+    "val": 13.2090107980638,
+    "min": 0,
+    "max": 25
+  },
+  "waterGun:bulletPushback": {
     "val": 13.2090107980638,
     "min": 0,
     "max": 25

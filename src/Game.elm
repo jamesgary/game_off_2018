@@ -40,6 +40,7 @@ init session =
                 |> tupleToVec2
                 |> Vec2.add (Vec2.vec2 0.5 0.5)
         , vel = Vec2.vec2 0 0
+        , acc = Vec2.vec2 0 0
         , healthAmt = c.getFloat "hero:healthMax"
         , healthMax = c.getFloat "hero:healthMax"
         }
@@ -92,6 +93,7 @@ initTryOut session savedMap =
                     |> tupleToVec2
                     |> Vec2.add (Vec2.vec2 0.5 0.5)
             , vel = Vec2.vec2 0 0
+            , acc = Vec2.vec2 0 0
             , healthAmt = c.getFloat "hero:healthMax"
             , healthMax = c.getFloat "hero:healthMax"
             }
@@ -230,6 +232,7 @@ type alias HeroPos =
 type alias Hero =
     { pos : HeroPos
     , vel : Vec2
+    , acc : Vec2
     , healthAmt : Float
     , healthMax : Float
     }
@@ -1118,6 +1121,13 @@ moveHero session delta model =
         hero =
             model.hero
 
+        heroInput =
+            heroDirInput session.keysPressed
+                |> (\input ->
+                        input
+                            |> Vec2.setY (-1 * Vec2.getY input)
+                   )
+
         newAcc =
             Vec2.scale (session.c.getFloat "hero:acceleration")
                 (heroDirInput session.keysPressed
@@ -1128,19 +1138,14 @@ moveHero session delta model =
                 )
 
         newVelUncapped =
-            Vec2.add model.hero.vel (Vec2.scale delta newAcc)
-
-        percentBeyondCap =
-            Vec2.length newVelUncapped / session.c.getFloat "hero:maxSpeed"
+            Vec2.scale delta (Vec2.add model.hero.vel newAcc)
 
         newVel =
-            (if percentBeyondCap > 1.0 then
-                Vec2.scale (1 / percentBeyondCap) newVelUncapped
+            if Vec2.length newVelUncapped > session.c.getFloat "hero:maxSpeed" then
+                Vec2.scale (session.c.getFloat "hero:maxSpeed") (Vec2.normalize newVelUncapped)
 
-             else
+            else
                 newVelUncapped
-            )
-                |> Vec2.scale 0.8
 
         newPos =
             Vec2.add model.hero.pos (Vec2.scale delta newVel)
@@ -1600,16 +1605,33 @@ getSprites session model =
         cursorLayer =
             { name = "cursor"
             , sprites =
-                case hoveringTilePos model of
-                    Just ( x, y ) ->
-                        [ { x = x |> toFloat
-                          , y = y |> toFloat
-                          , texture = "selectedTile"
-                          }
-                        ]
-
-                    Nothing ->
+                case model.equipped of
+                    Gun ->
                         []
+
+                    MoneyCropSeed ->
+                        case hoveringTilePos model of
+                            Just ( x, y ) ->
+                                [ { x = x |> toFloat
+                                  , y = y |> toFloat
+                                  , texture = "selectedTile"
+                                  }
+                                ]
+
+                            Nothing ->
+                                []
+
+                    TurretSeed ->
+                        case hoveringTilePos model of
+                            Just ( x, y ) ->
+                                [ { x = x |> toFloat
+                                  , y = y |> toFloat
+                                  , texture = "selectedTile"
+                                  }
+                                ]
+
+                            Nothing ->
+                                []
             , graphics = []
             }
 

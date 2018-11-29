@@ -51,7 +51,7 @@ window.makeEmitter = function(container, x, y) {
 		"min": 0.1,
 		"max": 0.22
 	},
-	"blendMode": "normal",
+	"blendMode": "screen",
 	"frequency": 0.001,
 	"emitterLifetime": 0.1,
 	"maxParticles": 50,
