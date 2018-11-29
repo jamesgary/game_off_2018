@@ -677,7 +677,7 @@ drawToolbox session model =
         [ Html.Attributes.style "font-size" "16px"
         , Html.Attributes.style "position" "fixed"
         , Html.Attributes.style "right" "0"
-        , Html.Attributes.style "top" "0"
+        , Html.Attributes.style "top" "50px"
         , Html.Attributes.style "padding" "20px"
         , Html.Attributes.style "margin" "5px"
         , Html.Attributes.style "background" "#eee"

@@ -3,6 +3,7 @@ port module Main exposing (main)
 import Browser
 import Browser.Events
 import Common exposing (..)
+import DefaultConfig
 import Dict exposing (Dict)
 import Game
 import Html exposing (Html)
@@ -42,78 +43,9 @@ defaultPersistence : Persistence
 defaultPersistence =
     { isConfigOpen = False
     , configFloats =
-        --[ ( "bulletDmg", { val = 15, min = 0, max = 20 } )
-        --, ( "bulletMaxAge", { val = 2, min = 0, max = 5 } )
-        --, ( "bulletSpeed", { val = 10, min = 5, max = 50 } )
-        --, ( "canvasHeight", { val = 600, min = 300, max = 1200 } )
-        --, ( "canvasWidth", { val = 800, min = 400, max = 1600 } )
-        --, ( "creepDps", { val = 10, min = 0, max = 200 } )
-        --, ( "creepHealth", { val = 100, min = 1, max = 200 } )
-        --, ( "creepSpeed", { val = 1, min = 0, max = 2 } )
-        --, ( "heroAcc", { val = 70, min = 10, max = 200 } )
-        --, ( "heroHealthMax", { val = 100, min = 1, max = 10000 } )
-        --, ( "heroMaxSpeed", { val = 20, min = 10, max = 100 } )
-        --, ( "meterWidth", { val = 450, min = 10, max = 800 } )
-        --, ( "refillRate", { val = 20, min = 0, max = 1000 } )
-        --, ( "tilesToShowLengthwise", { val = 20, min = 10, max = 200 } )
-        --, ( "towerHealthMax", { val = 1000, min = 100, max = 5000 } )
-        --, ( "turretTimeToSprout", { val = 5, min = 0, max = 30 } )
-        --, ( "waterBulletCost", { val = 5, min = 0, max = 25 } )
-        --]
-        [ ( "system:gameSpeed", { val = 5, min = 0, max = 25 } )
-        , ( "ui:meterWidth", { val = 5, min = 0, max = 25 } )
-
-        --
-        , ( "hero:velocity", { val = 5, min = 0, max = 25 } )
-        , ( "hero:acceleration", { val = 5, min = 0, max = 25 } )
-        , ( "hero:maxSpeed", { val = 5, min = 0, max = 25 } )
-        , ( "hero:healthMax", { val = 5, min = 0, max = 25 } )
-        , ( "hero:size", { val = 5, min = 0, max = 25 } )
-
-        --
-        , ( "waterGun:refillRate", { val = 5, min = 0, max = 25 } )
-        , ( "waterGun:ammoMax", { val = 5, min = 0, max = 25 } )
-        , ( "waterGun:fireRate", { val = 5, min = 0, max = 25 } )
-        , ( "waterGun:bulletDmg", { val = 5, min = 0, max = 25 } )
-        , ( "waterGun:bulletSpeed", { val = 5, min = 0, max = 25 } )
-        , ( "waterGun:bulletMaxAge", { val = 5, min = 0, max = 25 } )
-        , ( "waterGun:bulletCost", { val = 5, min = 0, max = 25 } )
-
-        --
-        , ( "base:healthMax", { val = 5, min = 0, max = 25 } )
-
-        --
-        , ( "crops:turret:timeToSprout", { val = 5, min = 0, max = 25 } )
-        , ( "crops:turret:healthMax", { val = 5, min = 0, max = 25 } )
-        , ( "crops:moneyCrop:healthMax", { val = 5, min = 0, max = 25 } )
-
-        --
-        , ( "creeps:global:speed", { val = 5, min = 0, max = 25 } )
-        , ( "creeps:global:health", { val = 5, min = 0, max = 25 } )
-        , ( "creeps:global:damage", { val = 5, min = 0, max = 25 } )
-        , ( "creeps:global:pathingVariation", { val = 5, min = 0, max = 25 } )
-
-        --
-        , ( "creeps:attacker:melee:speed", { val = 5, min = 0, max = 25 } )
-        , ( "creeps:attacker:melee:health", { val = 5, min = 0, max = 25 } )
-        , ( "creeps:attacker:melee:damage", { val = 5, min = 0, max = 25 } )
-        , ( "creeps:attacker:melee:attackPerSecond", { val = 5, min = 0, max = 25 } )
-        , ( "creeps:attacker:melee:pathingVariation", { val = 5, min = 0, max = 25 } )
-
-        --
-        --, ( "creeps:attacker:ranged:speed", { val = 5, min = 0, max = 25 } )
-        --, ( "creeps:attacker:ranged:health", { val = 5, min = 0, max = 25 } )
-        --, ( "creeps:attacker:ranged:damage", { val = 5, min = 0, max = 25 } )
-        --, ( "creeps:attacker:ranged:attackPerSecond", { val = 5, min = 0, max = 25 } )
-        --, ( "creeps:attacker:ranged:pathingVariation", { val = 5, min = 0, max = 25 } )
-        --, ( "creeps:attacker:ranged:range", { val = 5, min = 0, max = 25 } )
-        --
-        , ( "enemyBase:secondsBetweenSpawnsAtDay", { val = 5, min = 0, max = 25 } )
-        , ( "enemyBase:secondsBetweenSpawnsAtNight", { val = 5, min = 0, max = 25 } )
-        , ( "enemyBase:creepsPerSpawn", { val = 5, min = 0, max = 25 } )
-        , ( "enemyBase:healthMax", { val = 5, min = 0, max = 25 } )
-        ]
-            |> Dict.fromList
+        DefaultConfig.json
+            |> Json.Decode.decodeString (Json.Decode.dict configFloatDecoder)
+            |> Result.withDefault Dict.empty
     , openConfigAccordions = [] |> Set.fromList
     , savedMaps =
         [ { name = "New Map"
@@ -165,6 +97,7 @@ type Msg
     | ToggleConfig Bool
     | ToggleConfigAccordion Bool String
     | ResetConfig
+    | GoToMapEditor
       -- app msgs
     | MapEditorMsg MapEditor.Msg
     | GameMsg Game.Msg
@@ -273,6 +206,17 @@ update msg model =
             model.session
     in
     case msg of
+        --CopyConfig ->
+        --    ( model,
+        --    , performEffects
+        --        [ Json.Encode.object
+        --            [ ( "id", Json.Encode.string "COPY_CONFIG" )
+        --            ]
+        --        ]
+        --    )
+        GoToMapEditor ->
+            ( { model | state = MapEditor (MapEditor.init session) }, Cmd.none )
+
         KeyUp str ->
             ( { model | session = { session | keysPressed = Set.remove str session.keysPressed } }
             , Cmd.none
@@ -522,6 +466,19 @@ performGameEffects session effects model =
                                   , layers
                                         |> Json.Encode.list encodeSpriteLayer
                                   )
+                                ]
+                            ]
+                            :: updatingCmds
+                        )
+
+                    Game.DrawFx pos kind ->
+                        ( updatingModel
+                        , performEffects
+                            [ Json.Encode.object
+                                [ ( "id", Json.Encode.string "DRAW_FX" )
+                                , ( "kind", Json.Encode.string "SPLASH" ) -- todo encode type
+                                , ( "x", Json.Encode.float (Vec2.getX pos * 32) )
+                                , ( "y", Json.Encode.float (Vec2.getY pos * 32) )
                                 ]
                             ]
                             :: updatingCmds
@@ -951,9 +908,17 @@ viewConfig model =
         (if model.session.isConfigOpen then
             Html.button
                 [ Html.Attributes.style "float" "left"
+                , Html.Attributes.style "background" "red"
+                , Html.Attributes.style "color" "white"
+                , Html.Attributes.style "margin-right" "5px"
                 , Html.Events.onClick ResetConfig
                 ]
                 [ Html.text "Reset Configs" ]
+                :: Html.button
+                    [ Html.Attributes.style "float" "left"
+                    , Html.Events.onClick GoToMapEditor
+                    ]
+                    [ Html.text "Go to Map Editor" ]
                 :: Html.a
                     [ Html.Events.onClick (ToggleConfig False)
                     , Html.Attributes.style "float" "right"

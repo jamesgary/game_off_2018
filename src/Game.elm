@@ -45,7 +45,6 @@ init session =
         }
     , bullets = []
     , composts = []
-    , particles = []
     , creeps = []
     , enemyTowers =
         savedMap.enemyTowers
@@ -77,6 +76,7 @@ init session =
     , isMouseDown = False
     , mousePos = Vec2.vec2 -99 -99
     , age = 0
+    , fx = []
     }
 
 
@@ -97,7 +97,6 @@ initTryOut session savedMap =
             }
       , bullets = []
       , composts = []
-      , particles = []
       , creeps = []
       , enemyTowers =
             savedMap.enemyTowers
@@ -129,6 +128,7 @@ initTryOut session savedMap =
       , isMouseDown = False
       , mousePos = Vec2.vec2 -99 -99
       , age = 0
+      , fx = []
       }
     , Cmd.none
     )
@@ -144,7 +144,6 @@ type alias Model =
     , composts : List Compost
 
     -- fluid bldgs?
-    , particles : List Particle
     , creeps : List Creep
 
     -- bldgs
@@ -168,6 +167,9 @@ type alias Model =
     , mousePos : Vec2
     , isMouseDown : Bool
     , age : Float
+
+    -- to be flushed at the end of every tick
+    , fx : List Effect
     }
 
 
@@ -186,10 +188,6 @@ type alias Compost =
     { pos : Vec2
     , age : Float
     }
-
-
-type Particle
-    = BulletHitCreep Vec2 Float Float
 
 
 type alias Config =
@@ -425,7 +423,6 @@ update msg session model =
             in
             model
                 |> ageSelf session delta
-                |> ageParticles session delta
                 |> moveHero session delta
                 |> refillWater session delta
                 |> makeTurretBullets session delta
@@ -441,10 +438,11 @@ update msg session model =
                 |> heroPickUpCompost session delta
                 |> checkGameOver session delta
                 |> (\updatedModel ->
-                        ( updatedModel
+                        ( { updatedModel | fx = [] }
                         , [ DrawSprites (getSprites session updatedModel)
                           , MoveCamera updatedModel.hero.pos
                           ]
+                            ++ updatedModel.fx
                         )
                    )
 
@@ -832,7 +830,7 @@ applyCreepDamageToHero session delta ({ hero } as model) =
 collideBulletsWithCreeps : Session -> Float -> Model -> Model
 collideBulletsWithCreeps session delta model =
     let
-        { particles, bullets, creeps, composts, seed } =
+        { bullets, creeps, composts, seed, fx } =
             model.bullets
                 |> List.foldl
                     (\bullet tmp ->
@@ -848,8 +846,7 @@ collideBulletsWithCreeps session delta model =
                                             (Random.float 0 (2 * pi))
                                             tmp.seed
                                 in
-                                { particles = BulletHitCreep bullet.pos angle 0 :: tmp.particles
-                                , bullets = tmp.bullets
+                                { bullets = tmp.bullets
                                 , creeps =
                                     if newCreep.healthAmt > 0 then
                                         firstHalf ++ (newCreep :: secondHalf)
@@ -863,28 +860,31 @@ collideBulletsWithCreeps session delta model =
                                     else
                                         { pos = vec2FromCreep foundCreep, age = 0 } :: tmp.composts
                                 , seed = newSeed
+
+                                --, fx = DrawFx bullet.pos Splash :: tmp.fx
+                                , fx = DrawFx (vec2FromCreep foundCreep) Splash :: tmp.fx
                                 }
 
                             _ ->
-                                { particles = tmp.particles
-                                , bullets = bullet :: tmp.bullets
+                                { bullets = bullet :: tmp.bullets
                                 , creeps = tmp.creeps
                                 , composts = tmp.composts
                                 , seed = tmp.seed
+                                , fx = tmp.fx
                                 }
                     )
-                    { particles = model.particles
-                    , bullets = []
+                    { bullets = []
                     , creeps = model.creeps
                     , composts = model.composts
                     , seed = session.seed
+                    , fx = model.fx
                     }
     in
     { model
         | creeps = creeps
         , bullets = bullets
-        , particles = particles
         , composts = composts
+        , fx = model.fx ++ fx
 
         --, seed = seed
     }
@@ -893,7 +893,7 @@ collideBulletsWithCreeps session delta model =
 collideBulletsWithEnemyTowers : Session -> Float -> Model -> Model
 collideBulletsWithEnemyTowers session delta model =
     let
-        { particles, bullets, enemyTowers, composts, seed } =
+        { bullets, enemyTowers, composts, seed, fx } =
             model.bullets
                 |> List.foldl
                     (\bullet tmp ->
@@ -908,8 +908,7 @@ collideBulletsWithEnemyTowers session delta model =
                                             (Random.float 0 (2 * pi))
                                             tmp.seed
                                 in
-                                { particles = BulletHitCreep bullet.pos angle 0 :: tmp.particles
-                                , bullets = tmp.bullets
+                                { bullets = tmp.bullets
                                 , enemyTowers =
                                     if newEnemyTower.healthAmt > 0 then
                                         firstHalf ++ (newEnemyTower :: secondHalf)
@@ -923,28 +922,29 @@ collideBulletsWithEnemyTowers session delta model =
                                     else
                                         { pos = vec2FromTurretPos foundEnemyTower.pos, age = 0 } :: tmp.composts
                                 , seed = newSeed
+                                , fx = DrawFx bullet.pos Splash :: tmp.fx
                                 }
 
                             _ ->
-                                { particles = tmp.particles
-                                , bullets = bullet :: tmp.bullets
+                                { bullets = bullet :: tmp.bullets
                                 , enemyTowers = tmp.enemyTowers
                                 , composts = tmp.composts
                                 , seed = tmp.seed
+                                , fx = tmp.fx
                                 }
                     )
-                    { particles = model.particles
-                    , bullets = []
+                    { bullets = []
                     , enemyTowers = model.enemyTowers
                     , composts = model.composts
                     , seed = session.seed
+                    , fx = model.fx
                     }
     in
     { model
         | enemyTowers = enemyTowers
         , bullets = bullets
-        , particles = particles
         , composts = composts
+        , fx = model.fx ++ fx
 
         --, seed = seed
     }
@@ -1110,25 +1110,6 @@ vec2OffsetGenerator : Float -> Float -> Random.Generator Vec2
 vec2OffsetGenerator min max =
     Random.pair (Random.float min max) (Random.float min max)
         |> Random.map tupleToVec2
-
-
-ageParticles : Session -> Float -> Model -> Model
-ageParticles session delta model =
-    let
-        newParticles =
-            model.particles
-                |> List.filterMap
-                    (\particle ->
-                        case particle of
-                            BulletHitCreep pos angle age ->
-                                if age + delta < 1 then
-                                    Just (BulletHitCreep pos angle (age + delta))
-
-                                else
-                                    Nothing
-                    )
-    in
-    { model | particles = newParticles }
 
 
 moveHero : Session -> Float -> Model -> Model
@@ -1805,3 +1786,8 @@ isTurretGrown session turret =
 type Effect
     = DrawSprites (List SpriteLayer)
     | MoveCamera Vec2
+    | DrawFx Vec2 ParticleEffect
+
+
+type ParticleEffect
+    = Splash
