@@ -219,6 +219,7 @@ type alias Creep =
     , healthAmt : Float
     , healthMax : Float
     , age : Float
+    , seed : Random.Seed
     }
 
 
@@ -506,8 +507,8 @@ update msg session model =
                                                     | turrets =
                                                         { pos = tilePos
                                                         , timeSinceLastFire = 0
-                                                        , healthAmt = session.c.getFloat "crops:turrent:healthMax"
-                                                        , healthMax = session.c.getFloat "crops:turrent:healthMax"
+                                                        , healthAmt = session.c.getFloat "crops:turret:healthMax"
+                                                        , healthMax = session.c.getFloat "crops:turret:healthMax"
                                                         , age = 0
                                                         }
                                                             :: m.turrets
@@ -748,14 +749,17 @@ moveCreep session model delta creep =
         -- can go to next tile this tick
         -- go naively to next pos, assuming you're not going faster than 1 tile per tick
         let
-            nextPos =
-                findNextPosTowards model creep.nextPos (model.base.pos |> vec2FromTilePos)
+            ( nextPos, newSeed ) =
+                Random.step
+                    (nextPosTowardsGenerator model creep.nextPos (model.base.pos |> vec2FromTilePos))
+                    creep.seed
         in
         -- todo not great
         if Vec2.distance creep.nextPos nextPos < 0.1 then
             { creep
                 | pos = nextPos
                 , nextPos = nextPos
+                , seed = newSeed
 
                 --, timeSinceLastHop = creep.timeSinceLastHop + delta
             }
@@ -767,6 +771,7 @@ moveCreep session model delta creep =
                         |> Vec2.scale (-delta * speed)
                         |> Vec2.add creep.pos
                 , nextPos = nextPos
+                , seed = newSeed
 
                 --, timeSinceLastHop = creep.timeSinceLastHop + delta
             }
@@ -851,9 +856,17 @@ collideBulletsWithCreeps session delta model =
                         case List.Extra.splitWhen (\creep -> collidesWith ( bullet.pos, 0.1 ) ( creep.pos, 0.5 )) tmp.creeps of
                             Just ( firstHalf, foundCreep :: secondHalf ) ->
                                 let
+                                    pushback =
+                                        ( 0.5, bullet.angle )
+                                            |> fromPolar
+                                            |> tupleToVec2
+
                                     newCreep =
                                         -- TODO different bullet dmgs
-                                        { foundCreep | healthAmt = foundCreep.healthAmt - session.c.getFloat "waterGun:bulletDmg" }
+                                        { foundCreep
+                                            | healthAmt = foundCreep.healthAmt - session.c.getFloat "waterGun:bulletDmg"
+                                            , pos = Vec2.add foundCreep.pos pushback
+                                        }
 
                                     ( angle, newSeed ) =
                                         Random.step
@@ -1076,15 +1089,19 @@ spawnCreeps session delta model =
                 |> List.foldl
                     (\enemyTower ( enemyTowers, creeps ) ->
                         --, seed ) ->
-                        if enemyTower.timeSinceLastSpawn + delta > 1.8 then
+                        if enemyTower.timeSinceLastSpawn + delta > session.c.getFloat "enemyBase:secondsBetweenSpawnsAtDay" then
                             let
-                                nextPos =
-                                    findNextPosTowards model
-                                        (enemyTower.pos |> vec2FromTilePos)
-                                        (model.base.pos |> vec2FromTilePos)
+                                seed =
+                                    -- (ruh roh)
+                                    Random.initialSeed (1000 * delta |> round)
 
-                                ( offset, newSeed2 ) =
-                                    Random.step (vec2OffsetGenerator -0.5 0.5) session.seed
+                                ( nextPos, newSeed ) =
+                                    Random.step
+                                        (nextPosTowardsGenerator model
+                                            (enemyTower.pos |> vec2FromTilePos)
+                                            (model.base.pos |> vec2FromTilePos)
+                                        )
+                                        seed
                             in
                             ( { enemyTower | timeSinceLastSpawn = 0 } :: enemyTowers
                             , { pos = enemyTower.pos |> vec2FromTilePos
@@ -1097,6 +1114,7 @@ spawnCreeps session delta model =
                                     session.c.getFloat "creeps:global:health"
                                         * session.c.getFloat "creeps:attacker:melee:health"
                               , age = 0
+                              , seed = newSeed
                               }
                                 :: creeps
                               --, newSeed2
@@ -1117,6 +1135,31 @@ spawnCreeps session delta model =
 
         --, seed = newSeed
     }
+
+
+creepGenerator : Session -> Model -> TilePos -> Random.Generator Creep
+creepGenerator session model tilePos =
+    Random.map3
+        (\nextPos offsettedPos seed ->
+            { pos = offsettedPos
+            , nextPos = nextPos
+            , timeSinceLastHop = 0 -- todo perhaps half default?
+            , healthAmt =
+                session.c.getFloat "creeps:global:health"
+                    * session.c.getFloat "creeps:attacker:melee:health"
+            , healthMax =
+                session.c.getFloat "creeps:global:health"
+                    * session.c.getFloat "creeps:attacker:melee:health"
+            , age = 0
+            , seed = seed
+            }
+        )
+        (nextPosTowardsGenerator model
+            (tilePos |> vec2FromTilePos)
+            (model.base.pos |> vec2FromTilePos)
+        )
+        (vec2OffsetGenerator -0.5 0.5)
+        Random.independentSeed
 
 
 vec2OffsetGenerator : Float -> Float -> Random.Generator Vec2
@@ -1275,8 +1318,8 @@ polySupport list d =
             Nothing
 
 
-findNextPosTowards : Model -> Vec2 -> Vec2 -> Vec2
-findNextPosTowards model origin destination =
+nextPosTowardsGenerator : Model -> Vec2 -> Vec2 -> Random.Generator Vec2
+nextPosTowardsGenerator model origin destination =
     let
         originTilePos =
             origin |> Vec2.toRecord |> (\{ x, y } -> ( floor x, floor y ))
@@ -1284,25 +1327,19 @@ findNextPosTowards model origin destination =
         destinationTilePos =
             destination |> Vec2.toRecord |> (\{ x, y } -> ( floor x, floor y ))
     in
-    AStar.findPath
-        pythagoreanCost
-        (possibleMoves model)
-        originTilePos
-        destinationTilePos
-        |> Maybe.andThen List.head
-        |> Maybe.map vec2FromTilePos
-        |> Maybe.withDefault origin
-
-
-findNextTileTowards : Model -> TilePos -> TilePos -> TilePos
-findNextTileTowards model origin destination =
-    AStar.findPath
-        pythagoreanCost
-        (possibleMoves model)
-        origin
-        destination
-        |> Maybe.andThen List.head
-        |> Maybe.withDefault origin
+    vec2OffsetGenerator -0.5 0.5
+        |> Random.map
+            (\offset ->
+                AStar.findPath
+                    pythagoreanCost
+                    (possibleMoves model)
+                    originTilePos
+                    destinationTilePos
+                    |> Maybe.andThen List.head
+                    |> Maybe.map vec2FromTilePos
+                    |> Maybe.withDefault origin
+                    |> Vec2.add offset
+            )
 
 
 pythagoreanCost : AStar.Position -> AStar.Position -> Float

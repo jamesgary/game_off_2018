@@ -118,7 +118,7 @@
             for (let j = particleContainer.numDrawnSprites; j < particleContainer.children.length; j++) {
               // TODO this is a little slow when removing a lot of sprites (like rect tool in editor)
               // it takes a few frames to clear out all the sprites
-              console.log("removin");
+              //console.log("removin");
               particleContainer.removeChildAt(j);
             }
           }
@@ -133,7 +133,7 @@
             });
             pixiLayer.addChild(pixiGraphics);
             pixiLayer.daGraphicZone = pixiGraphics;
-            console.log('creating');
+            //console.log('creating');
           } else {
             pixiGraphics.clear();
           }
@@ -161,9 +161,8 @@
 
       graphics.drawFx = function(effect) {
         if (effect.kind === "SPLASH") {
-          console.log("splash!");
           window.emitter = makeEmitter(viewport, effect.x, effect.y);
-          window.emitter.playOnceAndDestroy(function() { console.log("DONE") });
+          window.emitter.playOnceAndDestroy();
         } else {
           console.log("nosplash!");
         }

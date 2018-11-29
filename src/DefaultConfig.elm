@@ -38,7 +38,7 @@ json =
     "max": 25
   },
   "creeps:attacker:melee:speed": {
-    "val": 0.0980513838897853,
+    "val": 0.907533821521658,
     "min": 0,
     "max": 1
   },
@@ -88,9 +88,9 @@ json =
     "max": 25
   },
   "enemyBase:secondsBetweenSpawnsAtDay": {
-    "val": 5,
+    "val": 0.790616854908775,
     "min": 0,
-    "max": 25
+    "max": 5
   },
   "enemyBase:secondsBetweenSpawnsAtNight": {
     "val": 5,
@@ -98,7 +98,7 @@ json =
     "max": 25
   },
   "hero:acceleration": {
-    "val": 120,
+    "val": 497.827975673328,
     "min": 0,
     "max": 1000.003
   },
@@ -108,7 +108,7 @@ json =
     "max": 25
   },
   "hero:maxSpeed": {
-    "val": 13.0023581978404,
+    "val": 15,
     "min": 0,
     "max": 15
   },
@@ -157,12 +157,12 @@ json =
     "min": 0,
     "max": 25
   },
-  "waterGun:bulletSpeed": {
+  "waterGun:bulletPushback": {
     "val": 13.2090107980638,
     "min": 0,
     "max": 25
   },
-  "waterGun:bulletPushback": {
+  "waterGun:bulletSpeed": {
     "val": 13.2090107980638,
     "min": 0,
     "max": 25
