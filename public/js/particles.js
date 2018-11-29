@@ -104,7 +104,7 @@ window.makeCreepDeathEmitter = function(container, x, y) {
 	"blendMode": "normal",
 	"frequency": 0.001,
 	"emitterLifetime": 0.1,
-	"maxParticles": 158,
+	"maxParticles": 20,
 	"pos": {
 		"x": x,
 		"y": y

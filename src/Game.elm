@@ -1491,6 +1491,9 @@ view session model =
                 ]
                 [ Html.text "--- DEBUG ---"
                 , Html.br [] []
+                , Html.text "Time: "
+                , Html.text (formatTime model)
+                , Html.br [] []
 
                 --, Html.text "Map sprites (visible/total): "
                 --, Html.strong [] [ Html.text (String.fromInt (List.length map)) ]
@@ -1502,6 +1505,7 @@ view session model =
                 , viewMeter model.waterAmt model.waterMax (session.c.getFloat "ui:meterWidth")
                 ]
             ]
+        , drawClock session model
         , drawGlass session model
         , Html.div []
             [ case model.gameState of
@@ -1547,6 +1551,104 @@ view session model =
                     Html.text ""
             ]
         ]
+
+
+drawClock : Session -> Model -> Html Msg
+drawClock session model =
+    let
+        size =
+            px 200
+
+        padding =
+            px 1
+
+        borderWidth =
+            px 10
+
+        timeCoef =
+            30
+
+        minutesDegrees =
+            ((model.age * timeCoef) / 60 * 360)
+                + 90
+                |> String.fromFloat
+
+        hourDegrees =
+            ((model.age / 12 * timeCoef) / 60 * 360)
+                + 90
+                |> String.fromFloat
+    in
+    Html.div
+        [ Html.Attributes.class "clock"
+        , Html.Attributes.style "position" "fixed"
+        , Html.Attributes.style "bottom" "60px"
+        , Html.Attributes.style "right" "10px"
+        , Html.Attributes.style "width" size
+        , Html.Attributes.style "height" size
+        , Html.Attributes.style "padding" padding
+        , Html.Attributes.style "border-width" borderWidth
+        ]
+        [ Html.div [ Html.Attributes.class "outer-clock-face" ]
+            [ Html.div [ Html.Attributes.class "marking marking-one" ] []
+            , Html.div [ Html.Attributes.class "marking marking-two" ] []
+            , Html.div [ Html.Attributes.class "marking marking-three" ] []
+            , Html.div [ Html.Attributes.class "marking marking-four" ] []
+            , Html.div [ Html.Attributes.class "inner-clock-face" ]
+                [ Html.div
+                    [ Html.Attributes.class "hand hour-hand"
+                    , Html.Attributes.style "transform" ("rotate(" ++ hourDegrees ++ "deg)")
+                    ]
+                    []
+                , Html.div
+                    [ Html.Attributes.class "hand min-hand"
+                    , Html.Attributes.style "transform" ("rotate(" ++ minutesDegrees ++ "deg)")
+                    ]
+                    []
+
+                --, Html.div [ Html.Attributes.class "hand second-hand" ] []
+                ]
+            ]
+        ]
+
+
+formatTime : Model -> String
+formatTime model =
+    let
+        seconds =
+            model.age * 30 |> round
+
+        mm =
+            modBy 60 seconds
+
+        hh =
+            ((seconds - mm) // 60)
+                |> modBy 24
+
+        ( hhh, ampm ) =
+            if hh == 0 then
+                ( 12, "AM" )
+
+            else if hh < 12 then
+                ( hh, "AM" )
+
+            else if hh == 12 then
+                ( hh, "PM" )
+
+            else
+                ( hh - 12, "PM" )
+
+        leadingZero num =
+            if num < 10 then
+                "0" ++ String.fromInt num
+
+            else
+                String.fromInt num
+    in
+    (hhh |> leadingZero)
+        ++ ":"
+        ++ (mm |> leadingZero)
+        ++ " "
+        ++ ampm
 
 
 bulletHitFrag : WebGL.Shader a { b | age : Float, angle : Float } { vcoord : Vec2 }
