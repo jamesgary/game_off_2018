@@ -1605,33 +1605,36 @@ getSprites session model =
         cursorLayer =
             { name = "cursor"
             , sprites =
+                let
+                    tileCursor =
+                        case ( canPlace model, hoveringTilePos model ) of
+                            ( Can, Just ( x, y ) ) ->
+                                [ { x = x |> toFloat
+                                  , y = y |> toFloat
+                                  , texture = "selectedTile"
+                                  }
+                                ]
+
+                            ( Shouldnt, Just ( x, y ) ) ->
+                                []
+
+                            --[ { x = x |> toFloat
+                            --  , y = y |> toFloat
+                            --  , texture = "selectedTile-inactive"
+                            --  }
+                            --]
+                            _ ->
+                                []
+                in
                 case model.equipped of
                     Gun ->
                         []
 
                     MoneyCropSeed ->
-                        case hoveringTilePos model of
-                            Just ( x, y ) ->
-                                [ { x = x |> toFloat
-                                  , y = y |> toFloat
-                                  , texture = "selectedTile"
-                                  }
-                                ]
-
-                            Nothing ->
-                                []
+                        tileCursor
 
                     TurretSeed ->
-                        case hoveringTilePos model of
-                            Just ( x, y ) ->
-                                [ { x = x |> toFloat
-                                  , y = y |> toFloat
-                                  , texture = "selectedTile"
-                                  }
-                                ]
-
-                            Nothing ->
-                                []
+                        tileCursor
             , graphics = []
             }
 
