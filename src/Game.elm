@@ -218,6 +218,7 @@ type alias Creep =
     , timeSinceLastHop : Float
     , healthAmt : Float
     , healthMax : Float
+    , age : Float
     }
 
 
@@ -414,7 +415,7 @@ update msg session model =
                     min (d / 1000) 0.25
             in
             model
-                |> ageSelf session delta
+                |> ageAll session delta
                 |> moveHero session delta
                 |> refillWater session delta
                 |> makeTurretBullets session delta
@@ -529,9 +530,17 @@ update msg session model =
             )
 
 
-ageSelf : Session -> Float -> Model -> Model
-ageSelf session delta model =
-    { model | age = delta + model.age }
+ageAll : Session -> Float -> Model -> Model
+ageAll session delta model =
+    { model
+        | age = delta + model.age
+        , creeps =
+            model.creeps
+                |> List.map
+                    (\creep ->
+                        { creep | age = creep.age + delta }
+                    )
+    }
 
 
 hoveringTileAndPos : Model -> Maybe ( Tile, TilePos )
@@ -726,6 +735,8 @@ moveCreep session model delta creep =
         speed =
             session.c.getFloat "creeps:global:speed"
                 * session.c.getFloat "creeps:attacker:melee:speed"
+                * 0.4
+                * (1.1 + sin (10 * creep.age))
 
         distToTravel =
             Vec2.distance creep.pos creep.nextPos
@@ -1085,6 +1096,7 @@ spawnCreeps session delta model =
                               , healthMax =
                                     session.c.getFloat "creeps:global:health"
                                         * session.c.getFloat "creeps:attacker:melee:health"
+                              , age = 0
                               }
                                 :: creeps
                               --, newSeed2
