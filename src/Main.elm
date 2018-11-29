@@ -476,7 +476,7 @@ performGameEffects session effects model =
                         , performEffects
                             [ Json.Encode.object
                                 [ ( "id", Json.Encode.string "DRAW_FX" )
-                                , ( "kind", Json.Encode.string "SPLASH" ) -- todo encode type
+                                , ( "kind", encodeFxKind kind )
                                 , ( "x", Json.Encode.float (Vec2.getX pos * 32) )
                                 , ( "y", Json.Encode.float (Vec2.getY pos * 32) )
                                 ]
@@ -498,6 +498,16 @@ performGameEffects session effects model =
             )
             ( model, [] )
         |> Tuple.mapSecond Cmd.batch
+
+
+encodeFxKind : Game.FxKind -> Json.Decode.Value
+encodeFxKind fxKind =
+    case fxKind of
+        Game.Splash ->
+            Json.Encode.string "SPLASH"
+
+        Game.CreepDeath ->
+            Json.Encode.string "CREEP_DEATH"
 
 
 encodeSpriteLayer : SpriteLayer -> Json.Decode.Value

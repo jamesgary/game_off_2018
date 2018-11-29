@@ -160,11 +160,18 @@
       };
 
       graphics.drawFx = function(effect) {
-        if (effect.kind === "SPLASH") {
-          window.emitter = makeEmitter(viewport, effect.x, effect.y);
-          window.emitter.playOnceAndDestroy();
-        } else {
-          console.log("nosplash!");
+        switch (effect.kind) {
+          case "SPLASH":
+            makeSplashEmitter(viewport, effect.x, effect.y)
+              .playOnceAndDestroy();
+            break;
+          case "CREEP_DEATH":
+            makeCreepDeathEmitter(viewport, effect.x, effect.y)
+              .playOnceAndDestroy();
+            break;
+          default:
+            console.error("unknown fx!", effect);
+            break;
         }
       }
 

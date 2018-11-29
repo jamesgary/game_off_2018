@@ -1,18 +1,7 @@
-// Create a new emitter
-window.makeEmitter = function(container, x, y) {
+window.makeSplashEmitter = function(container, x, y) {
   return new PIXI.particles.Emitter(
-
-    // The PIXI.Container to put the emitter in
-    // if using blend modes, it's important to put this
-    // on top of a bitmap, and not use the root stage Container
     container,
-
-    // The collection of particle images to use
     [PIXI.Texture.fromImage('images/HardCircle.png')],
-
-    // Emitter configuration, edit this to change the look
-    // of the emitter
-
     // trying on bg: #6CBE42
 {
 	"alpha": {
@@ -55,6 +44,67 @@ window.makeEmitter = function(container, x, y) {
 	"frequency": 0.001,
 	"emitterLifetime": 0.1,
 	"maxParticles": 50,
+	"pos": {
+		"x": x,
+		"y": y
+	},
+	"addAtBack": false,
+	"spawnType": "circle",
+	"spawnCircle": {
+		"x": 0,
+		"y": 0,
+		"r": 0
+	}
+}
+  );
+}
+
+window.makeCreepDeathEmitter = function(container, x, y) {
+  return new PIXI.particles.Emitter(
+    container,
+    [PIXI.Texture.fromImage('images/HardCircle.png')],
+    // trying on bg: #6CBE42
+{
+	"alpha": {
+		"start": 1,
+		"end": 0.08
+	},
+	"scale": {
+		"start": 0.3,
+		"end": 0.1,
+		"minimumScaleMultiplier": 1
+	},
+	"color": {
+		"start": "#444477",
+		"end": "#222233"
+	},
+	"speed": {
+		"start": 111,
+		"end": 71,
+		"minimumSpeedMultiplier": 2
+	},
+	"acceleration": {
+		"x": 0,
+		"y": 0
+	},
+	"maxSpeed": 0,
+	"startRotation": {
+		"min": 0,
+		"max": 360
+	},
+	"noRotation": false,
+	"rotationSpeed": {
+		"min": 0,
+		"max": 0
+	},
+	"lifetime": {
+		"min": 0.1,
+		"max": 0.32
+	},
+	"blendMode": "normal",
+	"frequency": 0.001,
+	"emitterLifetime": 0.1,
+	"maxParticles": 158,
 	"pos": {
 		"x": x,
 		"y": y

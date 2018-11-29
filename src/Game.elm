@@ -1,4 +1,4 @@
-port module Game exposing (Effect(..), GameState(..), Model, Msg(..), init, initTryOut, update, view)
+port module Game exposing (Effect(..), FxKind(..), GameState(..), Model, Msg(..), init, initTryOut, update, view)
 
 import AStar
 import Browser
@@ -887,7 +887,15 @@ collideBulletsWithCreeps session delta model =
                                     else
                                         { pos = foundCreep.pos, age = 0 } :: tmp.composts
                                 , seed = newSeed
-                                , fx = DrawFx foundCreep.pos Splash :: tmp.fx
+                                , fx =
+                                    if newCreep.healthAmt > 0 then
+                                        DrawFx foundCreep.pos Splash :: tmp.fx
+
+                                    else
+                                        [ DrawFx foundCreep.pos CreepDeath
+                                        , DrawFx foundCreep.pos Splash
+                                        ]
+                                            ++ tmp.fx
                                 }
 
                             _ ->
@@ -1877,8 +1885,9 @@ isTurretGrown session turret =
 type Effect
     = DrawSprites (List SpriteLayer)
     | MoveCamera Vec2
-    | DrawFx Vec2 ParticleEffect
+    | DrawFx Vec2 FxKind
 
 
-type ParticleEffect
+type FxKind
     = Splash
+    | CreepDeath
