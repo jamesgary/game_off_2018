@@ -256,7 +256,7 @@ type alias EnemyTower =
 
 
 waterNeededToMatureC =
-    100
+    300
 
 
 type alias Crop =
@@ -269,7 +269,12 @@ type alias Crop =
 
 
 type CropState
-    = Seedling { waterNeededToMature : Float, waterConsumed : Float }
+    = Seedling
+        { waterNeededToMature : Float
+        , waterConsumed : Float
+        , waterCapacity : Float
+        , waterInSoil : Float
+        }
     | Mature
 
 
@@ -430,6 +435,7 @@ update msg session model =
             in
             model
                 |> ageAll session delta
+                |> soilAbsorbWaterFromBullets session delta
                 |> cropsAbsorbWater session delta
                 |> moveHero session delta
                 |> refillWater session delta
@@ -491,6 +497,8 @@ update msg session model =
                                             Seedling
                                                 { waterNeededToMature = waterNeededToMatureC
                                                 , waterConsumed = 0
+                                                , waterCapacity = maxWaterCapacity
+                                                , waterInSoil = 0
                                                 }
                                         , kind = MoneyCrop
                                         }
@@ -507,6 +515,8 @@ update msg session model =
                                             Seedling
                                                 { waterNeededToMature = waterNeededToMatureC
                                                 , waterConsumed = 0
+                                                , waterCapacity = maxWaterCapacity
+                                                , waterInSoil = 0
                                                 }
                                         , kind = Turret { timeSinceLastFire = 0 }
                                         }
@@ -554,15 +564,15 @@ absorptionRate =
     50
 
 
-cropsAbsorbWater : Session -> Float -> Model -> Model
-cropsAbsorbWater session delta model =
+soilAbsorbWaterFromBullets : Session -> Float -> Model -> Model
+soilAbsorbWaterFromBullets session delta model =
     { model
         | crops =
             model.crops
                 |> List.map
                     (\crop ->
                         case crop.state of
-                            Seedling { waterNeededToMature, waterConsumed } ->
+                            Seedling seedlingData ->
                                 let
                                     numBullets =
                                         model.bullets
@@ -573,15 +583,45 @@ cropsAbsorbWater session delta model =
                                             |> List.length
                                             |> toFloat
                                 in
-                                if waterConsumed + (delta * absorptionRate * numBullets) >= waterNeededToMature then
+                                { crop
+                                    | state =
+                                        Seedling
+                                            { seedlingData
+                                                | waterInSoil =
+                                                    min (delta * 300 * numBullets + seedlingData.waterInSoil) seedlingData.waterCapacity
+                                            }
+                                }
+
+                            Mature ->
+                                crop
+                    )
+    }
+
+
+cropsAbsorbWater : Session -> Float -> Model -> Model
+cropsAbsorbWater session delta model =
+    { model
+        | crops =
+            model.crops
+                |> List.map
+                    (\crop ->
+                        case crop.state of
+                            Seedling { waterNeededToMature, waterConsumed, waterInSoil, waterCapacity } ->
+                                let
+                                    amtToAbsorb =
+                                        min (delta * absorptionRate) waterInSoil
+                                in
+                                if waterConsumed + amtToAbsorb > waterNeededToMature then
                                     { crop | state = Mature }
 
                                 else
                                     { crop
                                         | state =
                                             Seedling
-                                                { waterConsumed = waterConsumed + (delta * absorptionRate * numBullets)
+                                                { waterConsumed = waterConsumed + amtToAbsorb
                                                 , waterNeededToMature = waterNeededToMature
+                                                , waterCapacity = waterCapacity
+                                                , waterInSoil = waterInSoil - amtToAbsorb
                                                 }
                                     }
 
@@ -589,6 +629,10 @@ cropsAbsorbWater session delta model =
                                 crop
                     )
     }
+
+
+maxWaterCapacity =
+    100
 
 
 slashCreeps : Session -> Model -> List Creep
@@ -2119,20 +2163,29 @@ getSprites session model =
                             case crop.pos of
                                 ( etX, etY ) ->
                                     case crop.state of
-                                        Seedling { waterNeededToMature, waterConsumed } ->
-                                            drawWaterMeter
-                                                (Vec2.vec2 (toFloat etX + 0.5) (toFloat etY + 0.5))
-                                                0.8
+                                        Seedling { waterNeededToMature, waterConsumed, waterCapacity, waterInSoil } ->
+                                            [ drawMaturityMeter
+                                                (Vec2.vec2 (toFloat etX + 0.5) (toFloat etY + 0.4))
+                                                1.1
                                                 waterConsumed
                                                 waterNeededToMature
+                                                waterInSoil
+                                            , drawWaterMeter
+                                                (Vec2.vec2 (toFloat etX + 0.5) (toFloat etY + 0.6))
+                                                1.1
+                                                waterInSoil
+                                                waterCapacity
+                                            ]
 
                                         Mature ->
-                                            drawHealthMeter
+                                            [ drawHealthMeter
                                                 (Vec2.vec2 (toFloat etX + 0.5) (toFloat etY + 0.5))
                                                 0.9
                                                 crop.healthAmt
                                                 crop.healthMax
+                                            ]
                         )
+                    |> List.concat
                     |> List.concat
                 ]
                     |> List.concat
@@ -2305,7 +2358,7 @@ drawWaterMeter pos width amt max =
 drawMeter : Vec2 -> Float -> Float -> Float -> String -> List Graphic
 drawMeter pos width amt max color =
     let
-        ( healthX, healthY ) =
+        ( x, y ) =
             ( Vec2.getX pos - (width / 2)
             , Vec2.getY pos + 0.7
             )
@@ -2319,8 +2372,8 @@ drawMeter pos width amt max color =
         offset =
             outlineRatio * width
     in
-    [ { x = healthX - offset
-      , y = healthY - offset
+    [ { x = x - offset
+      , y = y - offset
       , width = width + (offset * 2)
       , height = height + (offset * 2)
       , bgColor = "#000000"
@@ -2330,11 +2383,67 @@ drawMeter pos width amt max color =
       , alpha = 1
       , shape = Rect
       }
-    , { x = healthX
-      , y = healthY
+    , { x = x
+      , y = y
       , width = width * (amt / max)
       , height = height
       , bgColor = color
+      , lineStyleWidth = 0
+      , lineStyleColor = "#000000"
+      , lineStyleAlpha = 1
+      , alpha = 1
+      , shape = Rect
+      }
+    ]
+
+
+drawMaturityMeter : Vec2 -> Float -> Float -> Float -> Float -> List Graphic
+drawMaturityMeter pos width consumed need has =
+    let
+        ( x, y ) =
+            ( Vec2.getX pos - (width / 2)
+            , Vec2.getY pos + 0.7
+            )
+
+        height =
+            0.1 * width
+
+        outlineRatio =
+            0.05
+
+        offset =
+            outlineRatio * width
+    in
+    [ -- bg
+      { x = x - offset
+      , y = y - offset
+      , width = width + (offset * 2)
+      , height = height + (offset * 2)
+      , bgColor = "#000000"
+      , lineStyleWidth = 0
+      , lineStyleColor = "#000000"
+      , lineStyleAlpha = 1
+      , alpha = 1
+      , shape = Rect
+      }
+    , -- water
+      { x = x
+      , y = y
+      , width = width * min 1 ((consumed + has) / need)
+      , height = height
+      , bgColor = "#00eeee"
+      , lineStyleWidth = 0
+      , lineStyleColor = "#000000"
+      , lineStyleAlpha = 1
+      , alpha = 1
+      , shape = Rect
+      }
+    , -- growth
+      { x = x
+      , y = y
+      , width = width * (consumed / need)
+      , height = height
+      , bgColor = "#00aa00"
       , lineStyleWidth = 0
       , lineStyleColor = "#000000"
       , lineStyleAlpha = 1
