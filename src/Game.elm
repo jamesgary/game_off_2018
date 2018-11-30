@@ -77,6 +77,7 @@ init session =
     , isMouseDown = False
     , mousePos = Vec2.vec2 -99 -99
     , age = 0
+    , isPaused = False
     , fx = []
     }
 
@@ -130,6 +131,7 @@ initTryOut session savedMap =
       , isMouseDown = False
       , mousePos = Vec2.vec2 -99 -99
       , age = 0
+      , isPaused = False
       , fx = []
       }
     , Cmd.none
@@ -169,6 +171,7 @@ type alias Model =
     , mousePos : Vec2
     , isMouseDown : Bool
     , age : Float
+    , isPaused : Bool
 
     -- to be flushed at the end of every tick
     , fx : List Effect
@@ -206,6 +209,7 @@ type alias Base =
 
 type Equippable
     = Gun
+    | Scythe
     | TurretSeed
     | MoneyCropSeed
 
@@ -290,6 +294,7 @@ type Msg
     | MouseUp
     | MouseMove ( Float, Float )
     | Tick Float
+    | TogglePause Bool
 
 
 dlog : String -> a -> a
@@ -432,7 +437,11 @@ update msg session model =
                 |> heroPickUpCompost session delta
                 |> checkGameOver session delta
                 |> (\updatedModel ->
-                        ( { updatedModel | fx = [] }
+                        ( { updatedModel
+                            | fx = []
+
+                            --, isPaused = True
+                          }
                         , [ DrawSprites (getSprites session updatedModel)
                           , MoveCamera updatedModel.hero.pos
                           ]
@@ -474,16 +483,16 @@ update msg session model =
         MouseDown ->
             ( { model | isMouseDown = True }
                 |> (\m ->
-                        case canPlace model of
-                            Shouldnt ->
-                                m
+                        case m.equipped of
+                            MoneyCropSeed ->
+                                case canPlace model of
+                                    Shouldnt ->
+                                        m
 
-                            Cant ->
-                                m
+                                    Cant ->
+                                        m
 
-                            Can ->
-                                case m.equipped of
-                                    MoneyCropSeed ->
+                                    Can ->
                                         case hoveringTilePos m of
                                             Just tilePos ->
                                                 { m
@@ -500,7 +509,15 @@ update msg session model =
                                             Nothing ->
                                                 m
 
-                                    TurretSeed ->
+                            TurretSeed ->
+                                case canPlace model of
+                                    Shouldnt ->
+                                        m
+
+                                    Cant ->
+                                        m
+
+                                    Can ->
                                         case hoveringTilePos m of
                                             Just tilePos ->
                                                 { m
@@ -517,8 +534,12 @@ update msg session model =
                                             Nothing ->
                                                 m
 
-                                    Gun ->
-                                        m
+                            Gun ->
+                                m
+
+                            Scythe ->
+                                -- POWER SCYTHE (todo)
+                                { model | creeps = [] }
                    )
             , []
             )
@@ -526,6 +547,13 @@ update msg session model =
         MouseUp ->
             ( { model
                 | isMouseDown = False
+              }
+            , []
+            )
+
+        TogglePause shouldPause ->
+            ( { model
+                | isPaused = shouldPause
               }
             , []
             )
@@ -572,9 +600,12 @@ applyKeyDown str model =
             { model | equipped = Gun }
 
         "2" ->
-            { model | equipped = MoneyCropSeed }
+            { model | equipped = Scythe }
 
         "3" ->
+            { model | equipped = MoneyCropSeed }
+
+        "4" ->
             { model | equipped = TurretSeed }
 
         _ ->
@@ -1063,6 +1094,9 @@ canPlace model =
 
             Gun ->
                 False
+
+            Scythe ->
+                False
     then
         case hoveringTilePos model of
             Just tilePos ->
@@ -1427,22 +1461,26 @@ makeBullet kind heroPos aimPos =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.batch
-        [ Browser.Events.onKeyDown (Decode.map KeyDown (Decode.field "key" Decode.string))
-        , Browser.Events.onKeyUp (Decode.map KeyUp (Decode.field "key" Decode.string))
-        , Sub.batch
-            (case model.gameState of
-                Playing ->
-                    [ Browser.Events.onAnimationFrameDelta Tick
-                    ]
+    if model.isPaused then
+        Sub.none
 
-                GameOver ->
-                    []
+    else
+        Sub.batch
+            [ Browser.Events.onKeyDown (Decode.map KeyDown (Decode.field "key" Decode.string))
+            , Browser.Events.onKeyUp (Decode.map KeyUp (Decode.field "key" Decode.string))
+            , Sub.batch
+                (case model.gameState of
+                    Playing ->
+                        [ Browser.Events.onAnimationFrameDelta Tick
+                        ]
 
-                Win ->
-                    []
-            )
-        ]
+                    GameOver ->
+                        []
+
+                    Win ->
+                        []
+                )
+            ]
 
 
 view : Session -> Model -> Html Msg
@@ -1462,8 +1500,14 @@ view session model =
             , Html.Attributes.style "position" "absolute"
             , Html.Attributes.style "width" "100%"
             , Html.Attributes.style "color" "white"
+            , Html.Attributes.style "z-index" "99"
             ]
-            [ Html.div
+            [ Html.button
+                [ Html.Events.onClick (TogglePause True)
+                , Html.Attributes.style "z-index" "99"
+                ]
+                [ Html.text "Pause" ]
+            , Html.div
                 [ Html.Attributes.style "margin" "5px 20px 0"
                 , Html.Attributes.style "font-family" "sans-serif"
                 , Html.Attributes.style "font-size" "14px"
@@ -1502,6 +1546,7 @@ view session model =
                 , viewMeter model.waterAmt model.waterMax (session.c.getFloat "ui:meterWidth")
                 ]
             ]
+        , drawEquippables session model
         , drawClock session model
         , drawGlass session model
         , Html.div []
@@ -1547,6 +1592,60 @@ view session model =
                 Playing ->
                     Html.text ""
             ]
+        ]
+
+
+drawEquippables : Session -> Model -> Html Msg
+drawEquippables session model =
+    let
+        size =
+            "50px"
+
+        equippables =
+            [ ( Gun, "images/icon-watergun.png" )
+            , ( Scythe, "images/scythe.png" )
+            , ( MoneyCropSeed, "images/moneyCrop.png" )
+            , ( TurretSeed, "images/turret.png" )
+            , ( TurretSeed, "images/hedge.png" )
+            ]
+    in
+    Html.div
+        [ Html.Attributes.style "position" "fixed"
+        , Html.Attributes.style "bottom" "5px"
+        , Html.Attributes.style "width" "100%"
+        ]
+        [ Html.div
+            [ Html.Attributes.style "display" "flex"
+            , Html.Attributes.style "justify-content" "center"
+            ]
+            (equippables
+                |> List.map
+                    (\( equippable, imgSrc ) ->
+                        Html.div
+                            ([ Html.Attributes.style "border" "7px ridge white"
+                             , Html.Attributes.style "border-radius" "4px"
+                             , Html.Attributes.style "background" "rgba(255, 255, 255, 0.4)"
+                             , Html.Attributes.style "margin" "0 5px"
+                             ]
+                                ++ (if model.equipped == equippable then
+                                        [ Html.Attributes.style "background" "rgba(90, 255, 90, 0.6)"
+                                        , Html.Attributes.style "border" "7px ridge rgb(90, 255, 90)"
+                                        ]
+
+                                    else
+                                        []
+                                   )
+                            )
+                            [ Html.img
+                                [ Html.Attributes.src imgSrc
+                                , Html.Attributes.style "width" size
+                                , Html.Attributes.style "height" size
+                                , Html.Attributes.style "margin" "3px"
+                                ]
+                                []
+                            ]
+                    )
+            )
         ]
 
 
@@ -1751,6 +1850,9 @@ equippableStr equippable =
         Gun ->
             "Gun"
 
+        Scythe ->
+            "Scythe"
+
         MoneyCropSeed ->
             "MoneyCrop Seed"
 
@@ -1823,6 +1925,9 @@ getSprites session model =
                 in
                 case model.equipped of
                     Gun ->
+                        []
+
+                    Scythe ->
                         []
 
                     MoneyCropSeed ->

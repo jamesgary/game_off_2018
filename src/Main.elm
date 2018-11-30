@@ -856,16 +856,20 @@ subscriptions model =
         , Sub.batch
             (case model.state of
                 Game gameModel ->
-                    case gameModel.gameState of
-                        Game.Playing ->
-                            [ Browser.Events.onAnimationFrameDelta Tick
-                            ]
+                    if gameModel.isPaused then
+                        []
 
-                        Game.GameOver ->
-                            []
+                    else
+                        case gameModel.gameState of
+                            Game.Playing ->
+                                [ Browser.Events.onAnimationFrameDelta Tick
+                                ]
 
-                        Game.Win ->
-                            []
+                            Game.GameOver ->
+                                []
+
+                            Game.Win ->
+                                []
 
                 MapEditor mapEditorModel ->
                     [ Browser.Events.onAnimationFrameDelta Tick
