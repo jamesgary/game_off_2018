@@ -1,4 +1,4 @@
-module Common exposing (Config, ConfigFloat, Graphic, Key, Map, PlacementAvailability(..), SavedMap, Session, Shape(..), Sprite, SpriteLayer, Texture(..), Tile(..), TilePos, drawHealth, heroDirInput, mapFromAscii, textureToStr, tilePosToFloats, tileToStr, tupleToVec2, vec2ToTuple)
+module Common exposing (Config, ConfigFloat, Graphic, Key, Map, PlacementAvailability(..), SavedMap, Session, Shape(..), Sprite, SpriteLayer, Texture(..), Tile(..), TilePos, drawHealth, heroDirInput, mapFromAscii, pct, px, textureToStr, tilePosToFloats, tileToStr, tupleToVec2, vec2ToTuple)
 
 import Dict exposing (Dict)
 import Math.Vector2 as Vec2 exposing (Vec2)
@@ -219,7 +219,7 @@ type alias Graphic =
     , lineStyleWidth : Float
     , lineStyleColor : String
     , lineStyleAlpha : Float
-    , angle : Float
+    , alpha : Float
     , shape : Shape
     }
 
@@ -254,7 +254,7 @@ drawHealth pos width amt max =
       , lineStyleWidth = 0
       , lineStyleColor = "#000000"
       , lineStyleAlpha = 1
-      , angle = 0
+      , alpha = 1
       , shape = Rect
       }
     , { x = healthX
@@ -265,7 +265,17 @@ drawHealth pos width amt max =
       , lineStyleWidth = 0
       , lineStyleColor = "#000000"
       , lineStyleAlpha = 1
-      , angle = 0
+      , alpha = 1
       , shape = Rect
       }
     ]
+
+
+px : Float -> String
+px length =
+    String.fromFloat length ++ "px"
+
+
+pct : Float -> String
+pct length =
+    String.fromFloat length ++ "%"

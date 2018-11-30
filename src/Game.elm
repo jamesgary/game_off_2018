@@ -20,6 +20,45 @@ import Set exposing (Set)
 import WebGL
 
 
+type alias Model =
+    { -- fluid things
+      hero : Hero
+    , bullets : List Bullet
+    , composts : List Compost
+
+    -- fluid bldgs?
+    , creeps : List Creep
+
+    -- bldgs
+    , enemyTowers : List EnemyTower
+    , turrets : List Turret
+    , moneyCrops : List MoneyCrop
+    , base : Base
+
+    -- hero things
+    , timeSinceLastFire : Float
+    , timeSinceLastSlash : Float
+    , slashEffects : List ( Float, Graphic )
+    , waterAmt : Float
+    , waterMax : Float
+    , equipped : Equippable
+
+    -- map
+    , map : Map
+    , inv : Inv
+
+    -- state
+    , gameState : GameState
+    , mousePos : Vec2
+    , isMouseDown : Bool
+    , age : Float
+    , isPaused : Bool
+
+    -- to be flushed at the end of every tick
+    , fx : List Effect
+    }
+
+
 init : Session -> Model
 init session =
     let
@@ -66,7 +105,8 @@ init session =
         , healthMax = c.getFloat "base:healthMax"
         }
     , timeSinceLastFire = 0
-    , timeSinceLastSlash = 0
+    , timeSinceLastSlash = 99999
+    , slashEffects = []
     , waterAmt = 75
     , waterMax = 100
     , equipped = Gun
@@ -121,7 +161,8 @@ initTryOut session savedMap =
             , healthMax = c.getFloat "base:healthMax"
             }
       , timeSinceLastFire = 0
-      , timeSinceLastSlash = 0
+      , timeSinceLastSlash = 99999
+      , slashEffects = []
       , waterAmt = 75
       , waterMax = 100
       , equipped = Gun
@@ -141,44 +182,6 @@ initTryOut session savedMap =
 
 
 port hardReset : () -> Cmd msg
-
-
-type alias Model =
-    { -- fluid things
-      hero : Hero
-    , bullets : List Bullet
-    , composts : List Compost
-
-    -- fluid bldgs?
-    , creeps : List Creep
-
-    -- bldgs
-    , enemyTowers : List EnemyTower
-    , turrets : List Turret
-    , moneyCrops : List MoneyCrop
-    , base : Base
-
-    -- hero things
-    , timeSinceLastFire : Float
-    , timeSinceLastSlash : Float
-    , waterAmt : Float
-    , waterMax : Float
-    , equipped : Equippable
-
-    -- map
-    , map : Map
-    , inv : Inv
-
-    -- state
-    , gameState : GameState
-    , mousePos : Vec2
-    , isMouseDown : Bool
-    , age : Float
-    , isPaused : Bool
-
-    -- to be flushed at the end of every tick
-    , fx : List Effect
-    }
 
 
 type GameState
@@ -533,8 +536,8 @@ update msg session model =
                                 -- POWER SCYTHE (todo)
                                 { model
                                     | timeSinceLastSlash = 0
-
-                                    --, creeps = []
+                                    , slashEffects = ( 0, makeSlashEffect session model ) :: model.slashEffects
+                                    , creeps = slashCreeps session model
                                 }
                    )
             , []
@@ -555,6 +558,115 @@ update msg session model =
             )
 
 
+slashDmg =
+    2
+
+
+creepRad =
+    -- inconsistent w/ sprite :(
+    0.4
+
+
+slashCreeps : Session -> Model -> List Creep
+slashCreeps session model =
+    let
+        slashPoly =
+            getSlashPoly session model
+    in
+    model.creeps
+        |> List.filterMap
+            (\creep ->
+                if
+                    Collision.collision 10
+                        ( slashPoly, polySupport )
+                        ( polyFromSquare creep.pos creepRad, polySupport )
+                        |> Maybe.withDefault False
+                then
+                    -- hit!
+                    let
+                        pushback =
+                            ( 0.5, mouseAngleToHero session model )
+                                |> fromPolar
+                                |> tupleToVec2
+
+                        damagedCreep =
+                            { creep
+                                | healthAmt = creep.healthAmt - 2
+                                , pos = Vec2.add creep.pos pushback
+                            }
+                    in
+                    if damagedCreep.healthAmt > 0 then
+                        Just damagedCreep
+
+                    else
+                        Nothing
+
+                else
+                    Just creep
+            )
+
+
+getSlashPoly : Session -> Model -> List Collision.Pt
+getSlashPoly session model =
+    let
+        ( leftCorner, tippyTop, rightCorner ) =
+            scythePoints session model
+    in
+    [ leftCorner, tippyTop, rightCorner, model.hero.pos ]
+        |> List.map vec2ToTuple
+
+
+mouseAngleToHero : Session -> Model -> Float
+mouseAngleToHero session model =
+    let
+        heroPos =
+            model.hero.pos
+
+        mousePos =
+            mouseGamePos session model
+
+        xDiff =
+            Vec2.sub mousePos heroPos
+                |> Vec2.getX
+
+        yDiff =
+            Vec2.sub mousePos heroPos
+                |> Vec2.getY
+
+        ( _, mouseAngle ) =
+            toPolar ( xDiff, yDiff )
+    in
+    mouseAngle
+
+
+makeSlashEffect : Session -> Model -> Graphic
+makeSlashEffect session model =
+    let
+        height =
+            2
+
+        halfWidth =
+            1
+
+        heroPos =
+            model.hero.pos
+
+        ( leftCorner, tippyTop, rightCorner ) =
+            scythePoints session model
+    in
+    { x = model.hero.pos |> Vec2.getX
+    , y = model.hero.pos |> Vec2.getY
+    , width = 60
+    , height = 100
+    , bgColor = "#ffffff"
+    , lineStyleWidth = 0
+    , lineStyleColor = "#000000"
+    , lineStyleAlpha = 1
+    , alpha = 1 --max 0 ((maxTimeToShowSlash - model.timeSinceLastSlash) / maxTimeToShowSlash)
+    , shape = Arc leftCorner tippyTop rightCorner
+    }
+
+
 ageAll : Session -> Float -> Model -> Model
 ageAll session delta model =
     { model
@@ -565,8 +677,17 @@ ageAll session delta model =
                     (\creep ->
                         { creep | age = creep.age + delta }
                     )
+        , timeSinceLastSlash = delta + model.timeSinceLastSlash
+        , slashEffects =
+            model.slashEffects
+                |> List.filterMap
+                    (\( age, slash ) ->
+                        if age + delta > maxTimeToShowSlash then
+                            Nothing
 
-        --, timeSinceLastSlash = delta + model.timeSinceLastSlash
+                        else
+                            Just ( age + delta, slash )
+                    )
     }
 
 
@@ -1270,12 +1391,16 @@ moveHero session delta model =
     { model | hero = newHero }
 
 
+heroRad =
+    0.45
+
+
 isHeroColliding : Map -> Vec2 -> Bool
 isHeroColliding map heroPos =
     -- TODO performance!
     let
         heroPoly =
-            polyFromSquare heroPos 0.45
+            polyFromSquare heroPos heroRad
     in
     heroPos
         |> Vec2.add (Vec2.vec2 -0.5 -0.5)
@@ -1767,46 +1892,6 @@ formatTime model =
         ++ ampm
 
 
-bulletHitFrag : WebGL.Shader a { b | age : Float, angle : Float } { vcoord : Vec2 }
-bulletHitFrag =
-    [glsl|
-      precision mediump float;
-
-      varying vec2 vcoord;
-      uniform float age;
-      uniform float angle;
-
-      void main () {
-        float maxAge = 0.4;
-        float ageProgress = age / maxAge;
-        float radius = 0.04 + (0.07 * ageProgress);
-        //vec2  pos = vec2(0.5, (0.5 + (0.2 * ageProgress)));
-        vec2  pos = vec2(0.5 + 0.2 * ageProgress * sin(angle), 0.5 + 0.2 * ageProgress * cos(angle));
-        float dist = length(pos - vcoord);
-
-        float alpha = smoothstep(radius - 0.01, radius, dist);
-        vec4 color = vec4(
-          (1.0 * ageProgress) + 0.4,
-          (1.0 * ageProgress) + 0.4,
-          (1.0 * ageProgress) + 1.0,
-          (1.0 - alpha) * (1.0 - age / maxAge)
-        );
-
-        gl_FragColor = color;
-      }
-    |]
-
-
-px : Float -> String
-px length =
-    String.fromFloat length ++ "px"
-
-
-pct : Float -> String
-pct length =
-    String.fromFloat length ++ "%"
-
-
 formatConfigFloat : Float -> String
 formatConfigFloat val =
     Round.round 1 val
@@ -1920,7 +2005,7 @@ getSprites session model =
                     1.4
                     model.hero.healthAmt
                     model.hero.healthMax
-                    ++ drawArc session model
+                    ++ drawSlash session model
             }
 
         buildingsLayer =
@@ -2072,33 +2157,19 @@ getSprites session model =
             )
 
 
-drawArc : Session -> Model -> List Graphic
-drawArc session model =
-    let
-        height =
-            2
+maxTimeToShowSlash =
+    0.1
 
-        halfWidth =
-            1
 
-        heroPos =
-            model.hero.pos
-
-        ( leftCorner, tippyTop, rightCorner ) =
-            scythePoints session model
-    in
-    [ { x = model.hero.pos |> Vec2.getX
-      , y = model.hero.pos |> Vec2.getY
-      , width = 60
-      , height = 100
-      , bgColor = "#ffffff"
-      , lineStyleWidth = 0
-      , lineStyleColor = "#000000"
-      , lineStyleAlpha = 1
-      , angle = 0
-      , shape = Arc leftCorner tippyTop rightCorner
-      }
-    ]
+drawSlash : Session -> Model -> List Graphic
+drawSlash session model =
+    model.slashEffects
+        |> List.map
+            (\( age, slash ) ->
+                { slash
+                    | alpha = max 0 ((maxTimeToShowSlash - age) / maxTimeToShowSlash)
+                }
+            )
 
 
 scythePoints : Session -> Model -> ( Vec2, Vec2, Vec2 )
@@ -2113,19 +2184,8 @@ scythePoints session model =
         heroPos =
             model.hero.pos
 
-        mousePos =
-            mouseGamePos session model
-
-        xDiff =
-            Vec2.sub mousePos heroPos
-                |> Vec2.getX
-
-        yDiff =
-            Vec2.sub mousePos heroPos
-                |> Vec2.getY
-
-        ( _, mouseAngle ) =
-            toPolar ( xDiff, yDiff )
+        mouseAngle =
+            mouseAngleToHero session model
 
         leftCorner =
             Vec2.vec2 height -halfWidth

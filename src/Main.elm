@@ -545,6 +545,7 @@ encodeSpriteLayer layer =
                         , lineStyleWidth = graphic.lineStyleWidth * 32
                         , lineStyleColor = graphic.lineStyleColor
                         , lineStyleAlpha = graphic.lineStyleAlpha
+                        , alpha = graphic.alpha
                         , shape = graphic.shape
                         }
                     )
@@ -559,6 +560,7 @@ encodeSpriteLayer layer =
                              , ( "lineStyleWidth", Json.Encode.float graphic.lineStyleWidth )
                              , ( "lineStyleColor", Json.Encode.string graphic.lineStyleColor )
                              , ( "lineStyleAlpha", Json.Encode.float graphic.lineStyleAlpha )
+                             , ( "alpha", Json.Encode.float graphic.alpha )
                              , ( "shape", encodeShape graphic.shape )
                              ]
                                 ++ (case graphic.shape of
