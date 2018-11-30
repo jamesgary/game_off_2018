@@ -30,10 +30,9 @@ type alias Model =
     , creeps : List Creep
 
     -- bldgs
-    , enemyTowers : List EnemyTower
-    , turrets : List Turret
-    , moneyCrops : List MoneyCrop
     , base : Base
+    , enemyTowers : List EnemyTower
+    , crops : List Crop
 
     -- hero things
     , timeSinceLastFire : Float
@@ -97,8 +96,7 @@ init session =
                     , healthMax = c.getFloat "enemyBase:healthMax"
                     }
                 )
-    , turrets = []
-    , moneyCrops = []
+    , crops = []
     , base =
         { pos = savedMap.base
         , healthAmt = c.getFloat "base:healthMax"
@@ -153,8 +151,7 @@ initTryOut session savedMap =
                         , healthMax = c.getFloat "enemyBase:healthMax"
                         }
                     )
-      , turrets = []
-      , moneyCrops = []
+      , crops = []
       , base =
             { pos = savedMap.base
             , healthAmt = c.getFloat "base:healthMax"
@@ -258,22 +255,27 @@ type alias EnemyTower =
     }
 
 
-type alias Turret =
+waterNeededToMatureC =
+    100
+
+
+type alias Crop =
     { pos : TilePos
-    , timeSinceLastFire : Float
-    , age : Float
     , healthAmt : Float
     , healthMax : Float
+    , state : CropState
+    , kind : CropKind
     }
 
 
-type alias MoneyCrop =
-    { pos : TilePos
-    , timeSinceLastGenerate : Float
-    , age : Float
-    , healthAmt : Float
-    , healthMax : Float
-    }
+type CropState
+    = Seedling { waterNeededToMature : Float, waterConsumed : Float }
+    | Mature
+
+
+type CropKind
+    = MoneyCrop
+    | Turret { timeSinceLastFire : Float }
 
 
 type alias Bullet =
@@ -428,11 +430,11 @@ update msg session model =
             in
             model
                 |> ageAll session delta
+                |> cropsAbsorbWater session delta
                 |> moveHero session delta
                 |> refillWater session delta
                 |> makeTurretBullets session delta
                 |> makePlayerBullets session delta
-                |> ageCrops session delta
                 |> moveBullets session delta
                 |> spawnCreeps session delta
                 |> moveCreeps session delta
@@ -478,42 +480,40 @@ update msg session model =
         MouseDown ->
             ( { model | isMouseDown = True }
                 |> (\m ->
-                        case ( m.equipped, canPlace session model ) of
-                            ( MoneyCropSeed, Can ) ->
-                                case hoveringTilePos session m of
-                                    Just tilePos ->
-                                        { m
-                                            | moneyCrops =
-                                                { pos = tilePos
-                                                , timeSinceLastGenerate = 0
-                                                , healthAmt = session.c.getFloat "crops:moneyCrop:healthMax"
-                                                , healthMax = session.c.getFloat "crops:moneyCrop:healthMax"
-                                                , age = 0
+                        case ( m.equipped, canPlace session model, hoveringTilePos session m ) of
+                            ( MoneyCropSeed, Can, Just tilePos ) ->
+                                { m
+                                    | crops =
+                                        { pos = tilePos
+                                        , healthAmt = session.c.getFloat "crops:moneyCrop:healthMax"
+                                        , healthMax = session.c.getFloat "crops:moneyCrop:healthMax"
+                                        , state =
+                                            Seedling
+                                                { waterNeededToMature = waterNeededToMatureC
+                                                , waterConsumed = 0
                                                 }
-                                                    :: m.moneyCrops
+                                        , kind = MoneyCrop
                                         }
+                                            :: m.crops
+                                }
 
-                                    Nothing ->
-                                        m
-
-                            ( TurretSeed, Can ) ->
-                                case hoveringTilePos session m of
-                                    Just tilePos ->
-                                        { m
-                                            | turrets =
-                                                { pos = tilePos
-                                                , timeSinceLastFire = 0
-                                                , healthAmt = session.c.getFloat "crops:turret:healthMax"
-                                                , healthMax = session.c.getFloat "crops:turret:healthMax"
-                                                , age = 0
+                            ( TurretSeed, Can, Just tilePos ) ->
+                                { m
+                                    | crops =
+                                        { pos = tilePos
+                                        , healthAmt = session.c.getFloat "crops:turret:healthMax"
+                                        , healthMax = session.c.getFloat "crops:turret:healthMax"
+                                        , state =
+                                            Seedling
+                                                { waterNeededToMature = waterNeededToMatureC
+                                                , waterConsumed = 0
                                                 }
-                                                    :: m.turrets
+                                        , kind = Turret { timeSinceLastFire = 0 }
                                         }
+                                            :: m.crops
+                                }
 
-                                    Nothing ->
-                                        m
-
-                            ( Scythe, _ ) ->
+                            ( Scythe, _, _ ) ->
                                 { model
                                     | timeSinceLastSlash = 0
                                     , slashEffects = ( 0, makeSlashEffect session model ) :: model.slashEffects
@@ -548,6 +548,47 @@ slashDmg =
 creepRad =
     -- inconsistent w/ sprite :(
     0.4
+
+
+absorptionRate =
+    50
+
+
+cropsAbsorbWater : Session -> Float -> Model -> Model
+cropsAbsorbWater session delta model =
+    { model
+        | crops =
+            model.crops
+                |> List.map
+                    (\crop ->
+                        case crop.state of
+                            Seedling { waterNeededToMature, waterConsumed } ->
+                                let
+                                    numBullets =
+                                        model.bullets
+                                            |> List.filter
+                                                (\bullet ->
+                                                    crop.pos == (bullet.pos |> vec2ToTuple |> Tuple.mapBoth floor floor)
+                                                )
+                                            |> List.length
+                                            |> toFloat
+                                in
+                                if waterConsumed + (delta * absorptionRate * numBullets) >= waterNeededToMature then
+                                    { crop | state = Mature }
+
+                                else
+                                    { crop
+                                        | state =
+                                            Seedling
+                                                { waterConsumed = waterConsumed + (delta * absorptionRate * numBullets)
+                                                , waterNeededToMature = waterNeededToMature
+                                                }
+                                    }
+
+                            Mature ->
+                                crop
+                    )
+    }
 
 
 slashCreeps : Session -> Model -> List Creep
@@ -733,28 +774,6 @@ makePlayerBullets session delta model =
         { model | timeSinceLastFire = model.timeSinceLastFire + delta }
 
 
-ageCrops : Session -> Float -> Model -> Model
-ageCrops session delta model =
-    { model
-        | turrets =
-            model.turrets
-                |> List.map
-                    (\turret ->
-                        { turret
-                            | age = turret.age + delta
-                        }
-                    )
-        , moneyCrops =
-            model.moneyCrops
-                |> List.map
-                    (\crop ->
-                        { crop
-                            | age = crop.age + delta
-                        }
-                    )
-    }
-
-
 refillWater : Session -> Float -> Model -> Model
 refillWater session delta model =
     { model
@@ -818,38 +837,56 @@ getTilePosSurroundingVec2 model pos =
 makeTurretBullets : Session -> Float -> Model -> Model
 makeTurretBullets session delta model =
     let
-        ( newBullets, newTurrets ) =
-            model.turrets
+        ( newBullets, newCrops ) =
+            model.crops
                 |> List.foldl
-                    (\turret ( bullets, turrets ) ->
-                        let
-                            shotBullet =
-                                if turret.age > session.c.getFloat "crops:turret:timeToSprout" && turret.timeSinceLastFire > 0.5 then
-                                    model.creeps
-                                        |> List.Extra.minimumBy (\closestCreep -> Vec2.distanceSquared closestCreep.pos (vec2FromTilePos turret.pos))
-                                        |> Maybe.andThen
-                                            (\closestCreep ->
-                                                if Vec2.distanceSquared closestCreep.pos (vec2FromTilePos turret.pos) < 5 ^ 2 then
-                                                    Just (makeBullet PlantBullet (vec2FromTilePos turret.pos) closestCreep.pos)
+                    (\crop ( bullets, crops ) ->
+                        case ( crop.state, crop.kind ) of
+                            ( Mature, Turret { timeSinceLastFire } ) ->
+                                let
+                                    shotBullet =
+                                        if timeSinceLastFire > 0.2 then
+                                            model.creeps
+                                                |> List.Extra.minimumBy (\closestCreep -> Vec2.distanceSquared closestCreep.pos (vec2FromTilePos crop.pos))
+                                                |> Maybe.andThen
+                                                    (\closestCreep ->
+                                                        if Vec2.distanceSquared closestCreep.pos (vec2FromTilePos crop.pos) < 5 ^ 2 then
+                                                            Just (makeBullet PlantBullet (vec2FromTilePos crop.pos) closestCreep.pos)
 
-                                                else
-                                                    Nothing
-                                            )
+                                                        else
+                                                            Nothing
+                                                    )
 
-                                else
-                                    Nothing
-                        in
-                        case shotBullet of
-                            Just bullet ->
-                                ( bullet :: bullets, { turret | timeSinceLastFire = 0 } :: turrets )
+                                        else
+                                            Nothing
+                                in
+                                case shotBullet of
+                                    Just bullet ->
+                                        ( bullet :: bullets
+                                        , { crop
+                                            | kind = Turret { timeSinceLastFire = 0 }
+                                          }
+                                            :: crops
+                                        )
 
-                            Nothing ->
-                                ( bullets, { turret | timeSinceLastFire = turret.timeSinceLastFire + delta } :: turrets )
+                                    Nothing ->
+                                        ( bullets
+                                        , { crop
+                                            | kind =
+                                                Turret
+                                                    { timeSinceLastFire = timeSinceLastFire + delta
+                                                    }
+                                          }
+                                            :: crops
+                                        )
+
+                            _ ->
+                                ( bullets, crop :: crops )
                     )
                     ( model.bullets, [] )
     in
     { model
-        | turrets = newTurrets
+        | crops = newCrops
         , bullets = newBullets
     }
 
@@ -1217,8 +1254,7 @@ canPlace session model =
                             -- check for buildings
                             [ [ model.base.pos ]
                             , List.map .pos model.enemyTowers
-                            , List.map .pos model.moneyCrops
-                            , List.map .pos model.turrets
+                            , List.map .pos model.crops
                             ]
                                 |> List.concat
                                 |> Set.fromList
@@ -2003,7 +2039,7 @@ getSprites session model =
                   }
                 ]
             , graphics =
-                drawHealth
+                drawHealthMeter
                     model.hero.pos
                     1.4
                     model.hero.healthAmt
@@ -2031,29 +2067,25 @@ getSprites session model =
                                     , texture = "enemyTower"
                                     }
                         )
-                , model.moneyCrops
+                , model.crops
                     |> List.map
-                        (\moneyCrop ->
-                            case moneyCrop.pos of
-                                ( etX, etY ) ->
-                                    { x = etX |> toFloat
-                                    , y = etY |> toFloat
-                                    , texture = "moneyCrop"
-                                    }
-                        )
-                , model.turrets
-                    |> List.map
-                        (\turret ->
-                            case turret.pos of
+                        (\crop ->
+                            case crop.pos of
                                 ( etX, etY ) ->
                                     { x = etX |> toFloat
                                     , y = etY |> toFloat
                                     , texture =
-                                        if isTurretGrown session turret then
-                                            "turret"
+                                        case crop.state of
+                                            Seedling _ ->
+                                                "seedling"
 
-                                        else
-                                            "seedling"
+                                            Mature ->
+                                                case crop.kind of
+                                                    MoneyCrop ->
+                                                        "moneyCrop"
+
+                                                    Turret _ ->
+                                                        "turret"
                                     }
                         )
                 ]
@@ -2061,7 +2093,7 @@ getSprites session model =
             , graphics =
                 [ (case model.base.pos of
                     ( x, y ) ->
-                        [ drawHealth
+                        [ drawHealthMeter
                             (Vec2.vec2 (toFloat x + 0.5) (toFloat y + 0.5))
                             2
                             model.base.healthAmt
@@ -2074,31 +2106,32 @@ getSprites session model =
                         (\enemyTower ->
                             case enemyTower.pos of
                                 ( etX, etY ) ->
-                                    drawHealth
+                                    drawHealthMeter
                                         (Vec2.vec2 (toFloat etX + 0.5) (toFloat etY + 0.5))
                                         2
                                         enemyTower.healthAmt
                                         enemyTower.healthMax
                         )
                     |> List.concat
-                , model.turrets
+                , model.crops
                     |> List.map
-                        (\turret ->
-                            case turret.pos of
+                        (\crop ->
+                            case crop.pos of
                                 ( etX, etY ) ->
-                                    if isTurretGrown session turret then
-                                        drawHealth
-                                            (Vec2.vec2 (toFloat etX + 0.5) (toFloat etY + 0.5))
-                                            1
-                                            turret.healthAmt
-                                            turret.healthMax
+                                    case crop.state of
+                                        Seedling { waterNeededToMature, waterConsumed } ->
+                                            drawWaterMeter
+                                                (Vec2.vec2 (toFloat etX + 0.5) (toFloat etY + 0.5))
+                                                0.8
+                                                waterConsumed
+                                                waterNeededToMature
 
-                                    else
-                                        drawHealth
-                                            (Vec2.vec2 (toFloat etX + 0.5) (toFloat etY + 0.5))
-                                            1
-                                            turret.age
-                                            (session.c.getFloat "crops:turret:timeToSprout")
+                                        Mature ->
+                                            drawHealthMeter
+                                                (Vec2.vec2 (toFloat etX + 0.5) (toFloat etY + 0.5))
+                                                0.9
+                                                crop.healthAmt
+                                                crop.healthMax
                         )
                     |> List.concat
                 ]
@@ -2134,7 +2167,7 @@ getSprites session model =
                 model.creeps
                     |> List.map
                         (\creep ->
-                            drawHealth
+                            drawHealthMeter
                                 creep.pos
                                 1
                                 creep.healthAmt
@@ -2248,11 +2281,6 @@ mouseGamePos session model =
         |> Vec2.scale (1 / zoomedTileSize model)
 
 
-isTurretGrown : Session -> Turret -> Bool
-isTurretGrown session turret =
-    turret.age > session.c.getFloat "crops:turret:timeToSprout"
-
-
 type Effect
     = DrawSprites (List SpriteLayer)
     | MoveCamera Vec2
@@ -2262,3 +2290,55 @@ type Effect
 type FxKind
     = Splash
     | CreepDeath
+
+
+drawHealthMeter : Vec2 -> Float -> Float -> Float -> List Graphic
+drawHealthMeter pos width amt max =
+    drawMeter pos width amt max "#00ff00"
+
+
+drawWaterMeter : Vec2 -> Float -> Float -> Float -> List Graphic
+drawWaterMeter pos width amt max =
+    drawMeter pos width amt max "#00ffff"
+
+
+drawMeter : Vec2 -> Float -> Float -> Float -> String -> List Graphic
+drawMeter pos width amt max color =
+    let
+        ( healthX, healthY ) =
+            ( Vec2.getX pos - (width / 2)
+            , Vec2.getY pos + 0.7
+            )
+
+        height =
+            0.1 * width
+
+        outlineRatio =
+            0.05
+
+        offset =
+            outlineRatio * width
+    in
+    [ { x = healthX - offset
+      , y = healthY - offset
+      , width = width + (offset * 2)
+      , height = height + (offset * 2)
+      , bgColor = "#000000"
+      , lineStyleWidth = 0
+      , lineStyleColor = "#000000"
+      , lineStyleAlpha = 1
+      , alpha = 1
+      , shape = Rect
+      }
+    , { x = healthX
+      , y = healthY
+      , width = width * (amt / max)
+      , height = height
+      , bgColor = color
+      , lineStyleWidth = 0
+      , lineStyleColor = "#000000"
+      , lineStyleAlpha = 1
+      , alpha = 1
+      , shape = Rect
+      }
+    ]
