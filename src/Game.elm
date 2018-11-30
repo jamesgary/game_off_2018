@@ -1721,41 +1721,43 @@ view session model =
                 , Html.Attributes.style "font-size" "14px"
                 ]
                 [ Html.text "WASD to move. 1 to switch to Gun, 2 to switch to MoneyCrop Seeds, 3 to switch to Turret Seeds."
-                ]
-            , Html.hr [] []
-            , Html.div
-                [ Html.Attributes.style "margin" "5px 20px 0"
-                , Html.Attributes.style "font-family" "monospace"
-                , Html.Attributes.style "font-size" "14px"
-                ]
-                [ Html.text "Currently equipped: "
-                , Html.strong [] [ Html.text (equippableStr model.equipped) ]
-                , Html.br [] []
-                , Html.text "Compost: "
-                , Html.strong [] [ Html.text (String.fromInt model.inv.compost) ]
-                , Html.br [] []
-                ]
-            , Html.hr [] []
-            , Html.div
-                [ Html.Attributes.style "margin" "5px 20px 0"
-                , Html.Attributes.style "font-family" "monospace"
-                , Html.Attributes.style "font-size" "14px"
-                ]
-                [ Html.text "--- DEBUG ---"
-                , Html.br [] []
-
-                --, Html.text "Map sprites (visible/total): "
-                --, Html.strong [] [ Html.text (String.fromInt (List.length map)) ]
-                --, Html.strong [] [ Html.text "/" ]
-                --, Html.strong [] [ Html.text (String.fromInt (Dict.size model.map)) ]
-                --, Html.br [] []
-                --, Html.br [] []
-                , Html.span [] [ Html.text "Water: " ]
                 , viewMeter model.waterAmt model.waterMax (session.c.getFloat "ui:meterWidth")
                 ]
+            , Html.hr [] []
+
+            --, Html.div
+            --    [ Html.Attributes.style "margin" "5px 20px 0"
+            --    , Html.Attributes.style "font-family" "monospace"
+            --    , Html.Attributes.style "font-size" "14px"
+            --    ]
+            --    [ Html.text "Currently equipped: "
+            --    , Html.strong [] [ Html.text (equippableStr model.equipped) ]
+            --    , Html.br [] []
+            --    , Html.text "Compost: "
+            --    , Html.strong [] [ Html.text (String.fromInt model.inv.compost) ]
+            --    , Html.br [] []
+            --    ]
+            , Html.hr [] []
+
+            --, Html.div
+            --    [ Html.Attributes.style "margin" "5px 20px 0"
+            --    , Html.Attributes.style "font-family" "monospace"
+            --    , Html.Attributes.style "font-size" "14px"
+            --    ]
+            --    [ Html.text "--- DEBUG ---"
+            --    , Html.br [] []
+            --    --, Html.text "Map sprites (visible/total): "
+            --    --, Html.strong [] [ Html.text (String.fromInt (List.length map)) ]
+            --    --, Html.strong [] [ Html.text "/" ]
+            --    --, Html.strong [] [ Html.text (String.fromInt (Dict.size model.map)) ]
+            --    --, Html.br [] []
+            --    --, Html.br [] []
+            --    ]
+            --]
             ]
         , drawEquippables session model
-        , drawClock session model
+
+        --, drawClock session model
         , drawGlass session model
         , Html.div []
             [ case model.gameState of
