@@ -1450,16 +1450,16 @@ moveHero session delta model =
             Vec2.add model.hero.pos (Vec2.scale delta newVel)
 
         ( newestPos, newestVel ) =
-            if not <| isHeroColliding model.map newPos then
+            if not <| isHeroColliding model newPos then
                 ( newPos, newVel )
                 -- also check common x/y slides
 
-            else if not <| isHeroColliding model.map (Vec2.vec2 (Vec2.getX newPos) (Vec2.getY hero.pos)) then
+            else if not <| isHeroColliding model (Vec2.vec2 (Vec2.getX newPos) (Vec2.getY hero.pos)) then
                 ( Vec2.vec2 (Vec2.getX newPos) (Vec2.getY hero.pos)
                 , Vec2.vec2 (Vec2.getX newVel) 0
                 )
 
-            else if not <| isHeroColliding model.map (Vec2.vec2 (Vec2.getX hero.pos) (Vec2.getY newPos)) then
+            else if not <| isHeroColliding model (Vec2.vec2 (Vec2.getX hero.pos) (Vec2.getY newPos)) then
                 ( Vec2.vec2 (Vec2.getX hero.pos) (Vec2.getY newPos)
                 , Vec2.vec2 0 (Vec2.getY newVel)
                 )
@@ -1480,8 +1480,8 @@ heroRad =
     0.45
 
 
-isHeroColliding : Map -> Vec2 -> Bool
-isHeroColliding map heroPos =
+isHeroColliding : Model -> Vec2 -> Bool
+isHeroColliding model heroPos =
     -- TODO performance!
     let
         heroPoly =
@@ -1505,7 +1505,7 @@ isHeroColliding map heroPos =
            )
         |> List.any
             (\( x, y ) ->
-                case Dict.get ( x, y ) map |> Maybe.map (not << isPassable) of
+                case Dict.get ( x, y ) model.map |> Maybe.map (not << isPassable) of
                     Just True ->
                         Collision.collision 10
                             ( heroPoly, polySupport )
@@ -1515,6 +1515,31 @@ isHeroColliding map heroPos =
                     _ ->
                         False
             )
+        |> (\doesCollide ->
+                if doesCollide then
+                    True
+
+                else
+                    -- check for base
+                    model.base.pos
+                        |> (\( x, y ) ->
+                                [ ( x - 1, y - 1 )
+                                , ( x - 1, y )
+                                , ( x - 1, y + 1 )
+                                , ( x, y - 1 )
+                                , ( x + 1, y - 1 )
+                                , ( x + 1, y )
+                                , ( x + 1, y + 1 )
+                                ]
+                           )
+                        |> List.any
+                            (\( x, y ) ->
+                                Collision.collision 10
+                                    ( heroPoly, polySupport )
+                                    ( polyFromSquare (Vec2.vec2 (0.5 + toFloat x) (0.5 + toFloat y)) 0.5, polySupport )
+                                    |> Maybe.withDefault False
+                            )
+           )
 
 
 polyFromSquare : Vec2 -> Float -> List Collision.Pt
@@ -2100,9 +2125,9 @@ getSprites session model =
             , sprites =
                 [ case model.base.pos of
                     ( x, y ) ->
-                        [ { x = x |> toFloat
-                          , y = y |> toFloat
-                          , texture = "tower"
+                        [ { x = x - 1 |> toFloat
+                          , y = y - 1 |> toFloat
+                          , texture = "base"
                           }
                         ]
                 , model.enemyTowers
@@ -2142,8 +2167,8 @@ getSprites session model =
                 [ (case model.base.pos of
                     ( x, y ) ->
                         [ drawHealthMeter
-                            (Vec2.vec2 (toFloat x + 0.5) (toFloat y + 0.5))
-                            2
+                            (Vec2.vec2 (toFloat x + 0.5) (toFloat y + 0))
+                            1
                             model.base.healthAmt
                             model.base.healthMax
                         ]

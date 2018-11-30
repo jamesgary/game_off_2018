@@ -1,7 +1,8 @@
 #!/bin/bash
 echo "Make sure elm-live isn't running or it may override main.js while deploying!"
 
-elm make src/Main.elm --optimize --output=public/js/main.js
+#elm make src/Main.elm --optimize --output=public/js/main.js
+elm make src/Main.elm --output=public/js/main.js
 
 # make fresh gh-pages branch
 git branch -D gh-pages
