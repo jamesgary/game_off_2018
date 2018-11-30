@@ -927,6 +927,7 @@ viewConfig model =
          , Html.Attributes.style "font-family" "sans-serif"
          , Html.Attributes.style "font-size" "18px"
          , Html.Attributes.style "padding" "8px"
+         , Html.Attributes.style "z-index" "99"
          ]
             ++ (if model.session.isConfigOpen then
                     [ Html.Attributes.style "height" "90%"

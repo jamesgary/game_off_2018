@@ -804,7 +804,7 @@ applyKeyDown str model =
 makePlayerBullets : Session -> Float -> Model -> Model
 makePlayerBullets session delta model =
     if model.isMouseDown && model.equipped == Gun && model.waterAmt > session.c.getFloat "waterGun:bulletCost" then
-        if model.timeSinceLastFire > 0.15 then
+        if model.timeSinceLastFire > (1 / session.c.getFloat "waterGun:fireRate") then
             { model
                 | timeSinceLastFire = 0
                 , bullets =

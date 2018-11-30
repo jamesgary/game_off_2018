@@ -32,11 +32,6 @@ json =
     "min": 0,
     "max": 25
   },
-  "creeps:attacker:melee:pathingVariation": {
-    "val": 5,
-    "min": 0,
-    "max": 25
-  },
   "creeps:attacker:melee:speed": {
     "val": 0.907533821521658,
     "min": 0,
@@ -48,11 +43,6 @@ json =
     "max": 25
   },
   "creeps:global:health": {
-    "val": 5,
-    "min": 0,
-    "max": 25
-  },
-  "creeps:global:pathingVariation": {
     "val": 5,
     "min": 0,
     "max": 25
