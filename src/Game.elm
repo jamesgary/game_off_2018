@@ -478,67 +478,50 @@ update msg session model =
         MouseDown ->
             ( { model | isMouseDown = True }
                 |> (\m ->
-                        case m.equipped of
-                            MoneyCropSeed ->
-                                case canPlace session model of
-                                    Shouldnt ->
-                                        m
-
-                                    Cant ->
-                                        m
-
-                                    Can ->
-                                        case hoveringTilePos session m of
-                                            Just tilePos ->
-                                                { m
-                                                    | moneyCrops =
-                                                        { pos = tilePos
-                                                        , timeSinceLastGenerate = 0
-                                                        , healthAmt = session.c.getFloat "crops:moneyCrop:healthMax"
-                                                        , healthMax = session.c.getFloat "crops:moneyCrop:healthMax"
-                                                        , age = 0
-                                                        }
-                                                            :: m.moneyCrops
+                        case ( m.equipped, canPlace session model ) of
+                            ( MoneyCropSeed, Can ) ->
+                                case hoveringTilePos session m of
+                                    Just tilePos ->
+                                        { m
+                                            | moneyCrops =
+                                                { pos = tilePos
+                                                , timeSinceLastGenerate = 0
+                                                , healthAmt = session.c.getFloat "crops:moneyCrop:healthMax"
+                                                , healthMax = session.c.getFloat "crops:moneyCrop:healthMax"
+                                                , age = 0
                                                 }
+                                                    :: m.moneyCrops
+                                        }
 
-                                            Nothing ->
-                                                m
-
-                            TurretSeed ->
-                                case canPlace session model of
-                                    Shouldnt ->
+                                    Nothing ->
                                         m
 
-                                    Cant ->
-                                        m
-
-                                    Can ->
-                                        case hoveringTilePos session m of
-                                            Just tilePos ->
-                                                { m
-                                                    | turrets =
-                                                        { pos = tilePos
-                                                        , timeSinceLastFire = 0
-                                                        , healthAmt = session.c.getFloat "crops:turret:healthMax"
-                                                        , healthMax = session.c.getFloat "crops:turret:healthMax"
-                                                        , age = 0
-                                                        }
-                                                            :: m.turrets
+                            ( TurretSeed, Can ) ->
+                                case hoveringTilePos session m of
+                                    Just tilePos ->
+                                        { m
+                                            | turrets =
+                                                { pos = tilePos
+                                                , timeSinceLastFire = 0
+                                                , healthAmt = session.c.getFloat "crops:turret:healthMax"
+                                                , healthMax = session.c.getFloat "crops:turret:healthMax"
+                                                , age = 0
                                                 }
+                                                    :: m.turrets
+                                        }
 
-                                            Nothing ->
-                                                m
+                                    Nothing ->
+                                        m
 
-                            Gun ->
-                                m
-
-                            Scythe ->
-                                -- POWER SCYTHE (todo)
+                            ( Scythe, _ ) ->
                                 { model
                                     | timeSinceLastSlash = 0
                                     , slashEffects = ( 0, makeSlashEffect session model ) :: model.slashEffects
                                     , creeps = slashCreeps session model
                                 }
+
+                            _ ->
+                                m
                    )
             , []
             )
@@ -1229,7 +1212,27 @@ canPlace session model =
                         model.hero.pos
                         < (3 ^ 2)
                 then
-                    Can
+                    case hoveringTile session model of
+                        Just Grass ->
+                            -- check for buildings
+                            [ [ model.base.pos ]
+                            , List.map .pos model.enemyTowers
+                            , List.map .pos model.moneyCrops
+                            , List.map .pos model.turrets
+                            ]
+                                |> List.concat
+                                |> Set.fromList
+                                |> Set.member tilePos
+                                |> (\bldgInWay ->
+                                        if bldgInWay then
+                                            Cant
+
+                                        else
+                                            Can
+                                   )
+
+                        _ ->
+                            Cant
 
                 else
                     Shouldnt
