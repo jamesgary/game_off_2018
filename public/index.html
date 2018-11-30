@@ -23,6 +23,8 @@
       let app;
       let viewport;
       let nameToPixiLayer = {};
+      let topLayer = new PIXI.Container();
+      let botLayer = new PIXI.Container();
 
       graphics.init = function() {
         PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
@@ -47,14 +49,16 @@
           interaction: app.renderer.interaction
         });
         app.stage.addChild(viewport);
+        viewport.addChild(topLayer);
+        viewport.addChild(botLayer);
 
         // debug stuff
-        //let rectangle = new PIXI.Graphics();
-        //rectangle.beginFill(0xFFCCFF);
-        //rectangle.drawRect(-999, 0, 2000, 1); // x axis
-        //rectangle.drawRect(0, -999, 1, 2000); // y axis
-        //rectangle.endFill();
-        //viewport.addChild(rectangle);
+        // let rectangle = new PIXI.Graphics();
+        // rectangle.beginFill(0xFFCCFF);
+        // rectangle.drawRect(-999, 0, 2000, 1); // x axis
+        // rectangle.drawRect(0, -999, 1, 2000); // y axis
+        // rectangle.endFill();
+        // viewport.addChild(rectangle);
         // end debug stuff
       }
 
@@ -70,7 +74,7 @@
             pixiLayer.textureNameToParticleGroupCache = {};
             pixiLayer.addChild(pixiLayer.particleContainerContainer);
             nameToPixiLayer[layer.name] = pixiLayer;
-            viewport.addChild(pixiLayer);
+            botLayer.addChild(pixiLayer);
           }
 
           // SPRITES (maybe start above and refactor?)
@@ -163,11 +167,11 @@
       graphics.drawFx = function(effect) {
         switch (effect.kind) {
           case "SPLASH":
-            makeSplashEmitter(viewport, effect.x, effect.y)
+            makeSplashEmitter(botLayer, effect.x, effect.y)
               .playOnceAndDestroy();
             break;
           case "CREEP_DEATH":
-            makeCreepDeathEmitter(viewport, effect.x, effect.y)
+            makeCreepDeathEmitter(botLayer, effect.x, effect.y)
               .playOnceAndDestroy();
             break;
           default:
