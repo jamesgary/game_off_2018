@@ -578,7 +578,9 @@ soilAbsorbWaterFromBullets session delta model =
                                         model.bullets
                                             |> List.filter
                                                 (\bullet ->
-                                                    crop.pos == (bullet.pos |> vec2ToTuple |> Tuple.mapBoth floor floor)
+                                                    (bullet.kind == PlayerBullet)
+                                                        && crop.pos
+                                                        == (bullet.pos |> vec2ToTuple |> Tuple.mapBoth floor floor)
                                                 )
                                             |> List.length
                                             |> toFloat
@@ -2199,7 +2201,13 @@ getSprites session model =
                         (\bullet ->
                             { x = (bullet.pos |> Vec2.getX) - 0.5
                             , y = (bullet.pos |> Vec2.getY) - 0.5
-                            , texture = "bullet"
+                            , texture =
+                                case bullet.kind of
+                                    PlayerBullet ->
+                                        "bullet"
+
+                                    PlantBullet ->
+                                        "plantBullet"
                             }
                         )
             , graphics = []
