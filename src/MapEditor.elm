@@ -478,6 +478,7 @@ getSprites session model =
                   , lineStyleWidth = 0
                   , lineStyleColor = "#000000"
                   , lineStyleAlpha = 1
+                  , angle = 0
                   , shape = Rect
                   }
                 , { x = healthX
@@ -488,6 +489,7 @@ getSprites session model =
                   , lineStyleWidth = 0
                   , lineStyleColor = "#000000"
                   , lineStyleAlpha = 1
+                  , angle = 0
                   , shape = Rect
                   }
                 ]

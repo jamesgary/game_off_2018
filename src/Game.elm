@@ -66,6 +66,7 @@ init session =
         , healthMax = c.getFloat "base:healthMax"
         }
     , timeSinceLastFire = 0
+    , timeSinceLastSlash = 0
     , waterAmt = 75
     , waterMax = 100
     , equipped = Gun
@@ -120,6 +121,7 @@ initTryOut session savedMap =
             , healthMax = c.getFloat "base:healthMax"
             }
       , timeSinceLastFire = 0
+      , timeSinceLastSlash = 0
       , waterAmt = 75
       , waterMax = 100
       , equipped = Gun
@@ -158,6 +160,7 @@ type alias Model =
 
     -- hero things
     , timeSinceLastFire : Float
+    , timeSinceLastSlash : Float
     , waterAmt : Float
     , waterMax : Float
     , equipped : Equippable
@@ -464,17 +467,6 @@ update msg session model =
                 mousePos =
                     ( x, y )
                         |> tupleToVec2
-                        |> Vec2.add
-                            -- camera offset
-                            (model.hero.pos
-                                |> Vec2.scale (zoomedTileSize model)
-                                |> Vec2.add
-                                    (Vec2.vec2
-                                        (session.windowWidth * -0.5)
-                                        (session.windowHeight * -0.5)
-                                    )
-                            )
-                        |> Vec2.scale (1 / zoomedTileSize model)
             in
             ( { model | mousePos = mousePos }
             , []
@@ -485,7 +477,7 @@ update msg session model =
                 |> (\m ->
                         case m.equipped of
                             MoneyCropSeed ->
-                                case canPlace model of
+                                case canPlace session model of
                                     Shouldnt ->
                                         m
 
@@ -493,7 +485,7 @@ update msg session model =
                                         m
 
                                     Can ->
-                                        case hoveringTilePos m of
+                                        case hoveringTilePos session m of
                                             Just tilePos ->
                                                 { m
                                                     | moneyCrops =
@@ -510,7 +502,7 @@ update msg session model =
                                                 m
 
                             TurretSeed ->
-                                case canPlace model of
+                                case canPlace session model of
                                     Shouldnt ->
                                         m
 
@@ -518,7 +510,7 @@ update msg session model =
                                         m
 
                                     Can ->
-                                        case hoveringTilePos m of
+                                        case hoveringTilePos session m of
                                             Just tilePos ->
                                                 { m
                                                     | turrets =
@@ -539,7 +531,11 @@ update msg session model =
 
                             Scythe ->
                                 -- POWER SCYTHE (todo)
-                                { model | creeps = [] }
+                                { model
+                                    | timeSinceLastSlash = 0
+
+                                    --, creeps = []
+                                }
                    )
             , []
             )
@@ -569,12 +565,14 @@ ageAll session delta model =
                     (\creep ->
                         { creep | age = creep.age + delta }
                     )
+
+        --, timeSinceLastSlash = delta + model.timeSinceLastSlash
     }
 
 
-hoveringTileAndPos : Model -> Maybe ( Tile, TilePos )
-hoveringTileAndPos model =
-    case hoveringTilePos model of
+hoveringTileAndPos : Session -> Model -> Maybe ( Tile, TilePos )
+hoveringTileAndPos session model =
+    case hoveringTilePos session model of
         Just tilePos ->
             Dict.get tilePos model.map
                 |> Maybe.map (\tile -> ( tile, tilePos ))
@@ -583,9 +581,9 @@ hoveringTileAndPos model =
             Nothing
 
 
-hoveringTile : Model -> Maybe Tile
-hoveringTile model =
-    case hoveringTilePos model of
+hoveringTile : Session -> Model -> Maybe Tile
+hoveringTile session model =
+    case hoveringTilePos session model of
         Just tile ->
             Dict.get tile model.map
 
@@ -619,7 +617,7 @@ makePlayerBullets session delta model =
             { model
                 | timeSinceLastFire = 0
                 , bullets =
-                    makeBullet PlayerBullet model.hero.pos model.mousePos
+                    makeBullet PlayerBullet model.hero.pos (mouseGamePos session model)
                         :: model.bullets
                 , waterAmt = model.waterAmt - session.c.getFloat "waterGun:bulletCost"
             }
@@ -1082,8 +1080,8 @@ type PlacementAvailability
     | Can
 
 
-canPlace : Model -> PlacementAvailability
-canPlace model =
+canPlace : Session -> Model -> PlacementAvailability
+canPlace session model =
     if
         case model.equipped of
             TurretSeed ->
@@ -1098,7 +1096,7 @@ canPlace model =
             Scythe ->
                 False
     then
-        case hoveringTilePos model of
+        case hoveringTilePos session model of
             Just tilePos ->
                 if
                     Vec2.distanceSquared
@@ -1433,9 +1431,9 @@ possibleMoves model ( col, row ) =
         |> Set.fromList
 
 
-hoveringTilePos : Model -> Maybe TilePos
-hoveringTilePos model =
-    model.mousePos
+hoveringTilePos : Session -> Model -> Maybe TilePos
+hoveringTilePos session model =
+    mouseGamePos session model
         |> Vec2.toRecord
         |> (\{ x, y } ->
                 -- always return tilepos for now
@@ -1799,36 +1797,6 @@ bulletHitFrag =
     |]
 
 
-
---viewHealthMeter : Float -> Vec2 -> Float -> Float -> List GameTwoDRender.Renderable
---viewHealthMeter size pos amt max =
---    let
---        healthOffset =
---            Vec2.vec2 0 -0.25
---
---        outlineAmt =
---            0.8
---
---        ratio =
---            -- Basics.max 0 (amt / max) -- can spot bugs faster without this
---            amt / max
---    in
---    [ drawRect
---        Color.black
---        (pos |> Vec2.add healthOffset)
---        (Vec2.scale size (Vec2.vec2 0.9 0.2))
---    , drawRect
---        Color.green
---        (pos
---            |> Vec2.add healthOffset
---            |> Vec2.add (Vec2.vec2 (size * outlineAmt * -0.5 * (1 - ratio)) 0)
---        )
---        (Vec2.vec2 (outlineAmt * ratio) 0.1
---            |> Vec2.scale size
---        )
---    ]
-
-
 px : Float -> String
 px length =
     String.fromFloat length ++ "px"
@@ -1904,7 +1872,7 @@ getSprites session model =
             , sprites =
                 let
                     tileCursor =
-                        case ( canPlace model, hoveringTilePos model ) of
+                        case ( canPlace session model, hoveringTilePos session model ) of
                             ( Can, Just ( x, y ) ) ->
                                 [ { x = x |> toFloat
                                   , y = y |> toFloat
@@ -1952,6 +1920,7 @@ getSprites session model =
                     1.4
                     model.hero.healthAmt
                     model.hero.healthMax
+                    ++ drawArc session model
             }
 
         buildingsLayer =
@@ -2101,6 +2070,119 @@ getSprites session model =
                 , zOrder = i -- not used yet
                 }
             )
+
+
+drawArc : Session -> Model -> List Graphic
+drawArc session model =
+    let
+        height =
+            2
+
+        halfWidth =
+            1
+
+        heroPos =
+            model.hero.pos
+
+        ( leftCorner, tippyTop, rightCorner ) =
+            scythePoints session model
+    in
+    [ { x = model.hero.pos |> Vec2.getX
+      , y = model.hero.pos |> Vec2.getY
+      , width = 60
+      , height = 100
+      , bgColor = "#ffffff"
+      , lineStyleWidth = 0
+      , lineStyleColor = "#000000"
+      , lineStyleAlpha = 1
+      , angle = 0
+      , shape = Arc leftCorner tippyTop rightCorner
+      }
+    ]
+
+
+scythePoints : Session -> Model -> ( Vec2, Vec2, Vec2 )
+scythePoints session model =
+    let
+        height =
+            2
+
+        halfWidth =
+            1
+
+        heroPos =
+            model.hero.pos
+
+        mousePos =
+            mouseGamePos session model
+
+        xDiff =
+            Vec2.sub mousePos heroPos
+                |> Vec2.getX
+
+        yDiff =
+            Vec2.sub mousePos heroPos
+                |> Vec2.getY
+
+        ( _, mouseAngle ) =
+            toPolar ( xDiff, yDiff )
+
+        leftCorner =
+            Vec2.vec2 height -halfWidth
+                |> Vec2.toRecord
+                |> (\{ x, y } ->
+                        toPolar ( x, y )
+                            |> (\( r, o ) ->
+                                    fromPolar ( r, o + mouseAngle )
+                               )
+                   )
+                |> tupleToVec2
+                |> Vec2.add heroPos
+
+        tippyTop =
+            Vec2.vec2 (1.5 * height) 0
+                |> Vec2.toRecord
+                |> (\{ x, y } ->
+                        toPolar ( x, y )
+                            |> (\( r, o ) ->
+                                    fromPolar ( r, o + mouseAngle )
+                               )
+                   )
+                |> tupleToVec2
+                |> Vec2.add heroPos
+
+        rightCorner =
+            Vec2.vec2 height halfWidth
+                |> Vec2.toRecord
+                |> (\{ x, y } ->
+                        toPolar ( x, y )
+                            |> (\( r, o ) ->
+                                    fromPolar ( r, o + mouseAngle )
+                               )
+                   )
+                |> tupleToVec2
+                |> Vec2.add heroPos
+    in
+    ( leftCorner
+    , tippyTop
+    , rightCorner
+    )
+
+
+mouseGamePos : Session -> Model -> Vec2
+mouseGamePos session model =
+    model.mousePos
+        |> Vec2.add
+            -- camera offset
+            (model.hero.pos
+                |> Vec2.scale (zoomedTileSize model)
+                |> Vec2.add
+                    (Vec2.vec2
+                        (session.windowWidth * -0.5)
+                        (session.windowHeight * -0.5)
+                    )
+            )
+        |> Vec2.scale (1 / zoomedTileSize model)
 
 
 isTurretGrown : Session -> Turret -> Bool

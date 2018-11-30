@@ -551,16 +551,30 @@ encodeSpriteLayer layer =
                 |> Json.Encode.list
                     (\graphic ->
                         Json.Encode.object
-                            [ ( "x", Json.Encode.float graphic.x )
-                            , ( "y", Json.Encode.float graphic.y )
-                            , ( "width", Json.Encode.float graphic.width )
-                            , ( "height", Json.Encode.float graphic.height )
-                            , ( "bgColor", Json.Encode.string graphic.bgColor )
-                            , ( "lineStyleWidth", Json.Encode.float graphic.lineStyleWidth )
-                            , ( "lineStyleColor", Json.Encode.string graphic.lineStyleColor )
-                            , ( "lineStyleAlpha", Json.Encode.float graphic.lineStyleAlpha )
-                            , ( "shape", encodeShape graphic.shape )
-                            ]
+                            ([ ( "x", Json.Encode.float graphic.x )
+                             , ( "y", Json.Encode.float graphic.y )
+                             , ( "width", Json.Encode.float graphic.width )
+                             , ( "height", Json.Encode.float graphic.height )
+                             , ( "bgColor", Json.Encode.string graphic.bgColor )
+                             , ( "lineStyleWidth", Json.Encode.float graphic.lineStyleWidth )
+                             , ( "lineStyleColor", Json.Encode.string graphic.lineStyleColor )
+                             , ( "lineStyleAlpha", Json.Encode.float graphic.lineStyleAlpha )
+                             , ( "shape", encodeShape graphic.shape )
+                             ]
+                                ++ (case graphic.shape of
+                                        Rect ->
+                                            []
+
+                                        Arc left top right ->
+                                            [ ( "arcLeftX", left |> Vec2.scale 32 |> Vec2.getX |> Json.Encode.float )
+                                            , ( "arcLeftY", left |> Vec2.scale 32 |> Vec2.getY |> Json.Encode.float )
+                                            , ( "arcTopX", top |> Vec2.scale 32 |> Vec2.getX |> Json.Encode.float )
+                                            , ( "arcTopY", top |> Vec2.scale 32 |> Vec2.getY |> Json.Encode.float )
+                                            , ( "arcRightX", right |> Vec2.scale 32 |> Vec2.getX |> Json.Encode.float )
+                                            , ( "arcRightY", right |> Vec2.scale 32 |> Vec2.getY |> Json.Encode.float )
+                                            ]
+                                   )
+                            )
                     )
           )
         ]
@@ -571,6 +585,9 @@ encodeShape shape =
     case shape of
         Rect ->
             Json.Encode.string "rect"
+
+        Arc left top right ->
+            Json.Encode.string "arc"
 
 
 performMapEffects : Session -> List MapEditor.Effect -> Model -> ( Model, Cmd Msg )

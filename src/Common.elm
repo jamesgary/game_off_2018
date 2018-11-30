@@ -219,12 +219,14 @@ type alias Graphic =
     , lineStyleWidth : Float
     , lineStyleColor : String
     , lineStyleAlpha : Float
+    , angle : Float
     , shape : Shape
     }
 
 
 type Shape
     = Rect
+    | Arc Vec2 Vec2 Vec2
 
 
 drawHealth : Vec2 -> Float -> Float -> Float -> List Graphic
@@ -252,6 +254,7 @@ drawHealth pos width amt max =
       , lineStyleWidth = 0
       , lineStyleColor = "#000000"
       , lineStyleAlpha = 1
+      , angle = 0
       , shape = Rect
       }
     , { x = healthX
@@ -262,6 +265,7 @@ drawHealth pos width amt max =
       , lineStyleWidth = 0
       , lineStyleColor = "#000000"
       , lineStyleAlpha = 1
+      , angle = 0
       , shape = Rect
       }
     ]

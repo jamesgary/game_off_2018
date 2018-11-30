@@ -145,20 +145,35 @@
 
           // draw it!
           for (let k = 0; k < layer.graphics.length; k++) {
-            graphic = layer.graphics[k];
-            if (graphic.shape === "rect") {
-              pixiGraphics.beginFill(
-                toColor(graphic.bgColor),
-                1.0
-              );
-              pixiGraphics.drawRect(
-                graphic.x + 0.5,
-                graphic.y + 0.5,
-                graphic.width,
-                graphic.height
-              );
-            } else {
-              console.error("Wrong shape! ", graphics.shape);
+            let g = layer.graphics[k];
+            switch (g.shape) {
+              case "rect":
+                pixiGraphics.beginFill(
+                  toColor(g.bgColor),
+                  1.0
+                );
+                pixiGraphics.drawRect(
+                  g.x + 0.5,
+                  g.y + 0.5,
+                  g.width,
+                  g.height
+                );
+                break;
+              case "arc":
+                let x = g.x;
+                let y = g.y;
+
+                pixiGraphics.beginFill(0xFFFFFF, 0.8);
+
+                pixiGraphics.moveTo(x, y);
+                pixiGraphics.lineTo(g.arcLeftX, g.arcLeftY);
+                pixiGraphics.quadraticCurveTo(g.arcTopX, g.arcTopY, g.arcRightX, g.arcRightY);
+
+                pixiGraphics.lineTo(x, y);
+                pixiGraphics.endFill();
+                break;
+              default:
+                console.error("Wrong shape! ", graphic);
             }
           }
         }
@@ -238,7 +253,6 @@
                 });
                 break;
               case "DRAW":
-                // console.log(effect.layers);
                 graphics.drawSprites(effect.layers);
                 break;
               case "DRAW_FX":
