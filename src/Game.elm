@@ -1,4 +1,4 @@
-port module Game exposing (Effect(..), FxKind(..), GameState(..), Model, Msg(..), init, initTryOut, update, view)
+port module Game exposing (Effect(..), FxKind(..), GameState(..), Model, Msg(..), init, update, view)
 
 import AStar
 import Browser
@@ -125,6 +125,13 @@ init session =
                         , timeSinceLastSpawn = 9999
                         , healthAmt = c.getFloat "enemyBase:healthMax"
                         , healthMax = c.getFloat "enemyBase:healthMax"
+                        , pathToBase =
+                            AStar.findPath
+                                pythagoreanCost
+                                (possibleMoves savedMap.map)
+                                pos
+                                savedMap.base
+                                |> Maybe.withDefault []
                         }
                     )
       , crops = []
@@ -160,67 +167,68 @@ init session =
     )
 
 
-initTryOut : Session -> SavedMap -> ( Model, Cmd Msg )
-initTryOut session savedMap =
-    let
-        c =
-            session.c
-    in
-    ( { hero =
-            { pos =
-                tilePosToFloats savedMap.hero
-                    |> tupleToVec2
-                    |> Vec2.add (Vec2.vec2 0.5 0.5)
-            , vel = Vec2.vec2 0 0
-            , acc = Vec2.vec2 0 0
-            , healthAmt = c.getFloat "hero:healthMax"
-            , healthMax = c.getFloat "hero:healthMax"
-            }
-      , bullets = []
-      , composts = []
-      , creeps = []
-      , enemyTowers =
-            savedMap.enemyTowers
-                |> Set.toList
-                |> List.map
-                    (\pos ->
-                        { pos = pos
-                        , timeSinceLastSpawn = 9999
-                        , healthAmt = c.getFloat "enemyBase:healthMax"
-                        , healthMax = c.getFloat "enemyBase:healthMax"
-                        }
-                    )
-      , crops = []
-      , base =
-            { pos = savedMap.base
-            , healthAmt = c.getFloat "base:healthMax"
-            , healthMax = c.getFloat "base:healthMax"
-            }
-      , timeSinceLastFire = 0
-      , timeSinceLastSlash = 99999
-      , slashEffects = []
-      , waterAmt = 75
-      , equipped = Gun
-      , map = savedMap.map
-      , inv =
-            { compost = 0
-            }
-      , money = 0
-      , rangeLevel = 1
-      , capacityLevel = 1
-      , fireRateLevel = 1
-      , moolahSeedAmt = 0
-      , turretSeedAmt = 0
-      , gameState = Playing
-      , isMouseDown = False
-      , mousePos = Vec2.vec2 -99 -99
-      , age = 0
-      , isPaused = False
-      , fx = []
-      , shouldShowHelp = False
-      }
-    , Cmd.none
-    )
+
+--initTryOut : Session -> SavedMap -> ( Model, Cmd Msg )
+--initTryOut session savedMap =
+--    let
+--        c =
+--            session.c
+--    in
+--    ( { hero =
+--            { pos =
+--                tilePosToFloats savedMap.hero
+--                    |> tupleToVec2
+--                    |> Vec2.add (Vec2.vec2 0.5 0.5)
+--            , vel = Vec2.vec2 0 0
+--            , acc = Vec2.vec2 0 0
+--            , healthAmt = c.getFloat "hero:healthMax"
+--            , healthMax = c.getFloat "hero:healthMax"
+--            }
+--      , bullets = []
+--      , composts = []
+--      , creeps = []
+--      , enemyTowers =
+--            savedMap.enemyTowers
+--                |> Set.toList
+--                |> List.map
+--                    (\pos ->
+--                        { pos = pos
+--                        , timeSinceLastSpawn = 9999
+--                        , healthAmt = c.getFloat "enemyBase:healthMax"
+--                        , healthMax = c.getFloat "enemyBase:healthMax"
+--                        }
+--                    )
+--      , crops = []
+--      , base =
+--            { pos = savedMap.base
+--            , healthAmt = c.getFloat "base:healthMax"
+--            , healthMax = c.getFloat "base:healthMax"
+--            }
+--      , timeSinceLastFire = 0
+--      , timeSinceLastSlash = 99999
+--      , slashEffects = []
+--      , waterAmt = 75
+--      , equipped = Gun
+--      , map = savedMap.map
+--      , inv =
+--            { compost = 0
+--            }
+--      , money = 0
+--      , rangeLevel = 1
+--      , capacityLevel = 1
+--      , fireRateLevel = 1
+--      , moolahSeedAmt = 0
+--      , turretSeedAmt = 0
+--      , gameState = Playing
+--      , isMouseDown = False
+--      , mousePos = Vec2.vec2 -99 -99
+--      , age = 0
+--      , isPaused = False
+--      , fx = []
+--      , shouldShowHelp = False
+--      }
+--    , Cmd.none
+--    )
 
 
 port hardReset : () -> Cmd msg
@@ -265,7 +273,6 @@ type Equippable
 
 type alias Creep =
     { pos : Vec2
-    , nextPos : Vec2
 
     --, target : Target -- use for hero
     , timeSinceLastHop : Float
@@ -273,6 +280,7 @@ type alias Creep =
     , healthMax : Float
     , age : Float
     , seed : Random.Seed
+    , path : List TilePos
     }
 
 
@@ -298,6 +306,7 @@ type alias EnemyTower =
     , timeSinceLastSpawn : Float
     , healthAmt : Float
     , healthMax : Float
+    , pathToBase : List TilePos
     }
 
 
@@ -1221,59 +1230,47 @@ moveCreeps session delta model =
 
 moveCreep : Session -> Model -> Float -> Creep -> Creep
 moveCreep session model delta creep =
-    let
-        speed =
-            session.c.getFloat "creeps:global:speed"
-                * session.c.getFloat "creeps:attacker:melee:speed"
-                * 0.4
-                * (1.1 + sin (10 * creep.age))
+    case creep.path of
+        [] ->
+            -- maybe wiggle or something?
+            creep
 
-        distToTravel =
-            Vec2.distance creep.pos creep.nextPos
+        nextTilePos :: rest ->
+            let
+                ( offset, newSeed ) =
+                    Random.step
+                        (vec2OffsetGenerator -0.5 0.5)
+                        creep.seed
 
-        deltaNeededToTravel =
-            distToTravel / speed
-    in
-    if deltaNeededToTravel < delta then
-        -- can go to next tile this tick
-        -- go naively to next pos, assuming you're not going faster than 1 tile per tick
-        let
-            ( nextPos, newSeed ) =
-                Random.step
-                    (nextPosTowardsGenerator model creep.nextPos (model.base.pos |> vec2FromTilePos))
-                    creep.seed
-        in
-        -- todo not great
-        if Vec2.distance creep.nextPos nextPos < 0.1 then
-            { creep
-                | pos = nextPos
-                , nextPos = nextPos
-                , seed = newSeed
+                nextPos =
+                    nextTilePos |> vec2FromTilePos |> Vec2.add offset
 
-                --, timeSinceLastHop = creep.timeSinceLastHop + delta
-            }
+                speed =
+                    session.c.getFloat "creeps:global:speed"
+                        * session.c.getFloat "creeps:attacker:melee:speed"
+                        * 0.4
+                        * (1.1 + sin (10 * creep.age))
 
-        else
-            { creep
-                | pos =
-                    Vec2.direction creep.pos creep.nextPos
-                        |> Vec2.scale (-delta * speed)
-                        |> Vec2.add creep.pos
-                , nextPos = nextPos
-                , seed = newSeed
+                distToTravel =
+                    Vec2.distance creep.pos nextPos
 
-                --, timeSinceLastHop = creep.timeSinceLastHop + delta
-            }
+                deltaNeededToTravel =
+                    distToTravel / speed
+            in
+            if deltaNeededToTravel < delta then
+                { creep
+                    | pos = nextPos
+                    , seed = newSeed
+                    , path = List.drop 1 creep.path
+                }
 
-    else
-        { creep
-            | pos =
-                Vec2.direction creep.pos creep.nextPos
-                    |> Vec2.scale (-delta * speed)
-                    |> Vec2.add creep.pos
-
-            --, timeSinceLastHop = creep.timeSinceLastHop + delta
-        }
+            else
+                { creep
+                    | pos =
+                        Vec2.direction creep.pos nextPos
+                            |> Vec2.scale (-delta * speed)
+                            |> Vec2.add creep.pos
+                }
 
 
 isCreepOnHero : Hero -> Creep -> Bool
@@ -1618,6 +1615,20 @@ canPlace session model =
         Shouldnt
 
 
+offsettedNextPosGenerator : TilePos -> List TilePos -> Random.Generator Vec2
+offsettedNextPosGenerator curPos path =
+    path
+        |> List.head
+        |> Maybe.withDefault curPos
+        |> (\tilePos ->
+                vec2OffsetGenerator -0.5 -0.5
+                    |> Random.map
+                        (\offset ->
+                            Vec2.add (vec2FromTilePos tilePos) offset
+                        )
+           )
+
+
 spawnCreeps : Session -> Float -> Model -> Model
 spawnCreeps session delta model =
     let
@@ -1632,18 +1643,9 @@ spawnCreeps session delta model =
                                 seed =
                                     -- (ruh roh)
                                     Random.initialSeed (1000 * delta |> round)
-
-                                ( nextPos, newSeed ) =
-                                    Random.step
-                                        (nextPosTowardsGenerator model
-                                            (enemyTower.pos |> vec2FromTilePos)
-                                            (model.base.pos |> vec2FromTilePos)
-                                        )
-                                        seed
                             in
                             ( { enemyTower | timeSinceLastSpawn = 0 } :: enemyTowers
                             , { pos = enemyTower.pos |> vec2FromTilePos
-                              , nextPos = nextPos
                               , timeSinceLastHop = 0 -- todo perhaps half default?
                               , healthAmt =
                                     session.c.getFloat "creeps:global:health"
@@ -1652,7 +1654,8 @@ spawnCreeps session delta model =
                                     session.c.getFloat "creeps:global:health"
                                         * session.c.getFloat "creeps:attacker:melee:health"
                               , age = 0
-                              , seed = newSeed
+                              , seed = seed
+                              , path = enemyTower.pathToBase
                               }
                                 :: creeps
                               --, newSeed2
@@ -1673,31 +1676,6 @@ spawnCreeps session delta model =
 
         --, seed = newSeed
     }
-
-
-creepGenerator : Session -> Model -> TilePos -> Random.Generator Creep
-creepGenerator session model tilePos =
-    Random.map3
-        (\nextPos offsettedPos seed ->
-            { pos = offsettedPos
-            , nextPos = nextPos
-            , timeSinceLastHop = 0 -- todo perhaps half default?
-            , healthAmt =
-                session.c.getFloat "creeps:global:health"
-                    * session.c.getFloat "creeps:attacker:melee:health"
-            , healthMax =
-                session.c.getFloat "creeps:global:health"
-                    * session.c.getFloat "creeps:attacker:melee:health"
-            , age = 0
-            , seed = seed
-            }
-        )
-        (nextPosTowardsGenerator model
-            (tilePos |> vec2FromTilePos)
-            (model.base.pos |> vec2FromTilePos)
-        )
-        (vec2OffsetGenerator -0.5 0.5)
-        Random.independentSeed
 
 
 vec2OffsetGenerator : Float -> Float -> Random.Generator Vec2
@@ -1899,7 +1877,7 @@ nextPosTowardsGenerator model origin destination =
             (\offset ->
                 AStar.findPath
                     pythagoreanCost
-                    (possibleMoves model)
+                    (possibleMoves model.map)
                     originTilePos
                     destinationTilePos
                     |> Maybe.andThen List.head
@@ -1928,8 +1906,8 @@ isDiagonal ( posCol, posRow ) ( nextPosCol, nextPosRow ) =
     (abs (posCol - nextPosCol) + abs (posRow - nextPosRow)) == 2
 
 
-possibleMoves : Model -> TilePos -> Set TilePos
-possibleMoves model ( col, row ) =
+possibleMoves : Map -> TilePos -> Set TilePos
+possibleMoves map ( col, row ) =
     [ ( col - 1, row )
     , ( col + 1, row )
     , ( col, row - 1 )
@@ -1941,7 +1919,7 @@ possibleMoves model ( col, row ) =
     , ( col + 1, row - 1 )
     , ( col + 1, row + 1 )
     ]
-        |> List.filterMap (\pos -> Dict.get pos model.map |> Maybe.map (Tuple.pair pos))
+        |> List.filterMap (\pos -> Dict.get pos map |> Maybe.map (Tuple.pair pos))
         |> List.filter
             (\( _, tile ) ->
                 case tile of

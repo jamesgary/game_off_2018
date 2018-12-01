@@ -653,14 +653,15 @@ performMapEffects session effects model =
                         )
 
                     MapEditor.PlayMapEffect editingMap ->
-                        let
-                            ( newestModel, _ ) =
-                                Game.initTryOut session editingMap
-                        in
-                        ( { updatingModel | state = Game newestModel }
-                        , updatingCmds
-                        )
+                        ( updatingModel, updatingCmds )
 
+                    --let
+                    --    ( newestModel, _ ) =
+                    --        Game.initTryOut session editingMap
+                    --in
+                    --( { updatingModel | state = Game newestModel }
+                    --, updatingCmds
+                    --)
                     MapEditor.ZoomEffect zoomLevel ->
                         ( updatingModel
                         , performEffects
