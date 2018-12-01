@@ -55,6 +55,7 @@ type alias Model =
     , money : Int
     , moolahSeedAmt : Int
     , turretSeedAmt : Int
+    , shouldShowHelp : Bool
 
     -- to be flushed at the end of every tick
     , fx : List Effect
@@ -123,6 +124,7 @@ init session =
     , mousePos = Vec2.vec2 -99 -99
     , age = 0
     , isPaused = False
+    , shouldShowHelp = False
     , fx = []
     }
 
@@ -182,6 +184,7 @@ initTryOut session savedMap =
       , age = 0
       , isPaused = False
       , fx = []
+      , shouldShowHelp = False
       }
     , Cmd.none
     )
@@ -320,6 +323,7 @@ type Msg
     | TogglePause Bool
     | Buy Equippable Int
     | LeaveMarket
+    | ToggleHelp Bool
 
 
 dlog : String -> a -> a
@@ -602,8 +606,20 @@ update msg session model =
                     model.hero
             in
             ( { model
-                | hero = { hero | pos = hero.pos |> Vec2.add (Vec2.vec2 0 1) }
+                | hero =
+                    { hero
+                        | pos = hero.pos |> Vec2.add (Vec2.vec2 0 1)
+                        , healthAmt = hero.healthMax
+                    }
                 , gameState = Playing
+              }
+            , []
+            )
+
+        ToggleHelp shouldShow ->
+            ( { model
+                | shouldShowHelp = shouldShow
+                , isPaused = shouldShow
               }
             , []
             )
@@ -1934,256 +1950,311 @@ view session model =
     Html.div
         [ Html.Attributes.style "height" "100%"
         , Html.Attributes.style "width" "100%"
+        , Html.Attributes.style "font-family" "'Open Sans', sans-serif"
+        ]
+        [ --, drawClock session model
+          drawGlass session model
+        , viewScreens session model
+        , drawHud session model
+        , drawEquippables session model
+        , drawHelp session model
+        ]
+
+
+drawHud : Session -> Model -> Html Msg
+drawHud session model =
+    Html.div
+        [ Html.Attributes.style "position" "fixed"
+        , Html.Attributes.style "top" "20px"
+        , Html.Attributes.style "left" "20px"
+        , Html.Attributes.style "display" "flex"
+        , Html.Attributes.style "font-size" "24px"
+        , Html.Attributes.style "color" "#cfc"
         ]
         [ Html.div
-            [ Html.Attributes.style "margin" "5px 20px 0"
-            , Html.Attributes.style "font-family" "sans-serif"
-            , Html.Attributes.style "font-size" "14px"
-            , Html.Attributes.style "background" "rgba(0,0,0,0.8)"
-            , Html.Attributes.style "margin" "0"
-            , Html.Attributes.style "padding" "0"
-            , Html.Attributes.style "top" "0"
-            , Html.Attributes.style "position" "absolute"
-            , Html.Attributes.style "width" "100%"
-            , Html.Attributes.style "color" "white"
-            , Html.Attributes.style "z-index" "99"
+            [ Html.Attributes.style "width" "300px"
             ]
-            [ Html.button
-                [ Html.Events.onClick (TogglePause True)
-                , Html.Attributes.style "z-index" "99"
-                ]
-                [ Html.text "Pause" ]
-            , Html.div
-                [ Html.Attributes.style "margin" "5px 20px 0"
-                , Html.Attributes.style "font-family" "sans-serif"
-                , Html.Attributes.style "font-size" "14px"
-                ]
-                [ Html.text "WASD to move. 1 to switch to Gun, 2 to switch to MoneyCrop Seeds, 3 to switch to Turret Seeds."
-                , viewMeter model.waterAmt model.waterMax (session.c.getFloat "ui:meterWidth")
-                ]
-            , Html.hr [] []
-            , Html.strong [] [ Html.text "Money: " ]
-            , Html.strong [] [ Html.text (String.fromInt model.money) ]
-
-            --, Html.div
-            --    [ Html.Attributes.style "margin" "5px 20px 0"
-            --    , Html.Attributes.style "font-family" "monospace"
-            --    , Html.Attributes.style "font-size" "14px"
-            --    ]
-            --    [ Html.text "Currently equipped: "
-            --    , Html.strong [] [ Html.text (equippableStr model.equipped) ]
-            --    , Html.br [] []
-            --    , Html.text "Compost: "
-            --    , Html.strong [] [ Html.text (String.fromInt model.inv.compost) ]
-            --    , Html.br [] []
-            --    ]
-            , Html.hr [] []
-
-            --, Html.div
-            --    [ Html.Attributes.style "margin" "5px 20px 0"
-            --    , Html.Attributes.style "font-family" "monospace"
-            --    , Html.Attributes.style "font-size" "14px"
-            --    ]
-            --    [ Html.text "--- DEBUG ---"
-            --    , Html.br [] []
-            --    --, Html.text "Map sprites (visible/total): "
-            --    --, Html.strong [] [ Html.text (String.fromInt (List.length map)) ]
-            --    --, Html.strong [] [ Html.text "/" ]
-            --    --, Html.strong [] [ Html.text (String.fromInt (Dict.size model.map)) ]
-            --    --, Html.br [] []
-            --    --, Html.br [] []
-            --    ]
-            --]
-            ]
-        , drawEquippables session model
-
-        --, drawClock session model
-        , drawGlass session model
-        , case model.gameState of
-            GameOver ->
-                Html.div
-                    [ Html.Attributes.style "position" "absolute"
-                    , Html.Attributes.style "top" "0"
-                    , Html.Attributes.style "left" "0"
-                    , Html.Attributes.style "width" "100%"
-                    , Html.Attributes.style "height" "100%"
-                    , Html.Attributes.style "background" "rgba(0,0,0,0.5)"
-                    ]
-                    [ Html.div
-                        [ Html.Attributes.style "font-size" "48px"
-                        , Html.Attributes.style "color" "white"
-                        , Html.Attributes.style "text-align" "center"
-                        , Html.Attributes.style "margin-top" "30%"
-                        , Html.Attributes.style "cursor" "default"
-                        ]
-                        [ Html.text "GAME OVER" ]
-                    ]
-
-            Win ->
-                Html.div
-                    [ Html.Attributes.style "position" "absolute"
-                    , Html.Attributes.style "top" "0"
-                    , Html.Attributes.style "left" "0"
-                    , Html.Attributes.style "width" "100%"
-                    , Html.Attributes.style "height" "100%"
-                    , Html.Attributes.style "background" "rgba(0,0,0,0.5)"
-                    ]
-                    [ Html.div
-                        [ Html.Attributes.style "font-size" "48px"
-                        , Html.Attributes.style "color" "white"
-                        , Html.Attributes.style "text-align" "center"
-                        , Html.Attributes.style "margin-top" "30%"
-                        , Html.Attributes.style "cursor" "default"
-                        ]
-                        [ Html.text "A WINNER IS YOU" ]
-                    ]
-
-            Playing ->
-                Html.text ""
-
-            InStore ->
-                Html.div
-                    [ Html.Attributes.style "width" "100%"
-                    , Html.Attributes.style "height" "100%"
-                    , Html.Attributes.style "background" "rgba(0,0,0,0.5)"
-                    , Html.Attributes.style "left" "0"
-                    , Html.Attributes.style "top" "0"
-                    , Html.Attributes.style "position" "absolute"
-                    , Html.Attributes.style "font-size" "36px"
-                    , Html.Attributes.style "font-family" "sans-serif"
-                    , Html.Attributes.style "z-index" "99"
-                    , Html.Attributes.style "display" "flex"
-                    , Html.Attributes.style "justify-content" "center"
-                    , Html.Attributes.style "align-items" "center"
-                    , Html.Attributes.style "align-content" "center"
-                    ]
-                    [ Html.div
-                        [ Html.Attributes.style "background" "#003d00"
-                        , Html.Attributes.style "color" "white"
-                        , Html.Attributes.style "border" "10px double #2ab02a"
-                        , Html.Attributes.style "padding" "20px"
-                        ]
-                        [ Html.h1
-                            [ Html.Attributes.style "margin" "0"
-                            , Html.Attributes.style "font-size" "48px"
-                            , Html.Attributes.style "text-align" "center"
-                            ]
-                            [ Html.text "Terraformer's Market" ]
-                        , Html.hr
-                            [ Html.Attributes.style "border-color" "#2ab02a"
-                            ]
-                            []
-
-                        -- begin panels
-                        , Html.div
-                            [ Html.Attributes.style "display" "flex"
-                            , Html.Attributes.style "justify-content" "center"
-                            ]
-                            ([ { title = "Moolah Seed"
-                               , icon = "images/mature-money.png"
-                               , desc = "Harvesting mature Moolah with your scythe will yield money. Use money to buy more crops."
-                               , cost = 10
-                               , msg = Buy MoolahCropSeed
-                               , currentAmt = model.moolahSeedAmt
-                               }
-                             , { title = "Turret Seed"
-                               , icon = "images/turret.png"
-                               , desc = "Mature Turrets will automatically attack incoming creeps. Make sure to grow these before the harder waves!"
-                               , cost = 50
-                               , msg = Buy TurretSeed
-                               , currentAmt = model.turretSeedAmt
-                               }
-                             ]
-                                |> List.map
-                                    (\{ title, icon, desc, cost, msg, currentAmt } ->
-                                        Html.div
-                                            [ Html.Attributes.style "display" "flex"
-                                            , Html.Attributes.style "flex-direction" "column"
-                                            , Html.Attributes.style "align-items" "center"
-                                            , Html.Attributes.style "margin" "0 20px"
-                                            ]
-                                            [ Html.span
-                                                [ Html.Attributes.style "font-size" "24px"
-                                                ]
-                                                [ Html.text title ]
-                                            , Html.div
-                                                [ Html.Attributes.style "border" "7px ridge white"
-                                                , Html.Attributes.style "border-radius" "4px"
-                                                , Html.Attributes.style "background" "rgba(255, 255, 255, 0.4)"
-                                                , Html.Attributes.style "margin" "0 5px"
-                                                , Html.Attributes.style "width" "auto"
-                                                , Html.Attributes.style "display" "inline-block"
-                                                , Html.Attributes.style "font-size" "0"
-                                                , Html.Attributes.style "margin" "12px 0"
-                                                ]
-                                                [ Html.img
-                                                    [ Html.Attributes.src icon
-                                                    , Html.Attributes.style "width" "50px"
-                                                    , Html.Attributes.style "height" "50px"
-                                                    , Html.Attributes.style "margin" "3px"
-                                                    ]
-                                                    []
-                                                ]
-                                            , Html.em
-                                                [ Html.Attributes.style "font-size" "16px"
-                                                , Html.Attributes.style "line-height" "20px"
-
-                                                --, Html.Attributes.style "margin-left" "5px"
-                                                , Html.Attributes.style "text-align" "center"
-                                                , Html.Attributes.style "width" "200px"
-                                                , Html.Attributes.style "height" "110px" -- :/
-                                                ]
-                                                [ Html.text desc ]
-                                            , Html.span
-                                                [ Html.Attributes.style "font-size" "16px"
-                                                , Html.Attributes.style "text-align" "center"
-                                                ]
-                                                [ Html.text ("Cost: $" ++ String.fromInt cost) ]
-                                            , Html.button
-                                                ([ Html.Attributes.style "margin" "10px"
-                                                 , Html.Attributes.style "color" "#000"
-                                                 , Html.Attributes.style "font-size" "16px"
-                                                 , Html.Attributes.style "border-radius" "3px"
-                                                 , Html.Attributes.style "padding" "5px"
-                                                 , Html.Events.onClick (msg cost)
-                                                 ]
-                                                    ++ (if model.money >= cost then
-                                                            [ Html.Attributes.style "background" "#0d3"
-                                                            , Html.Attributes.style "cursor" "pointer"
-                                                            , Html.Attributes.style "border-color" "#2f8"
-                                                            ]
-
-                                                        else
-                                                            [ Html.Attributes.style "background" "#aaa"
-                                                            , Html.Attributes.disabled True
-                                                            ]
-                                                       )
-                                                )
-                                                [ Html.text ("Buy " ++ title) ]
-                                            , Html.em
-                                                [ Html.Attributes.style "font-size" "16px"
-                                                , Html.Attributes.style "text-align" "center"
-                                                ]
-                                                [ Html.text ("Current amount: " ++ String.fromInt currentAmt) ]
-                                            ]
-                                    )
-                            )
-                        , Html.div
-                            [ Html.Attributes.style "width" "100%"
-                            , Html.Attributes.style "display" "flex"
-                            , Html.Attributes.style "justify-content" "center"
-                            , Html.Attributes.style "margin-top" "15px"
-                            ]
-                            [ Html.button
-                                [ Html.Attributes.style "font-size" "18px"
-                                , Html.Attributes.style "border-radius" "3px"
-                                , Html.Events.onClick LeaveMarket
-                                ]
-                                [ Html.text "Exit" ]
-                            ]
-                        ]
-                    ]
+            [ Html.text ("Money: $" ++ String.fromInt model.money) ]
+        , Html.div
+            [ Html.Attributes.style "margin-right" "4px" ]
+            [ Html.text "Water: " ]
+        , viewMeter model.waterAmt model.waterMax (session.c.getFloat "ui:meterWidth")
         ]
+
+
+
+--[ Html.button
+--    [ Html.Events.onClick (TogglePause (model.isPaused))
+--    ]
+--    [ Html.text (if model.isPaused then "Unpause" else "Pause" ]
+--    ]
+--]
+
+
+drawHelp : Session -> Model -> Html Msg
+drawHelp session model =
+    Html.div []
+        [ Html.button
+            [ Html.Attributes.style "position" "fixed"
+            , Html.Attributes.style "left" "10px"
+            , Html.Attributes.style "bottom" "10px"
+            , Html.Attributes.style "background" "#ffb020"
+            , Html.Attributes.style "border-color" "#eb2"
+            , Html.Attributes.style "width" "40px"
+            , Html.Attributes.style "height" "40px"
+            , Html.Attributes.style "font-size" "24px"
+            , Html.Attributes.style "border-radius" "4px"
+            , Html.Events.onClick (ToggleHelp True)
+            ]
+            [ Html.text "?" ]
+        , if model.shouldShowHelp then
+            Html.div
+                [ Html.Attributes.style "position" "fixed"
+                , Html.Attributes.style "top" "50%"
+                , Html.Attributes.style "left" "50%"
+                , Html.Attributes.style "transform" "translate(-50%, -50%)"
+                , Html.Attributes.style "background" "#eef"
+                , Html.Attributes.style "width" "700px"
+                , Html.Attributes.style "font-size" "20px"
+                , Html.Attributes.style "padding" "20px"
+                ]
+                [ Html.text "You've landed on an alien planet and must terraform to survive! "
+                , Html.br [] []
+                , Html.br [] []
+                , Html.text "Plant, water, and harvest "
+                , Html.strong [] [ Html.text "Moolah" ]
+                , Html.text " crops to make money. Plant "
+                , Html.strong [] [ Html.text "Turret" ]
+                , Html.text " seeds to defend against enemy creeps. Buy more seeds, heal up, and upgrade your water gun in your base."
+                , Html.br [] []
+                , Html.br [] []
+                , Html.strong [] [ Html.text "Goal: " ]
+                , Html.text "Destroy the enemy base before the spawned creeps overrun your farm!"
+                , Html.br [] []
+                , Html.br [] []
+                , Html.strong [] [ Html.text "WASD: " ]
+                , Html.text "Move"
+                , Html.br [] []
+                , Html.strong [] [ Html.text "1: " ]
+                , Html.text "Water Gun"
+                , Html.br [] []
+                , Html.strong [] [ Html.text "2: " ]
+                , Html.text "Scythe"
+                , Html.br [] []
+                , Html.strong [] [ Html.text "3: " ]
+                , Html.text "Moolah Seeds"
+                , Html.br [] []
+                , Html.strong [] [ Html.text "4: " ]
+                , Html.text "Turret Seeds"
+                , Html.br [] []
+                , Html.br [] []
+                , Html.button
+                    [ Html.Attributes.style "text-align" "center"
+                    , Html.Attributes.style "margin" "auto"
+                    , Html.Attributes.style "display" "block"
+                    , Html.Attributes.style "padding" "10px 20px"
+                    , Html.Attributes.style "border-radius" "3px"
+                    , Html.Events.onClick (ToggleHelp False)
+                    ]
+                    [ Html.text "OK" ]
+                ]
+
+          else
+            Html.text ""
+        ]
+
+
+viewScreens : Session -> Model -> Html Msg
+viewScreens session model =
+    case model.gameState of
+        GameOver ->
+            Html.div
+                [ Html.Attributes.style "position" "absolute"
+                , Html.Attributes.style "top" "0"
+                , Html.Attributes.style "left" "0"
+                , Html.Attributes.style "width" "100%"
+                , Html.Attributes.style "height" "100%"
+                , Html.Attributes.style "background" "rgba(0,0,0,0.5)"
+                ]
+                [ Html.div
+                    [ Html.Attributes.style "font-size" "48px"
+                    , Html.Attributes.style "color" "white"
+                    , Html.Attributes.style "text-align" "center"
+                    , Html.Attributes.style "top" "40%"
+                    , Html.Attributes.style "width" "100%"
+                    , Html.Attributes.style "height" "100%"
+                    , Html.Attributes.style "position" "absolute"
+                    ]
+                    [ Html.text "GAME OVER" ]
+                ]
+
+        Win ->
+            Html.div
+                [ Html.Attributes.style "position" "absolute"
+                , Html.Attributes.style "top" "0"
+                , Html.Attributes.style "left" "0"
+                , Html.Attributes.style "width" "100%"
+                , Html.Attributes.style "height" "100%"
+                , Html.Attributes.style "background" "rgba(0,0,0,0.5)"
+                ]
+                [ Html.div
+                    [ Html.Attributes.style "font-size" "48px"
+                    , Html.Attributes.style "color" "white"
+                    , Html.Attributes.style "text-align" "center"
+                    , Html.Attributes.style "top" "40%"
+                    , Html.Attributes.style "width" "100%"
+                    , Html.Attributes.style "height" "100%"
+                    , Html.Attributes.style "position" "absolute"
+                    ]
+                    [ Html.text "A WINNER IS YOU" ]
+                ]
+
+        Playing ->
+            Html.text ""
+
+        InStore ->
+            Html.div
+                [ Html.Attributes.style "width" "100%"
+                , Html.Attributes.style "height" "100%"
+                , Html.Attributes.style "background" "rgba(0,0,0,0.5)"
+                , Html.Attributes.style "left" "0"
+                , Html.Attributes.style "top" "0"
+                , Html.Attributes.style "position" "absolute"
+                , Html.Attributes.style "font-size" "36px"
+                , Html.Attributes.style "z-index" "99"
+                , Html.Attributes.style "display" "flex"
+                , Html.Attributes.style "justify-content" "center"
+                , Html.Attributes.style "align-items" "center"
+                , Html.Attributes.style "align-content" "center"
+                ]
+                [ Html.div
+                    [ Html.Attributes.style "background" "#003d00"
+                    , Html.Attributes.style "color" "white"
+                    , Html.Attributes.style "border" "10px double #2ab02a"
+                    , Html.Attributes.style "padding" "20px"
+                    ]
+                    [ Html.h1
+                        [ Html.Attributes.style "margin" "0"
+                        , Html.Attributes.style "font-size" "36px"
+                        , Html.Attributes.style "text-align" "center"
+                        , Html.Attributes.style "font-family" "'Rock Salt', cursive"
+                        , Html.Attributes.style "letter-spacing" "3px"
+                        ]
+                        [ Html.text "Terraformer's Market" ]
+                    , Html.hr
+                        [ Html.Attributes.style "border-color" "#2ab02a"
+                        ]
+                        []
+
+                    -- begin panels
+                    , Html.div
+                        [ Html.Attributes.style "display" "flex"
+                        , Html.Attributes.style "justify-content" "center"
+                        ]
+                        ([ { title = "Moolah Seed"
+                           , icon = "images/mature-money.png"
+                           , desc = "Harvesting mature Moolah with your scythe will yield money. Use money to buy more crops."
+                           , cost = 10
+                           , msg = Buy MoolahCropSeed
+                           , currentAmt = model.moolahSeedAmt
+                           }
+                         , { title = "Turret Seed"
+                           , icon = "images/turret.png"
+                           , desc = "Mature Turrets will automatically attack incoming creeps. Make sure to grow these before the harder waves!"
+                           , cost = 50
+                           , msg = Buy TurretSeed
+                           , currentAmt = model.turretSeedAmt
+                           }
+                         ]
+                            |> List.map
+                                (\{ title, icon, desc, cost, msg, currentAmt } ->
+                                    Html.div
+                                        [ Html.Attributes.style "display" "flex"
+                                        , Html.Attributes.style "flex-direction" "column"
+                                        , Html.Attributes.style "align-items" "center"
+                                        , Html.Attributes.style "margin" "0 20px"
+                                        ]
+                                        [ Html.span
+                                            [ Html.Attributes.style "font-size" "24px"
+                                            ]
+                                            [ Html.text title ]
+                                        , Html.div
+                                            [ Html.Attributes.style "border" "7px ridge white"
+                                            , Html.Attributes.style "border-radius" "4px"
+                                            , Html.Attributes.style "background" "rgba(255, 255, 255, 0.4)"
+                                            , Html.Attributes.style "margin" "0 5px"
+                                            , Html.Attributes.style "width" "auto"
+                                            , Html.Attributes.style "display" "inline-block"
+                                            , Html.Attributes.style "font-size" "0"
+                                            , Html.Attributes.style "margin" "12px 0"
+                                            ]
+                                            [ Html.img
+                                                [ Html.Attributes.src icon
+                                                , Html.Attributes.style "width" "50px"
+                                                , Html.Attributes.style "height" "50px"
+                                                , Html.Attributes.style "margin" "3px"
+                                                ]
+                                                []
+                                            ]
+                                        , Html.em
+                                            [ Html.Attributes.style "font-size" "16px"
+                                            , Html.Attributes.style "line-height" "20px"
+
+                                            --, Html.Attributes.style "margin-left" "5px"
+                                            , Html.Attributes.style "text-align" "center"
+                                            , Html.Attributes.style "width" "200px"
+                                            , Html.Attributes.style "height" "110px" -- :/
+                                            ]
+                                            [ Html.text desc ]
+                                        , Html.span
+                                            [ Html.Attributes.style "font-size" "16px"
+                                            , Html.Attributes.style "text-align" "center"
+                                            ]
+                                            [ Html.text ("Cost: $" ++ String.fromInt cost) ]
+                                        , Html.button
+                                            ([ Html.Attributes.style "margin" "10px"
+                                             , Html.Attributes.style "color" "#000"
+                                             , Html.Attributes.style "font-size" "16px"
+                                             , Html.Attributes.style "border-radius" "3px"
+                                             , Html.Attributes.style "padding" "5px"
+                                             , Html.Events.onClick (msg cost)
+                                             ]
+                                                ++ (if model.money >= cost then
+                                                        [ Html.Attributes.style "background" "#0d3"
+                                                        , Html.Attributes.style "cursor" "pointer"
+                                                        , Html.Attributes.style "border-color" "#2f8"
+                                                        ]
+
+                                                    else
+                                                        [ Html.Attributes.style "background" "#aaa"
+                                                        , Html.Attributes.disabled True
+                                                        ]
+                                                   )
+                                            )
+                                            [ Html.text ("Buy " ++ title) ]
+                                        , Html.span
+                                            [ Html.Attributes.style "font-size" "16px"
+                                            , Html.Attributes.style "text-align" "center"
+                                            ]
+                                            [ Html.text ("Current amount: " ++ String.fromInt currentAmt) ]
+                                        ]
+                                )
+                        )
+                    , Html.div
+                        [ Html.Attributes.style "width" "100%"
+                        , Html.Attributes.style "display" "flex"
+                        , Html.Attributes.style "justify-content" "center"
+                        , Html.Attributes.style "margin-top" "15px"
+                        ]
+                        [ Html.button
+                            [ Html.Attributes.style "font-size" "18px"
+                            , Html.Attributes.style "border-radius" "3px"
+                            , Html.Events.onClick LeaveMarket
+                            ]
+                            [ Html.text "Exit" ]
+                        ]
+                    ]
+                ]
 
 
 drawEquippables : Session -> Model -> Html Msg
@@ -2193,11 +2264,10 @@ drawEquippables session model =
             "50px"
 
         equippables =
-            [ ( Gun, "images/icon-watergun.png" )
-            , ( Scythe, "images/scythe.png" )
-            , ( MoolahCropSeed, "images/mature-money.png" )
-            , ( TurretSeed, "images/turret.png" )
-            , ( TurretSeed, "images/hedge.png" )
+            [ ( Gun, "images/icon-watergun.png", Nothing )
+            , ( Scythe, "images/scythe.png", Nothing )
+            , ( MoolahCropSeed, "images/mature-money.png", Just model.moolahSeedAmt )
+            , ( TurretSeed, "images/turret.png", Just model.turretSeedAmt )
             ]
     in
     Html.div
@@ -2211,12 +2281,13 @@ drawEquippables session model =
             ]
             (equippables
                 |> List.map
-                    (\( equippable, imgSrc ) ->
+                    (\( equippable, imgSrc, maybeAmt ) ->
                         Html.div
                             ([ Html.Attributes.style "border" "7px ridge white"
                              , Html.Attributes.style "border-radius" "4px"
                              , Html.Attributes.style "background" "rgba(255, 255, 255, 0.4)"
                              , Html.Attributes.style "margin" "0 5px"
+                             , Html.Attributes.style "position" "relative"
                              ]
                                 ++ (if model.equipped == equippable then
                                         [ Html.Attributes.style "background" "rgba(90, 255, 90, 0.6)"
@@ -2234,6 +2305,21 @@ drawEquippables session model =
                                 , Html.Attributes.style "margin" "3px"
                                 ]
                                 []
+                            , case maybeAmt of
+                                Just amt ->
+                                    Html.div
+                                        [ Html.Attributes.style "font-size" "12px"
+                                        , Html.Attributes.style "color" "white"
+                                        , Html.Attributes.style "position" "absolute"
+                                        , Html.Attributes.style "bottom" "1px"
+                                        , Html.Attributes.style "right" "3px"
+                                        , Html.Attributes.style "text-shadow" "1px 1px 1px black"
+                                        ]
+                                        [ Html.text (String.fromInt amt)
+                                        ]
+
+                                Nothing ->
+                                    Html.text ""
                             ]
                     )
             )
