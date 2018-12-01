@@ -53,6 +53,8 @@ type alias Model =
     , age : Float
     , isPaused : Bool
     , money : Int
+    , moolahSeedAmt : Int
+    , turretSeedAmt : Int
 
     -- to be flushed at the end of every tick
     , fx : List Effect
@@ -113,7 +115,9 @@ init session =
     , inv =
         { compost = 0
         }
-    , money = 0
+    , moolahSeedAmt = 0
+    , turretSeedAmt = 0
+    , money = 100
     , gameState = Playing
     , isMouseDown = False
     , mousePos = Vec2.vec2 -99 -99
@@ -170,6 +174,8 @@ initTryOut session savedMap =
             { compost = 0
             }
       , money = 0
+      , moolahSeedAmt = 0
+      , turretSeedAmt = 0
       , gameState = Playing
       , isMouseDown = False
       , mousePos = Vec2.vec2 -99 -99
@@ -186,6 +192,7 @@ port hardReset : () -> Cmd msg
 
 type GameState
     = Playing
+    | InStore
     | GameOver
     | Win
 
@@ -217,7 +224,7 @@ type Equippable
     = Gun
     | Scythe
     | TurretSeed
-    | MoneyCropSeed
+    | MoolahCropSeed
 
 
 type alias Creep =
@@ -311,6 +318,8 @@ type Msg
     | MouseMove ( Float, Float )
     | Tick Float
     | TogglePause Bool
+    | Buy Equippable Int
+    | LeaveMarket
 
 
 dlog : String -> a -> a
@@ -452,6 +461,7 @@ update msg session model =
                 |> collideBulletsWithCreeps session delta
                 |> collideBulletsWithEnemyTowers session delta
                 |> heroPickUpCompost session delta
+                |> checkIfInStore session delta
                 |> checkGameOver session delta
                 |> (\updatedModel ->
                         ( { updatedModel
@@ -491,7 +501,7 @@ update msg session model =
             ( { model | isMouseDown = True }
                 |> (\m ->
                         case ( m.equipped, canPlace session model, hoveringTilePos session m ) of
-                            ( MoneyCropSeed, Can, Just tilePos ) ->
+                            ( MoolahCropSeed, Can, Just tilePos ) ->
                                 { m
                                     | crops =
                                         { pos = tilePos
@@ -561,6 +571,43 @@ update msg session model =
             , []
             )
 
+        Buy seed cost ->
+            if model.money >= cost then
+                case seed of
+                    MoolahCropSeed ->
+                        ( { model
+                            | money = model.money - cost
+                            , moolahSeedAmt = model.moolahSeedAmt + 1
+                          }
+                        , []
+                        )
+
+                    TurretSeed ->
+                        ( { model
+                            | money = model.money - cost
+                            , turretSeedAmt = model.turretSeedAmt + 1
+                          }
+                        , []
+                        )
+
+                    _ ->
+                        ( model, [] )
+
+            else
+                ( model, [] )
+
+        LeaveMarket ->
+            let
+                hero =
+                    model.hero
+            in
+            ( { model
+                | hero = { hero | pos = hero.pos |> Vec2.add (Vec2.vec2 0 1) }
+                , gameState = Playing
+              }
+            , []
+            )
+
 
 slashDmg =
     2
@@ -573,6 +620,25 @@ creepRad =
 
 absorptionRate =
     50
+
+
+checkIfInStore : Session -> Float -> Model -> Model
+checkIfInStore session delta model =
+    -- todo
+    { model
+        | gameState =
+            if
+                model.hero.pos
+                    |> Vec2.add (Vec2.vec2 0 0)
+                    |> vec2ToTuple
+                    |> Tuple.mapBoth floor floor
+                    |> (\pos -> pos == model.base.pos)
+            then
+                InStore
+
+            else
+                model.gameState
+    }
 
 
 drawHero : Session -> Model -> HeroSprite
@@ -903,7 +969,7 @@ applyKeyDown str model =
             { model | equipped = Scythe }
 
         "3" ->
-            { model | equipped = MoneyCropSeed }
+            { model | equipped = MoolahCropSeed }
 
         "4" ->
             { model | equipped = TurretSeed }
@@ -1375,7 +1441,7 @@ checkGameOver session tick model =
                 Win
 
             else
-                Playing
+                model.gameState
     }
 
 
@@ -1415,10 +1481,10 @@ canPlace session model =
     if
         case model.equipped of
             TurretSeed ->
-                True
+                model.turretSeedAmt > 0
 
-            MoneyCropSeed ->
-                True
+            MoolahCropSeed ->
+                model.moolahSeedAmt > 0
 
             Gun ->
                 False
@@ -1850,6 +1916,10 @@ subscriptions model =
                         [ Browser.Events.onAnimationFrameDelta Tick
                         ]
 
+                    InStore ->
+                        -- maybe make toggleable?
+                        []
+
                     GameOver ->
                         []
 
@@ -1929,49 +1999,190 @@ view session model =
 
         --, drawClock session model
         , drawGlass session model
-        , Html.div []
-            [ case model.gameState of
-                GameOver ->
-                    Html.div
-                        [ Html.Attributes.style "position" "absolute"
-                        , Html.Attributes.style "top" "0"
-                        , Html.Attributes.style "left" "0"
-                        , Html.Attributes.style "width" "100%"
-                        , Html.Attributes.style "height" "100%"
-                        , Html.Attributes.style "background" "rgba(0,0,0,0.5)"
+        , case model.gameState of
+            GameOver ->
+                Html.div
+                    [ Html.Attributes.style "position" "absolute"
+                    , Html.Attributes.style "top" "0"
+                    , Html.Attributes.style "left" "0"
+                    , Html.Attributes.style "width" "100%"
+                    , Html.Attributes.style "height" "100%"
+                    , Html.Attributes.style "background" "rgba(0,0,0,0.5)"
+                    ]
+                    [ Html.div
+                        [ Html.Attributes.style "font-size" "48px"
+                        , Html.Attributes.style "color" "white"
+                        , Html.Attributes.style "text-align" "center"
+                        , Html.Attributes.style "margin-top" "30%"
+                        , Html.Attributes.style "cursor" "default"
                         ]
-                        [ Html.div
-                            [ Html.Attributes.style "font-size" "48px"
-                            , Html.Attributes.style "color" "white"
-                            , Html.Attributes.style "text-align" "center"
-                            , Html.Attributes.style "margin-top" "30%"
-                            , Html.Attributes.style "cursor" "default"
-                            ]
-                            [ Html.text "GAME OVER" ]
-                        ]
+                        [ Html.text "GAME OVER" ]
+                    ]
 
-                Win ->
-                    Html.div
-                        [ Html.Attributes.style "position" "absolute"
-                        , Html.Attributes.style "top" "0"
-                        , Html.Attributes.style "left" "0"
-                        , Html.Attributes.style "width" "100%"
-                        , Html.Attributes.style "height" "100%"
-                        , Html.Attributes.style "background" "rgba(0,0,0,0.5)"
+            Win ->
+                Html.div
+                    [ Html.Attributes.style "position" "absolute"
+                    , Html.Attributes.style "top" "0"
+                    , Html.Attributes.style "left" "0"
+                    , Html.Attributes.style "width" "100%"
+                    , Html.Attributes.style "height" "100%"
+                    , Html.Attributes.style "background" "rgba(0,0,0,0.5)"
+                    ]
+                    [ Html.div
+                        [ Html.Attributes.style "font-size" "48px"
+                        , Html.Attributes.style "color" "white"
+                        , Html.Attributes.style "text-align" "center"
+                        , Html.Attributes.style "margin-top" "30%"
+                        , Html.Attributes.style "cursor" "default"
                         ]
-                        [ Html.div
-                            [ Html.Attributes.style "font-size" "48px"
-                            , Html.Attributes.style "color" "white"
-                            , Html.Attributes.style "text-align" "center"
-                            , Html.Attributes.style "margin-top" "30%"
-                            , Html.Attributes.style "cursor" "default"
-                            ]
-                            [ Html.text "A WINNER IS YOU" ]
-                        ]
+                        [ Html.text "A WINNER IS YOU" ]
+                    ]
 
-                Playing ->
-                    Html.text ""
-            ]
+            Playing ->
+                Html.text ""
+
+            InStore ->
+                Html.div
+                    [ Html.Attributes.style "width" "100%"
+                    , Html.Attributes.style "height" "100%"
+                    , Html.Attributes.style "background" "rgba(0,0,0,0.5)"
+                    , Html.Attributes.style "left" "0"
+                    , Html.Attributes.style "top" "0"
+                    , Html.Attributes.style "position" "absolute"
+                    , Html.Attributes.style "font-size" "36px"
+                    , Html.Attributes.style "font-family" "sans-serif"
+                    , Html.Attributes.style "z-index" "99"
+                    , Html.Attributes.style "display" "flex"
+                    , Html.Attributes.style "justify-content" "center"
+                    , Html.Attributes.style "align-items" "center"
+                    , Html.Attributes.style "align-content" "center"
+                    ]
+                    [ Html.div
+                        [ Html.Attributes.style "background" "#003d00"
+                        , Html.Attributes.style "color" "white"
+                        , Html.Attributes.style "border" "10px double #2ab02a"
+                        , Html.Attributes.style "padding" "20px"
+                        ]
+                        [ Html.h1
+                            [ Html.Attributes.style "margin" "0"
+                            , Html.Attributes.style "font-size" "48px"
+                            , Html.Attributes.style "text-align" "center"
+                            ]
+                            [ Html.text "Terraformer's Market" ]
+                        , Html.hr
+                            [ Html.Attributes.style "border-color" "#2ab02a"
+                            ]
+                            []
+
+                        -- begin panels
+                        , Html.div
+                            [ Html.Attributes.style "display" "flex"
+                            , Html.Attributes.style "justify-content" "center"
+                            ]
+                            ([ { title = "Moolah Seed"
+                               , icon = "images/mature-money.png"
+                               , desc = "Harvesting mature Moolah with your scythe will yield money. Use money to buy more crops."
+                               , cost = 10
+                               , msg = Buy MoolahCropSeed
+                               , currentAmt = model.moolahSeedAmt
+                               }
+                             , { title = "Turret Seed"
+                               , icon = "images/turret.png"
+                               , desc = "Mature Turrets will automatically attack incoming creeps. Make sure to grow these before the harder waves!"
+                               , cost = 50
+                               , msg = Buy TurretSeed
+                               , currentAmt = model.turretSeedAmt
+                               }
+                             ]
+                                |> List.map
+                                    (\{ title, icon, desc, cost, msg, currentAmt } ->
+                                        Html.div
+                                            [ Html.Attributes.style "display" "flex"
+                                            , Html.Attributes.style "flex-direction" "column"
+                                            , Html.Attributes.style "align-items" "center"
+                                            , Html.Attributes.style "margin" "0 20px"
+                                            ]
+                                            [ Html.span
+                                                [ Html.Attributes.style "font-size" "24px"
+                                                ]
+                                                [ Html.text title ]
+                                            , Html.div
+                                                [ Html.Attributes.style "border" "7px ridge white"
+                                                , Html.Attributes.style "border-radius" "4px"
+                                                , Html.Attributes.style "background" "rgba(255, 255, 255, 0.4)"
+                                                , Html.Attributes.style "margin" "0 5px"
+                                                , Html.Attributes.style "width" "auto"
+                                                , Html.Attributes.style "display" "inline-block"
+                                                , Html.Attributes.style "font-size" "0"
+                                                , Html.Attributes.style "margin" "12px 0"
+                                                ]
+                                                [ Html.img
+                                                    [ Html.Attributes.src icon
+                                                    , Html.Attributes.style "width" "50px"
+                                                    , Html.Attributes.style "height" "50px"
+                                                    , Html.Attributes.style "margin" "3px"
+                                                    ]
+                                                    []
+                                                ]
+                                            , Html.em
+                                                [ Html.Attributes.style "font-size" "16px"
+                                                , Html.Attributes.style "line-height" "20px"
+
+                                                --, Html.Attributes.style "margin-left" "5px"
+                                                , Html.Attributes.style "text-align" "center"
+                                                , Html.Attributes.style "width" "200px"
+                                                , Html.Attributes.style "height" "110px" -- :/
+                                                ]
+                                                [ Html.text desc ]
+                                            , Html.span
+                                                [ Html.Attributes.style "font-size" "16px"
+                                                , Html.Attributes.style "text-align" "center"
+                                                ]
+                                                [ Html.text ("Cost: $" ++ String.fromInt cost) ]
+                                            , Html.button
+                                                ([ Html.Attributes.style "margin" "10px"
+                                                 , Html.Attributes.style "color" "#000"
+                                                 , Html.Attributes.style "font-size" "16px"
+                                                 , Html.Attributes.style "border-radius" "3px"
+                                                 , Html.Attributes.style "padding" "5px"
+                                                 , Html.Events.onClick (msg cost)
+                                                 ]
+                                                    ++ (if model.money >= cost then
+                                                            [ Html.Attributes.style "background" "#0d3"
+                                                            , Html.Attributes.style "cursor" "pointer"
+                                                            , Html.Attributes.style "border-color" "#2f8"
+                                                            ]
+
+                                                        else
+                                                            [ Html.Attributes.style "background" "#aaa"
+                                                            , Html.Attributes.disabled True
+                                                            ]
+                                                       )
+                                                )
+                                                [ Html.text ("Buy " ++ title) ]
+                                            , Html.em
+                                                [ Html.Attributes.style "font-size" "16px"
+                                                , Html.Attributes.style "text-align" "center"
+                                                ]
+                                                [ Html.text ("Current amount: " ++ String.fromInt currentAmt) ]
+                                            ]
+                                    )
+                            )
+                        , Html.div
+                            [ Html.Attributes.style "width" "100%"
+                            , Html.Attributes.style "display" "flex"
+                            , Html.Attributes.style "justify-content" "center"
+                            , Html.Attributes.style "margin-top" "15px"
+                            ]
+                            [ Html.button
+                                [ Html.Attributes.style "font-size" "18px"
+                                , Html.Attributes.style "border-radius" "3px"
+                                , Html.Events.onClick LeaveMarket
+                                ]
+                                [ Html.text "Exit" ]
+                            ]
+                        ]
+                    ]
         ]
 
 
@@ -1984,7 +2195,7 @@ drawEquippables session model =
         equippables =
             [ ( Gun, "images/icon-watergun.png" )
             , ( Scythe, "images/scythe.png" )
-            , ( MoneyCropSeed, "images/mature-money.png" )
+            , ( MoolahCropSeed, "images/mature-money.png" )
             , ( TurretSeed, "images/turret.png" )
             , ( TurretSeed, "images/hedge.png" )
             ]
@@ -2163,7 +2374,7 @@ equippableStr equippable =
         Scythe ->
             "scythe"
 
-        MoneyCropSeed ->
+        MoolahCropSeed ->
             "seed"
 
         TurretSeed ->
@@ -2240,7 +2451,7 @@ getSprites session model =
                     Scythe ->
                         []
 
-                    MoneyCropSeed ->
+                    MoolahCropSeed ->
                         tileCursor
 
                     TurretSeed ->

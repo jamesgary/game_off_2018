@@ -304,11 +304,13 @@
           heroSprite.y = hero.y * 32;
 
           if (hero.equipped === "gun") {
+            equippableSprite.alpha = 1;
             equippableSprite.texture = PIXI.utils.TextureCache["spazer_" + imgPrefix + ".png"];
           } else if (hero.equipped === "scythe") {
+            equippableSprite.alpha = 1;
             equippableSprite.texture = PIXI.utils.TextureCache["scythe_" + imgPrefix + ".png"];
           } else {
-            equippableSprite.texture = PIXI.utils.TextureCache["scythe_" + imgPrefix + ".png"];
+            equippableSprite.alpha = 0;
           }
           equippableSprite.x = hero.x * 32;
           equippableSprite.y = hero.y * 32 + 22;

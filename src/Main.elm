@@ -910,6 +910,10 @@ subscriptions model =
                                 [ Browser.Events.onAnimationFrameDelta Tick
                                 ]
 
+                            Game.InStore ->
+                                -- todo DRY!
+                                []
+
                             Game.GameOver ->
                                 []
 
