@@ -1,4 +1,4 @@
-module Common exposing (Config, ConfigFloat, Graphic, HeroSprite, Key, Map, PlacementAvailability(..), SavedMap, Session, Shape(..), Sprite, SpriteLayer, Texture(..), Tile(..), TilePos, heroDirInput, mapFromAscii, pct, px, textureToStr, tilePosToFloats, tileToStr, tupleToVec2, vec2ToTuple)
+module Common exposing (Config, ConfigFloat, Graphic, HeroSprite, Key, Map, PlacementAvailability(..), SavedMap, Session, Shape(..), Sprite, SpriteLayer, Texture(..), Tile(..), TilePos, dlog, heroDirInput, mapFromAscii, pct, px, textureToStr, tilePosToFloats, tileToStr, tupleToVec2, vec2ToTuple)
 
 import Dict exposing (Dict)
 import Math.Vector2 as Vec2 exposing (Vec2)
@@ -247,3 +247,9 @@ px length =
 pct : Float -> String
 pct length =
     String.fromFloat length ++ "%"
+
+
+dlog : String -> a -> a
+dlog str val =
+    --Debug.log str val
+    val

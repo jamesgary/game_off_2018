@@ -128,11 +128,6 @@ makeC configFloats =
     }
 
 
-dlog : String -> a -> a
-dlog str val =
-    Debug.log str val
-
-
 sessionFromFlags : Flags -> Session
 sessionFromFlags flags =
     let
@@ -701,7 +696,12 @@ jsonToFlags json =
             flags
 
         Err err ->
-            Debug.todo ("flags bad man: " ++ Json.Decode.errorToString err)
+            --Debug.todo ("flags bad man: " ++ Json.Decode.errorToString err)
+            { timestamp = 0
+            , windowWidth = 800
+            , windowHeight = 600
+            , persistence = Nothing
+            }
 
 
 flagsDecoder : Json.Decode.Decoder Flags

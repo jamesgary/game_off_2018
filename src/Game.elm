@@ -78,7 +78,29 @@ init session =
                     map
 
                 Nothing ->
-                    Debug.todo "whut you doin"
+                    --Debug.todo "whut you doin"
+                    { name = "New Map"
+                    , map =
+                        mapFromAscii
+                            """
+11111111111111111111111111111
+10000000000011100000000000001
+10000000000001100000000000001
+10000000000000100000111000001
+10000000000001110000011000001
+10000000000000110000011000001
+10000000000000011000011000001
+10000000000000000000011000001
+10000000000000000000011000001
+10000000000000000000011000001
+10000000000000000000011000001
+11111111111111111111111111111
+"""
+                    , hero = ( 3, 4 )
+                    , enemyTowers = Set.fromList [ ( 24, 7 ) ]
+                    , base = ( 2, 2 )
+                    , size = ( 6, 5 )
+                    }
     in
     { hero =
         { pos =
@@ -340,12 +362,6 @@ type Msg
     | LeaveMarket
     | ToggleHelp Bool
     | BuyUpgrade Upgrade
-
-
-dlog : String -> a -> a
-dlog str val =
-    --Debug.log str val
-    val
 
 
 makeC : Dict String ConfigVal -> Config

@@ -333,7 +333,8 @@ update msg session model =
                     { model | editingMap = savedMap }
 
                 Nothing ->
-                    Debug.todo "bad saved map :("
+                    --Debug.todo "bad saved map :("
+                    model
             , session
             , []
             )
@@ -544,7 +545,6 @@ view session model =
         [ drawGlass session model
         , drawSavedMaps session model
         , drawToolbox session model
-        , drawDebug session model
         ]
 
 
@@ -564,32 +564,6 @@ drawGlass session model =
         , Wheel.onWheel Zoom
         ]
         []
-
-
-drawDebug : Session -> Model -> Html Msg
-drawDebug session model =
-    Html.div
-        [ Html.Attributes.style "font-family" "monospace"
-        , Html.Attributes.style "left" "0"
-        , Html.Attributes.style "bottom" "0"
-        , Html.Attributes.style "padding" "10px"
-        , Html.Attributes.style "margin" "5px"
-        , Html.Attributes.style "background" "#333"
-        , Html.Attributes.style "border" "2px outset #666"
-        , Html.Attributes.style "position" "fixed"
-        , Html.Attributes.style "color" "white"
-        ]
-        [ Html.div
-            [ Html.Attributes.style "font-size" "16px"
-            , Html.Attributes.style "display" "flex"
-            , Html.Attributes.style "flex-direction" "column"
-            , Html.Attributes.style "justify-content" "space-between"
-            , Html.Attributes.style "align-items" "stretch"
-            ]
-            [ Html.text "hoveringTile: "
-            , Html.text (model.hoveringTile |> Debug.toString)
-            ]
-        ]
 
 
 drawSavedMaps : Session -> Model -> Html Msg
