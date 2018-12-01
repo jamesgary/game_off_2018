@@ -567,12 +567,48 @@ absorptionRate =
 
 drawHero : Session -> Model -> HeroSprite
 drawHero session model =
+    let
+        ( xDir, yDir ) =
+            heroDir session model
+    in
     { x = model.hero.pos |> Vec2.getX
     , y = model.hero.pos |> Vec2.getY
-    , xDir = model.hero.vel |> Vec2.getX |> round
-    , yDir = model.hero.vel |> Vec2.getY |> round
+    , xDir = xDir --model.hero.vel |> Vec2.getX |> round
+    , yDir = yDir --model.hero.vel |> Vec2.getY |> round
+    , isWalking = Vec2.distance (Vec2.vec2 0 0) model.hero.vel > 0.1
     , equipped = model.equipped |> equippableStr
     }
+
+
+heroDir : Session -> Model -> ( Int, Int )
+heroDir session model =
+    mouseAngleToHero session model
+        |> (\angle -> angle / pi)
+        |> (\rads ->
+                if (5 / 8) < rads && (rads < 7 / 8) then
+                    ( -1, 1 )
+
+                else if (3 / 8) < rads && (rads < 5 / 8) then
+                    ( 0, 1 )
+
+                else if (1 / 8) < rads && (rads < 3 / 8) then
+                    ( 1, 1 )
+
+                else if (-1 / 8) < rads && (rads < 1 / 8) then
+                    ( 1, 0 )
+
+                else if (-3 / 8) < rads && (rads < -1 / 8) then
+                    ( 1, -1 )
+
+                else if (-5 / 8) < rads && (rads < -3 / 8) then
+                    ( 0, -1 )
+
+                else if (-7 / 8) < rads && (rads < -5 / 8) then
+                    ( -1, -1 )
+
+                else
+                    ( -1, 0 )
+           )
 
 
 soilAbsorbWaterFromBullets : Session -> Float -> Model -> Model
@@ -819,7 +855,14 @@ makePlayerBullets session delta model =
             { model
                 | timeSinceLastFire = 0
                 , bullets =
-                    makeBullet PlayerBullet model.hero.pos (mouseGamePos session model)
+                    (makeBullet PlayerBullet
+                        --(Vec2.add model.hero.pos (barrelPos session model))
+                        model.hero.pos
+                        (mouseGamePos session model)
+                        |> (\bullet ->
+                                { bullet | pos = Vec2.add bullet.pos (barrelPos session model) }
+                           )
+                    )
                         :: model.bullets
                 , waterAmt = model.waterAmt - session.c.getFloat "waterGun:bulletCost"
             }
@@ -829,6 +872,31 @@ makePlayerBullets session delta model =
 
     else
         { model | timeSinceLastFire = model.timeSinceLastFire + delta }
+
+
+barrelPos : Session -> Model -> Vec2
+barrelPos session model =
+    heroDir session model
+        |> Tuple.mapBoth toFloat toFloat
+        |> (\( x, y ) ->
+                if round y == 0 then
+                    -- side view has barrel pretty low
+                    Vec2.vec2
+                        (x * 1)
+                        (y * 1 + 0.25)
+
+                else if round y > 0 then
+                    -- oh and bottom is too high
+                    Vec2.vec2
+                        (x * 1)
+                        (y * 1 - 0.35)
+
+                else
+                    -- ok it's all a little askew
+                    Vec2.vec2
+                        (x * 1)
+                        (y * 1 + 0.35)
+           )
 
 
 refillWater : Session -> Float -> Model -> Model

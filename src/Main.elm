@@ -512,6 +512,7 @@ performGameEffects session effects model =
                                 , ( "y", hero.y |> Json.Encode.float )
                                 , ( "xDir", hero.xDir |> Json.Encode.int )
                                 , ( "yDir", hero.yDir |> Json.Encode.int )
+                                , ( "isWalking", hero.isWalking |> Json.Encode.bool )
                                 , ( "equipped", hero.equipped |> Json.Encode.string )
                                 ]
                             ]

@@ -239,7 +239,6 @@
         let currentWidth = heroWidth;
         let currentHeight = heroHeight;
         let isFlipped = false;
-        let isMoving = false;
         let imgPrefix = "down"
         let eOffsetX = 0;
         let eOffsetY = 22;
@@ -249,12 +248,10 @@
           if (hero.xDir === 0 && hero.yDir === 0) {
             imgPrefix = lastImg;
             isFlipped = lastFlip;
-            isMoving = false;
             eOffsetX = lastEOffsetX;
             eOffsetY = lastEOffsetY;
             gunBehindHero = lastGunBehindHero;
           } else {
-            isMoving = true;
             if (hero.yDir > 0) {
               if (hero.xDir !== 0) {
                 imgPrefix = "diagdown";
@@ -296,7 +293,7 @@
           lastEOffsetY = eOffsetY;
           lastGunBehindHero = gunBehindHero;
 
-          let animFrame = isMoving ? 1 + ((Math.round (Date.now() / 100)) % 4) : 1;
+          let animFrame = hero.isWalking ? 1 + ((Math.round (Date.now() / 100)) % 4) : 1;
 
           heroSprite.texture = PIXI.utils.TextureCache[imgPrefix + "_0" + animFrame + ".png"];
           heroSprite.x = hero.x * 32;

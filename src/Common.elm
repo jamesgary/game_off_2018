@@ -234,6 +234,7 @@ type alias HeroSprite =
     , y : Float
     , xDir : Int
     , yDir : Int
+    , isWalking : Bool
     , equipped : String
     }
 
