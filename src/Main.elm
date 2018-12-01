@@ -185,12 +185,17 @@ initGame jsonFlags =
 
         session =
             sessionFromFlags flags
+
+        ( state, effects ) =
+            Game.init session
+
+        model =
+            { state = Game state
+            , session = session
+            }
     in
-    ( { state = Game (Game.init session)
-      , session = session
-      }
-    , Cmd.none
-    )
+    model
+        |> performGameEffects session effects
 
 
 updateStateAndSession : Model -> ( AppState, Session ) -> Model
@@ -473,6 +478,20 @@ performGameEffects session effects model =
                             :: updatingCmds
                         )
 
+                    Game.DrawMap sprites ->
+                        ( updatingModel
+                        , performEffects
+                            [ Json.Encode.object
+                                [ ( "id", Json.Encode.string "DRAW_MAP" )
+                                , ( "sprites"
+                                  , sprites
+                                        |> encodeSprites
+                                  )
+                                ]
+                            ]
+                            :: updatingCmds
+                        )
+
                     Game.DrawFx pos kind ->
                         ( updatingModel
                         , performEffects
@@ -531,29 +550,32 @@ encodeFxKind fxKind =
             Json.Encode.string "HARVEST"
 
 
+encodeSprites : List Sprite -> Json.Decode.Value
+encodeSprites sprites =
+    sprites
+        |> List.map
+            (\sprite ->
+                { x = sprite.x * 32
+                , y = sprite.y * 32
+                , texture = sprite.texture
+                }
+            )
+        |> Json.Encode.list
+            (\{ x, y, texture } ->
+                Json.Encode.object
+                    [ ( "x", Json.Encode.float x )
+                    , ( "y", Json.Encode.float y )
+                    , ( "texture", Json.Encode.string texture )
+                    ]
+            )
+
+
 encodeSpriteLayer : SpriteLayer -> Json.Decode.Value
 encodeSpriteLayer layer =
     Json.Encode.object
         [ ( "name", Json.Encode.string layer.name )
         , ( "zOrder", Json.Encode.int layer.zOrder ) -- not used yet
-        , ( "sprites"
-          , layer.sprites
-                |> List.map
-                    (\sprite ->
-                        { x = sprite.x * 32
-                        , y = sprite.y * 32
-                        , texture = sprite.texture
-                        }
-                    )
-                |> Json.Encode.list
-                    (\{ x, y, texture } ->
-                        Json.Encode.object
-                            [ ( "x", Json.Encode.float x )
-                            , ( "y", Json.Encode.float y )
-                            , ( "texture", Json.Encode.string texture )
-                            ]
-                    )
-          )
+        , ( "sprites", encodeSprites layer.sprites )
         , ( "graphics"
           , layer.graphics
                 |> List.map

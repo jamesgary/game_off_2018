@@ -66,7 +66,7 @@ type alias Model =
     }
 
 
-init : Session -> Model
+init : Session -> ( Model, List Effect )
 init session =
     let
         c =
@@ -102,60 +102,62 @@ init session =
                     , size = ( 6, 5 )
                     }
     in
-    { hero =
-        { pos =
-            tilePosToFloats savedMap.hero
-                |> always ( 2, 2 )
-                |> tupleToVec2
-                |> Vec2.add (Vec2.vec2 0.5 0.5)
-        , vel = Vec2.vec2 0 0
-        , acc = Vec2.vec2 0 0
-        , healthAmt = c.getFloat "hero:healthMax"
-        , healthMax = c.getFloat "hero:healthMax"
-        }
-    , bullets = []
-    , composts = []
-    , creeps = []
-    , enemyTowers =
-        savedMap.enemyTowers
-            |> Set.toList
-            |> List.map
-                (\pos ->
-                    { pos = pos
-                    , timeSinceLastSpawn = 9999
-                    , healthAmt = c.getFloat "enemyBase:healthMax"
-                    , healthMax = c.getFloat "enemyBase:healthMax"
-                    }
-                )
-    , crops = []
-    , base =
-        { pos = savedMap.base
-        , healthAmt = c.getFloat "base:healthMax"
-        , healthMax = c.getFloat "base:healthMax"
-        }
-    , timeSinceLastFire = 0
-    , timeSinceLastSlash = 99999
-    , slashEffects = []
-    , waterAmt = 75
-    , equipped = Gun
-    , map = savedMap.map
-    , inv =
-        { compost = 0
-        }
-    , moolahSeedAmt = 0
-    , turretSeedAmt = 0
-    , money = 100
-    , rangeLevel = 1
-    , capacityLevel = 1
-    , fireRateLevel = 1
-    , gameState = Playing
-    , isMouseDown = False
-    , mousePos = Vec2.vec2 -99 -99
-    , age = 0
-    , isPaused = False
-    , shouldShowHelp = False
-    , fx = []
-    }
+    ( { hero =
+            { pos =
+                tilePosToFloats savedMap.hero
+                    --|> always ( 2, 2 )
+                    |> tupleToVec2
+                    |> Vec2.add (Vec2.vec2 0.5 0.5)
+            , vel = Vec2.vec2 0 0
+            , acc = Vec2.vec2 0 0
+            , healthAmt = c.getFloat "hero:healthMax"
+            , healthMax = c.getFloat "hero:healthMax"
+            }
+      , bullets = []
+      , composts = []
+      , creeps = []
+      , enemyTowers =
+            savedMap.enemyTowers
+                |> Set.toList
+                |> List.map
+                    (\pos ->
+                        { pos = pos
+                        , timeSinceLastSpawn = 9999
+                        , healthAmt = c.getFloat "enemyBase:healthMax"
+                        , healthMax = c.getFloat "enemyBase:healthMax"
+                        }
+                    )
+      , crops = []
+      , base =
+            { pos = savedMap.base
+            , healthAmt = c.getFloat "base:healthMax"
+            , healthMax = c.getFloat "base:healthMax"
+            }
+      , timeSinceLastFire = 0
+      , timeSinceLastSlash = 99999
+      , slashEffects = []
+      , waterAmt = 75
+      , equipped = Gun
+      , map = savedMap.map
+      , inv =
+            { compost = 0
+            }
+      , moolahSeedAmt = 0
+      , turretSeedAmt = 0
+      , money = 1000
+      , rangeLevel = 1
+      , capacityLevel = 1
+      , fireRateLevel = 1
+      , gameState = Playing
+      , isMouseDown = False
+      , mousePos = Vec2.vec2 -99 -99
+      , age = 0
+      , isPaused = False
+      , shouldShowHelp = False
+      , fx = []
+      }
+    , [ DrawMap (drawMap savedMap) ]
+    )
 
 
 initTryOut : Session -> SavedMap -> ( Model, Cmd Msg )
@@ -2626,24 +2628,22 @@ drawGlass session model =
         []
 
 
+drawMap : SavedMap -> List Sprite
+drawMap savedMap =
+    savedMap.map
+        |> Dict.toList
+        |> List.map
+            (\( ( x, y ), tile ) ->
+                { x = x |> toFloat
+                , y = y |> toFloat
+                , texture = tileToStr tile
+                }
+            )
+
+
 getSprites : Session -> Model -> List SpriteLayer
 getSprites session model =
     let
-        mapLayer =
-            { name = "map"
-            , sprites =
-                model.map
-                    |> Dict.toList
-                    |> List.map
-                        (\( ( x, y ), tile ) ->
-                            { x = x |> toFloat
-                            , y = y |> toFloat
-                            , texture = tileToStr tile
-                            }
-                        )
-            , graphics = []
-            }
-
         cursorLayer =
             { name = "cursor"
             , sprites =
@@ -2843,8 +2843,7 @@ getSprites session model =
                     |> List.concat
             }
     in
-    [ mapLayer
-    , buildingsLayer
+    [ buildingsLayer
     , heroLayer
     , creepsLayer
     , bulletsLayer
@@ -2950,6 +2949,7 @@ mouseGamePos session model =
 
 type Effect
     = DrawSprites (List SpriteLayer)
+    | DrawMap (List Sprite)
     | DrawHero HeroSprite
     | MoveCamera Vec2
     | DrawFx Vec2 FxKind

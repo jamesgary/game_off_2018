@@ -24,10 +24,12 @@
       let app;
       let viewport;
       let nameToPixiLayer = {};
+      let mapLayer = new PIXI.particles.ParticleContainer(100000);
       let botLayer = new PIXI.Container();
       let heroLayer = new PIXI.Container();
       let gunLayerTop = new PIXI.Container();
       let gunLayerBot = new PIXI.Container();
+      let oceanBg;
 
       graphics.init = function() {
         PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
@@ -51,7 +53,15 @@
           // work properly when renderer.view is placed or scaled
           interaction: app.renderer.interaction
         });
+
+        oceanBg = new PIXI.extras.TilingSprite(
+          PIXI.Texture.fromImage('images/water.png'),
+          app.screen.width,
+          app.screen.height
+        );
+        app.stage.addChild(oceanBg);
         app.stage.addChild(viewport);
+        viewport.addChild(mapLayer);
         viewport.addChild(botLayer);
         viewport.addChild(gunLayerBot);
         viewport.addChild(heroLayer);
@@ -66,6 +76,20 @@
         // viewport.addChild(rectangle);
         // end debug stuff
       }
+
+      graphics.drawMap = function(mapData) {
+        for (let l = 0; l < mapData.sprites.length; l++) {
+          let spriteData = mapData.sprites[l];
+          if (spriteData.texture == "grass") {
+            let sprite = new PIXI.Sprite.fromImage('images/' + spriteData.texture + '.png')
+            sprite.x = spriteData.x + 0.5;
+            sprite.y = spriteData.y + 0.5;
+            mapLayer.addChild(sprite);
+          }
+        }
+        // figure out loading first!
+        //mapLayer.cacheAsBitmap = true;
+      };
 
       graphics.drawSprites = function(layerData) {
         for (let l = 0; l < layerData.length; l++) {
@@ -384,6 +408,8 @@
                 //localStorage.removeItem("persistence"); // TOO DANGEROUS
                 break;
               case "MOVE_CAMERA":
+                oceanBg.tilePosition.x = -effect.x;
+                oceanBg.tilePosition.y = -effect.y;
                 viewport.moveCenter(effect.x, effect.y);
                 break;
               case "ZOOM":
@@ -402,6 +428,9 @@
                 break;
               case "DRAW_HERO":
                 graphics.drawHero(effect);
+                break;
+              case "DRAW_MAP":
+                graphics.drawMap(effect);
                 break;
               default:
                 //console.error("unknown effect: " + JSON.stringify(effect));
