@@ -25,6 +25,7 @@
       let nameToPixiLayer = {};
       let topLayer = new PIXI.Container();
       let botLayer = new PIXI.Container();
+      let heroLayer = new PIXI.Container();
 
       graphics.init = function() {
         PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
@@ -49,8 +50,9 @@
           interaction: app.renderer.interaction
         });
         app.stage.addChild(viewport);
-        viewport.addChild(topLayer);
         viewport.addChild(botLayer);
+        viewport.addChild(topLayer);
+        viewport.addChild(heroLayer);
 
         // debug stuff
         // let rectangle = new PIXI.Graphics();
@@ -94,7 +96,7 @@
             let particleContainer = textureNameToParticleGroupCache[spriteData.texture];
             if (!particleContainer) {
               // make new particle container
-              particleContainer = new PIXI.particles.ParticleContainer();
+              particleContainer = new PIXI.particles.ParticleContainer(100000);
               particleContainer.numDrawnSprites = 0;
               // add to particleContainerContainer
               particleContainerContainer.addChild(particleContainer);
@@ -196,8 +198,89 @@
         }
       }
 
+      let heroSheet;
+      let heroSprite;
+      let jsonPath = "images/hero/sprites/sprites.json";
+
+      PIXI.loader
+        .add(jsonPath)
+        .load(function() {
+          sheet = PIXI.loader.resources[jsonPath].spritesheet;
+          heroSprite = new PIXI.Sprite();
+
+          heroLayer.addChild(heroSprite);
+
+          heroSprite.width = heroWidth;
+          heroSprite.height = heroHeight;
+          heroSprite.anchor.set(0.5);
+
+          return;
+        });
+
+      // 14x21
+      let w = 14;
+      let h = 21;
+      let lastImg = "south";
+      let lastFlip = false;
+      let heroWidth = w * 2;
+      let heroHeight = h * 2;
+
+      graphics.drawHero = function(hero) {
+        let currentWidth = heroWidth;
+        let currentHeight = heroHeight;
+        let isFlipped = false;
+        let isMoving = false;
+        let imgPrefix = "south"
+
+        if (heroSprite) {
+          if (hero.xDir === 0 && hero.yDir === 0) {
+            imgPrefix = lastImg;
+            isFlipped = lastFlip;
+            isMoving = false;
+          } else {
+            isMoving = true;
+            if (hero.yDir > 0) {
+              if (hero.xDir !== 0) {
+                imgPrefix = "diagdown";
+              } else {
+                imgPrefix = "south";
+              }
+            } else if (hero.yDir < 0) {
+              if (hero.xDir !== 0) {
+                imgPrefix = "diagup";
+              } else {
+                imgPrefix = "north";
+              }
+            } else {
+              // y === 0
+              if (hero.xDir === 0) {
+                imgPrefix = "south";
+              } else {
+                imgPrefix = "side";
+              }
+            }
+
+            if (hero.xDir < 0 && heroSprite.width > 0) {
+              isFlipped = true;
+            }
+          }
+          lastImg = imgPrefix;
+          lastFlip = isFlipped;
+
+          let animFrame = isMoving ? 1 + ((Math.round (Date.now() / 100)) % 4) : 1;
+
+          heroSprite.texture = PIXI.utils.TextureCache[imgPrefix + "_0" + animFrame + ".png"];
+          heroSprite.x = hero.x * 32;
+          heroSprite.y = hero.y * 32;
+          if (isFlipped) {
+            heroSprite.scale.x = -2;
+          } else {
+            heroSprite.scale.x = 2;
+          }
+        }
+      }
+
       function toColor(str) {
-        //console.log(str.substring(1), 16);
         return parseInt(str.substring(1), 16);
       }
     </script>
@@ -258,6 +341,9 @@
                 break;
               case "DRAW_FX":
                 graphics.drawFx(effect);
+                break;
+              case "DRAW_HERO":
+                graphics.drawHero(effect);
                 break;
               default:
                 //console.error("unknown effect: " + JSON.stringify(effect));

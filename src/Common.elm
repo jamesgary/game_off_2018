@@ -1,4 +1,4 @@
-module Common exposing (Config, ConfigFloat, Graphic, Key, Map, PlacementAvailability(..), SavedMap, Session, Shape(..), Sprite, SpriteLayer, Texture(..), Tile(..), TilePos, heroDirInput, mapFromAscii, pct, px, textureToStr, tilePosToFloats, tileToStr, tupleToVec2, vec2ToTuple)
+module Common exposing (Config, ConfigFloat, Graphic, HeroSprite, Key, Map, PlacementAvailability(..), SavedMap, Session, Shape(..), Sprite, SpriteLayer, Texture(..), Tile(..), TilePos, heroDirInput, mapFromAscii, pct, px, textureToStr, tilePosToFloats, tileToStr, tupleToVec2, vec2ToTuple)
 
 import Dict exposing (Dict)
 import Math.Vector2 as Vec2 exposing (Vec2)
@@ -227,6 +227,15 @@ type alias Graphic =
 type Shape
     = Rect
     | Arc Vec2 Vec2 Vec2
+
+
+type alias HeroSprite =
+    { x : Float
+    , y : Float
+    , xDir : Int
+    , yDir : Int
+    , equipped : String
+    }
 
 
 px : Float -> String

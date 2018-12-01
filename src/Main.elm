@@ -502,6 +502,21 @@ performGameEffects session effects model =
                             ]
                             :: updatingCmds
                         )
+
+                    Game.DrawHero hero ->
+                        ( updatingModel
+                        , performEffects
+                            [ Json.Encode.object
+                                [ ( "id", Json.Encode.string "DRAW_HERO" )
+                                , ( "x", hero.x |> Json.Encode.float )
+                                , ( "y", hero.y |> Json.Encode.float )
+                                , ( "xDir", hero.xDir |> Json.Encode.int )
+                                , ( "yDir", hero.yDir |> Json.Encode.int )
+                                , ( "equipped", hero.equipped |> Json.Encode.string )
+                                ]
+                            ]
+                            :: updatingCmds
+                        )
             )
             ( model, [] )
         |> Tuple.mapSecond Cmd.batch

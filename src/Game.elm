@@ -457,6 +457,7 @@ update msg session model =
                             --, isPaused = True
                           }
                         , [ DrawSprites (getSprites session updatedModel)
+                          , DrawHero (drawHero session updatedModel)
                           , MoveCamera updatedModel.hero.pos
                           ]
                             ++ updatedModel.fx
@@ -562,6 +563,16 @@ creepRad =
 
 absorptionRate =
     50
+
+
+drawHero : Session -> Model -> HeroSprite
+drawHero session model =
+    { x = model.hero.pos |> Vec2.getX
+    , y = model.hero.pos |> Vec2.getY
+    , xDir = model.hero.vel |> Vec2.getX |> round
+    , yDir = model.hero.vel |> Vec2.getY |> round
+    , equipped = model.equipped |> equippableStr
+    }
 
 
 soilAbsorbWaterFromBullets : Session -> Float -> Model -> Model
@@ -2013,16 +2024,16 @@ equippableStr : Equippable -> String
 equippableStr equippable =
     case equippable of
         Gun ->
-            "Gun"
+            "gun"
 
         Scythe ->
-            "Scythe"
+            "scythe"
 
         MoneyCropSeed ->
-            "MoneyCrop Seed"
+            "seed"
 
         TurretSeed ->
-            "Turret Seed"
+            "seed"
 
 
 drawGlass : Session -> Model -> Html Msg
@@ -2266,7 +2277,8 @@ getSprites session model =
     in
     [ mapLayer
     , buildingsLayer
-    , heroLayer
+
+    --, heroLayer
     , creepsLayer
     , bulletsLayer
     , cursorLayer
@@ -2371,6 +2383,7 @@ mouseGamePos session model =
 
 type Effect
     = DrawSprites (List SpriteLayer)
+    | DrawHero HeroSprite
     | MoveCamera Vec2
     | DrawFx Vec2 FxKind
 
