@@ -78,7 +78,7 @@ json =
     "max": 25
   },
   "crops:turret:bulletSpeed": {
-    "val": 3,
+    "val": 13,
     "min": 0,
     "max": 25
   },
@@ -93,9 +93,14 @@ json =
     "max": 25
   },
   "crops:turret:waterNeededToMature": {
-    "val": 5,
+    "val": 1,
     "min": 0,
     "max": 25
+  },
+  "crops:turret:absorptionRate": {
+    "val": 0,
+    "min": 0.05,
+    "max": 1
   },
   "enemyBase:creepsPerSpawn": {
     "val": 5,
@@ -188,7 +193,7 @@ json =
     "max": 25
   },
   "waterGun:maxCapacity": {
-    "val": 100,
+    "val": 25,
     "min": 0,
     "max": 1000
   },

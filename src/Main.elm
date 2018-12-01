@@ -444,16 +444,11 @@ update msg model =
                         ( newModel, effects ) =
                             Game.update gameMsg session gameModel
                     in
-                    ( { model
+                    { model
                         | state = Game newModel
+                    }
+                        |> performGameEffects session effects
 
-                        --, session = newSession
-                      }
-                    , Cmd.none
-                    )
-
-                --|> performMapEffects newSession effects
-                --|> performMapEffects session effects
                 _ ->
                     ( model, Cmd.none )
 
@@ -932,6 +927,9 @@ subscriptions model =
 
                     else
                         case gameModel.gameState of
+                            Game.MainMenu ->
+                                []
+
                             Game.Playing ->
                                 [ Browser.Events.onAnimationFrameDelta Tick
                                 ]

@@ -8,3 +8,12 @@
 ### Lessons Learned (???)
 
 I didn't know whether/when to Vec2, floats, tiles, etc, so I just (or will soon) make a bunch of helper methods, see what's common, and eventually check for performance. but at least this way I get some cool naturally-occuring abstraction.
+
+### TODO
+
+- More tile types: rock, desert, beach, swamp?
+- Wave indicator
+- Creeps shoot at hero
+- Creeps move towards hero
+- Enemy base fires back
+- Defensive swarm around enemy base

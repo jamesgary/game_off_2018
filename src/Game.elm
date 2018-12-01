@@ -122,7 +122,7 @@ init session =
                 |> List.map
                     (\pos ->
                         { pos = pos
-                        , timeSinceLastSpawn = 9999
+                        , timeSinceLastSpawn = 0
                         , healthAmt = c.getFloat "enemyBase:healthMax"
                         , healthMax = c.getFloat "enemyBase:healthMax"
                         , pathToBase =
@@ -143,7 +143,7 @@ init session =
       , timeSinceLastFire = 0
       , timeSinceLastSlash = 99999
       , slashEffects = []
-      , waterAmt = 75
+      , waterAmt = c.getFloat "waterGun:maxCapacity"
       , equipped = Gun
       , map = savedMap.map
       , inv =
@@ -155,7 +155,7 @@ init session =
       , rangeLevel = 1
       , capacityLevel = 1
       , fireRateLevel = 1
-      , gameState = Playing
+      , gameState = MainMenu
       , isMouseDown = False
       , mousePos = Vec2.vec2 -99 -99
       , age = 0
@@ -235,7 +235,8 @@ port hardReset : () -> Cmd msg
 
 
 type GameState
-    = Playing
+    = MainMenu
+    | Playing
     | InStore
     | GameOver
     | Win
@@ -373,6 +374,7 @@ type Msg
     | LeaveMarket
     | ToggleHelp Bool
     | BuyUpgrade Upgrade
+    | ClickPlay
 
 
 makeC : Dict String ConfigVal -> Config
@@ -663,6 +665,18 @@ update msg session model =
                 , isPaused = shouldShow
               }
             , []
+            )
+
+        ClickPlay ->
+            ( { model
+                | shouldShowHelp = True
+                , isPaused = True
+                , gameState = Playing
+              }
+            , [ DrawSprites (getSprites session model)
+              , DrawHero (drawHero session model)
+              , MoveCamera model.hero.pos
+              ]
             )
 
         BuyUpgrade upgrade ->
@@ -1970,6 +1984,9 @@ subscriptions model =
             , Browser.Events.onKeyUp (Decode.map KeyUp (Decode.field "key" Decode.string))
             , Sub.batch
                 (case model.gameState of
+                    MainMenu ->
+                        []
+
                     Playing ->
                         [ Browser.Events.onAnimationFrameDelta Tick
                         ]
@@ -2116,6 +2133,76 @@ drawHelp session model =
 viewScreens : Session -> Model -> Html Msg
 viewScreens session model =
     case model.gameState of
+        MainMenu ->
+            Html.div
+                [ Html.Attributes.style "position" "absolute"
+                , Html.Attributes.style "top" "0"
+                , Html.Attributes.style "left" "0"
+                , Html.Attributes.style "width" "100%"
+                , Html.Attributes.style "height" "100%"
+                , Html.Attributes.style "z-index" "99"
+                , Html.Attributes.style "background-image" "linear-gradient(15deg, #13547a 0%, #80d0c7 100%)"
+                ]
+                [ Html.div
+                    [ Html.Attributes.style "color" "white"
+                    , Html.Attributes.style "text-align" "center"
+                    , Html.Attributes.style "top" "10%"
+                    , Html.Attributes.style "width" "100%"
+                    , Html.Attributes.style "height" "100%"
+                    , Html.Attributes.style "position" "absolute"
+                    , Html.Attributes.style "line-height" "48px"
+                    ]
+                    [ Html.div
+                        [ Html.Attributes.style "font-size" "48px"
+                        , Html.Attributes.style "font-family" "'Rock Salt', cursive"
+                        , Html.Attributes.style "line-height" "69px"
+                        ]
+                        [ Html.text "Workin'"
+                        , Html.br [] []
+                        , Html.text "Progress"
+                        ]
+                    , Html.div
+                        [ Html.Attributes.style "font-size" "24px"
+                        ]
+                        [ Html.span
+                            [ Html.Attributes.style "color" "#fff"
+                            , Html.Attributes.style "font-family" "'Open Sans', sans-serif"
+                            ]
+                            [ Html.text "version 0.0001"
+                            ]
+                        ]
+                    , Html.div
+                        [ Html.Attributes.style "font-size" "16px"
+                        ]
+                        [ Html.a
+                            [ Html.Attributes.href "https://github.com/jamesgary/game_off_2018"
+                            , Html.Attributes.target "_blank"
+                            , Html.Attributes.style "color" "#aff"
+                            , Html.Attributes.style "font-family" "'Open Sans', sans-serif"
+                            ]
+                            [ Html.text "source code" ]
+                        ]
+                    , Html.div
+                        [ Html.Attributes.style "font-size" "14px"
+                        ]
+                        [ Html.span
+                            [ Html.Attributes.style "color" "#fff"
+                            , Html.Attributes.style "font-family" "'Open Sans', sans-serif"
+                            ]
+                            [ Html.text "A hybrid mash-up of farming simulator and tower defense!"
+                            ]
+                        ]
+                    , Html.button
+                        [ Html.Attributes.style "font-size" "24px"
+                        , Html.Attributes.style "border-radius" "4px"
+                        , Html.Attributes.style "padding" "8px 16px"
+                        , Html.Events.onClick ClickPlay
+                        ]
+                        [ Html.text "Play"
+                        ]
+                    ]
+                ]
+
         GameOver ->
             Html.div
                 [ Html.Attributes.style "position" "absolute"
