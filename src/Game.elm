@@ -39,7 +39,6 @@ type alias Model =
     , timeSinceLastSlash : Float
     , slashEffects : List ( Float, Graphic )
     , waterAmt : Float
-    , waterMax : Float
     , equipped : Equippable
 
     -- map
@@ -56,6 +55,11 @@ type alias Model =
     , moolahSeedAmt : Int
     , turretSeedAmt : Int
     , shouldShowHelp : Bool
+
+    -- upgrades
+    , rangeLevel : Int
+    , capacityLevel : Int
+    , fireRateLevel : Int
 
     -- to be flushed at the end of every tick
     , fx : List Effect
@@ -79,6 +83,7 @@ init session =
     { hero =
         { pos =
             tilePosToFloats savedMap.hero
+                |> always ( 2, 2 )
                 |> tupleToVec2
                 |> Vec2.add (Vec2.vec2 0.5 0.5)
         , vel = Vec2.vec2 0 0
@@ -110,7 +115,6 @@ init session =
     , timeSinceLastSlash = 99999
     , slashEffects = []
     , waterAmt = 75
-    , waterMax = 100
     , equipped = Gun
     , map = savedMap.map
     , inv =
@@ -119,6 +123,9 @@ init session =
     , moolahSeedAmt = 0
     , turretSeedAmt = 0
     , money = 100
+    , rangeLevel = 1
+    , capacityLevel = 1
+    , fireRateLevel = 1
     , gameState = Playing
     , isMouseDown = False
     , mousePos = Vec2.vec2 -99 -99
@@ -169,13 +176,15 @@ initTryOut session savedMap =
       , timeSinceLastSlash = 99999
       , slashEffects = []
       , waterAmt = 75
-      , waterMax = 100
       , equipped = Gun
       , map = savedMap.map
       , inv =
             { compost = 0
             }
       , money = 0
+      , rangeLevel = 1
+      , capacityLevel = 1
+      , fireRateLevel = 1
       , moolahSeedAmt = 0
       , turretSeedAmt = 0
       , gameState = Playing
@@ -313,6 +322,12 @@ type alias Key =
     String
 
 
+type Upgrade
+    = Range
+    | Capacity
+    | FireRate
+
+
 type Msg
     = KeyDown String
     | KeyUp String
@@ -324,6 +339,7 @@ type Msg
     | Buy Equippable Int
     | LeaveMarket
     | ToggleHelp Bool
+    | BuyUpgrade Upgrade
 
 
 dlog : String -> a -> a
@@ -410,10 +426,6 @@ viewMeter amt max meterWidth =
                 )
                 []
             ]
-
-        --, Html.span [] [ Html.text (String.fromFloat waterAmt) ]
-        --, Html.span [] [ Html.text "/" ]
-        --, Html.span [] [ Html.text (String.fromFloat waterMax) ]
         ]
 
 
@@ -464,7 +476,7 @@ update msg session model =
                 |> applyCreepDamageToHero session delta
                 |> collideBulletsWithCreeps session delta
                 |> collideBulletsWithEnemyTowers session delta
-                |> heroPickUpCompost session delta
+                --|> heroPickUpCompost session delta
                 |> checkIfInStore session delta
                 |> checkGameOver session delta
                 |> (\updatedModel ->
@@ -621,6 +633,22 @@ update msg session model =
                 | shouldShowHelp = shouldShow
                 , isPaused = shouldShow
               }
+            , []
+            )
+
+        BuyUpgrade upgrade ->
+            ( { model | money = model.money - costForUpgrade session model upgrade }
+                |> (\m ->
+                        case upgrade of
+                            Range ->
+                                { m | rangeLevel = m.rangeLevel + 1 }
+
+                            Capacity ->
+                                { m | capacityLevel = m.capacityLevel + 1 }
+
+                            FireRate ->
+                                { m | fireRateLevel = m.fireRateLevel + 1 }
+                   )
             , []
             )
 
@@ -996,8 +1024,8 @@ applyKeyDown str model =
 
 makePlayerBullets : Session -> Float -> Model -> Model
 makePlayerBullets session delta model =
-    if model.isMouseDown && model.equipped == Gun && model.waterAmt > session.c.getFloat "waterGun:bulletCost" then
-        if model.timeSinceLastFire > (1 / session.c.getFloat "waterGun:fireRate") then
+    if model.isMouseDown && model.equipped == Gun && model.waterAmt > 1 then
+        if model.timeSinceLastFire > (1 / ((toFloat model.fireRateLevel / 2) * session.c.getFloat "waterGun:fireRate")) then
             { model
                 | timeSinceLastFire = 0
                 , bullets =
@@ -1010,7 +1038,7 @@ makePlayerBullets session delta model =
                            )
                     )
                         :: model.bullets
-                , waterAmt = model.waterAmt - session.c.getFloat "waterGun:bulletCost"
+                , waterAmt = model.waterAmt - 1
             }
 
         else
@@ -1050,7 +1078,9 @@ refillWater session delta model =
     { model
         | waterAmt =
             if nearbyWater model then
-                min (model.waterAmt + (delta * session.c.getFloat "waterGun:refillRate")) model.waterMax
+                min
+                    (model.waterAmt + (delta * session.c.getFloat "waterGun:refillRate"))
+                    (heroWaterMax session model |> toFloat)
 
             else
                 model.waterAmt
@@ -1471,18 +1501,37 @@ moveBullets session delta model =
     { model
         | bullets =
             model.bullets
-                |> List.map
+                |> List.filterMap
                     (\bullet ->
-                        { bullet
-                            | pos =
-                                Vec2.add
-                                    -- TODO different bullet types
-                                    (tupleToVec2 (fromPolar ( session.c.getFloat "waterGun:bulletSpeed" * delta, bullet.angle )))
-                                    bullet.pos
-                            , age = bullet.age + delta
-                        }
+                        let
+                            ( speed, maxAge ) =
+                                case bullet.kind of
+                                    PlayerBullet ->
+                                        ( session.c.getFloat "waterGun:bulletSpeed"
+                                        , session.c.getFloat "waterGun:bulletMaxAge" * toFloat model.rangeLevel
+                                        )
+
+                                    PlantBullet ->
+                                        ( session.c.getFloat "crops:turret:bulletSpeed"
+                                        , session.c.getFloat "crops:turret:bulletMaxAge"
+                                        )
+
+                            newAge =
+                                bullet.age + delta
+                        in
+                        if newAge > maxAge then
+                            Nothing
+
+                        else
+                            Just
+                                { bullet
+                                    | pos =
+                                        Vec2.add
+                                            (tupleToVec2 (fromPolar ( speed * delta, bullet.angle )))
+                                            bullet.pos
+                                    , age = bullet.age + delta
+                                }
                     )
-                |> List.filter (\bullet -> bullet.age < session.c.getFloat "waterGun:bulletMaxAge")
     }
 
 
@@ -1972,13 +2021,20 @@ drawHud session model =
         , Html.Attributes.style "color" "#cfc"
         ]
         [ Html.div
-            [ Html.Attributes.style "width" "300px"
+            [ Html.Attributes.style "width" "200px"
             ]
             [ Html.text ("Money: $" ++ String.fromInt model.money) ]
         , Html.div
-            [ Html.Attributes.style "margin-right" "4px" ]
-            [ Html.text "Water: " ]
-        , viewMeter model.waterAmt model.waterMax (session.c.getFloat "ui:meterWidth")
+            [ Html.Attributes.style "width" "200px"
+            ]
+            [ Html.text
+                ("Water: "
+                    ++ String.fromInt (round model.waterAmt)
+                    ++ " / "
+                    ++ String.fromInt (heroWaterMax session model)
+                )
+            ]
+        , viewMeter model.waterAmt (heroWaterMax session model |> toFloat) (session.c.getFloat "ui:meterWidth")
         ]
 
 
@@ -2151,21 +2207,21 @@ viewScreens session model =
                         [ Html.Attributes.style "display" "flex"
                         , Html.Attributes.style "justify-content" "center"
                         ]
-                        ([ { title = "Moolah Seed"
-                           , icon = "images/mature-money.png"
-                           , desc = "Harvesting mature Moolah with your scythe will yield money. Use money to buy more crops."
-                           , cost = 10
-                           , msg = Buy MoolahCropSeed
-                           , currentAmt = model.moolahSeedAmt
-                           }
-                         , { title = "Turret Seed"
-                           , icon = "images/turret.png"
-                           , desc = "Mature Turrets will automatically attack incoming creeps. Make sure to grow these before the harder waves!"
-                           , cost = 50
-                           , msg = Buy TurretSeed
-                           , currentAmt = model.turretSeedAmt
-                           }
-                         ]
+                        (([ { title = "Moolah Seed"
+                            , icon = "images/mature-money.png"
+                            , desc = "Harvesting mature Moolah with your scythe will yield money. Use money to buy more crops."
+                            , cost = 10
+                            , msg = Buy MoolahCropSeed
+                            , currentAmt = model.moolahSeedAmt
+                            }
+                          , { title = "Turret Seed"
+                            , icon = "images/turret.png"
+                            , desc = "Mature Turrets will automatically attack incoming creeps. Make sure to grow these before the harder waves!"
+                            , cost = 50
+                            , msg = Buy TurretSeed
+                            , currentAmt = model.turretSeedAmt
+                            }
+                          ]
                             |> List.map
                                 (\{ title, icon, desc, cost, msg, currentAmt } ->
                                     Html.div
@@ -2239,6 +2295,72 @@ viewScreens session model =
                                             [ Html.text ("Current amount: " ++ String.fromInt currentAmt) ]
                                         ]
                                 )
+                         )
+                            ++ [ Html.div
+                                    [ Html.Attributes.style "display" "flex"
+                                    , Html.Attributes.style "flex-direction" "column"
+                                    , Html.Attributes.style "align-items" "center"
+                                    , Html.Attributes.style "margin" "0 20px"
+                                    ]
+                                    [ Html.span
+                                        [ Html.Attributes.style "font-size" "24px"
+                                        ]
+                                        [ Html.text "Water Gun Upgrades" ]
+                                    , Html.div []
+                                        ([ ( Range, "Range" )
+                                         , ( Capacity, "Capacity" )
+                                         , ( FireRate, "Fire Rate" )
+                                         ]
+                                            |> List.map
+                                                (\( kind, str ) ->
+                                                    let
+                                                        cost =
+                                                            costForUpgrade session model kind
+
+                                                        lvl =
+                                                            currentLevelForUpgrade session model kind
+                                                    in
+                                                    Html.div []
+                                                        [ Html.span
+                                                            [ Html.Attributes.style "font-size" "16px"
+                                                            , Html.Attributes.style "text-align" "center"
+                                                            ]
+                                                            [ Html.text ("Cost: $" ++ String.fromInt cost) ]
+                                                        , Html.button
+                                                            ([ Html.Attributes.style "margin" "10px"
+                                                             , Html.Attributes.style "color" "#000"
+                                                             , Html.Attributes.style "font-size" "16px"
+                                                             , Html.Attributes.style "border-radius" "3px"
+                                                             , Html.Attributes.style "padding" "5px"
+                                                             , Html.Events.onClick (BuyUpgrade kind)
+                                                             ]
+                                                                ++ (if model.money >= cost then
+                                                                        [ Html.Attributes.style "background" "#0d3"
+                                                                        , Html.Attributes.style "cursor" "pointer"
+                                                                        , Html.Attributes.style "border-color" "#2f8"
+                                                                        ]
+
+                                                                    else
+                                                                        [ Html.Attributes.style "background" "#aaa"
+                                                                        , Html.Attributes.disabled True
+                                                                        ]
+                                                                   )
+                                                            )
+                                                            [ Html.text
+                                                                ("Upgrade "
+                                                                    ++ str
+                                                                    ++ " ("
+                                                                    ++ String.fromInt lvl
+                                                                    ++ "->"
+                                                                    ++ String.fromInt (1 + lvl)
+                                                                    ++ ")"
+                                                                )
+                                                            ]
+                                                        ]
+                                                )
+                                        )
+                                    ]
+                               ]
                         )
                     , Html.div
                         [ Html.Attributes.style "width" "100%"
@@ -2929,3 +3051,34 @@ drawMaturityMeter pos width consumed need has =
       , shape = Rect
       }
     ]
+
+
+costForUpgrade : Session -> Model -> Upgrade -> Int
+costForUpgrade session model upgrade =
+    case upgrade of
+        Range ->
+            model.rangeLevel * 20
+
+        Capacity ->
+            model.capacityLevel * 20
+
+        FireRate ->
+            model.fireRateLevel * 20
+
+
+currentLevelForUpgrade : Session -> Model -> Upgrade -> Int
+currentLevelForUpgrade session model upgrade =
+    case upgrade of
+        Range ->
+            model.rangeLevel
+
+        Capacity ->
+            model.capacityLevel
+
+        FireRate ->
+            model.fireRateLevel
+
+
+heroWaterMax : Session -> Model -> Int
+heroWaterMax session model =
+    round (session.c.getFloat "waterGun:maxCapacity") * model.capacityLevel

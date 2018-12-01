@@ -67,6 +67,16 @@ json =
     "min": 0,
     "max": 25
   },
+  "crops:turret:bulletMaxAge": {
+    "val": 3,
+    "min": 0,
+    "max": 25
+  },
+  "crops:turret:bulletSpeed": {
+    "val": 3,
+    "min": 0,
+    "max": 25
+  },
   "enemyBase:creepsPerSpawn": {
     "val": 5,
     "min": 0,
@@ -132,18 +142,13 @@ json =
     "min": 0,
     "max": 25
   },
-  "waterGun:bulletCost": {
-    "val": 5,
-    "min": 0,
-    "max": 25
-  },
   "waterGun:bulletDmg": {
     "val": 5,
     "min": 0,
     "max": 25
   },
   "waterGun:bulletMaxAge": {
-    "val": 5,
+    "val": 0.3,
     "min": 0,
     "max": 25
   },
@@ -158,7 +163,7 @@ json =
     "max": 25
   },
   "waterGun:fireRate": {
-    "val": 18.4249720739729,
+    "val": 5,
     "min": 0,
     "max": 25
   },
@@ -166,6 +171,11 @@ json =
     "val": 20.5721732654834,
     "min": 0,
     "max": 25
+  },
+  "waterGun:maxCapacity": {
+    "val": 100,
+    "min": 0,
+    "max": 1000
   }
 }
 """
