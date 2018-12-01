@@ -194,6 +194,10 @@
             makeCreepDeathEmitter(botLayer, effect.x, effect.y)
               .playOnceAndDestroy();
             break;
+          case "HARVEST":
+            makeHarvestEmitter(botLayer, effect.x, effect.y)
+              .playOnceAndDestroy();
+            break;
           default:
             console.error("unknown fx!", effect);
             break;

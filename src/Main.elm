@@ -532,6 +532,9 @@ encodeFxKind fxKind =
         Game.CreepDeath ->
             Json.Encode.string "CREEP_DEATH"
 
+        Game.HarvestFx ->
+            Json.Encode.string "HARVEST"
+
 
 encodeSpriteLayer : SpriteLayer -> Json.Decode.Value
 encodeSpriteLayer layer =

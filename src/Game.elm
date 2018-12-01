@@ -52,6 +52,7 @@ type alias Model =
     , isMouseDown : Bool
     , age : Float
     , isPaused : Bool
+    , money : Int
 
     -- to be flushed at the end of every tick
     , fx : List Effect
@@ -112,6 +113,7 @@ init session =
     , inv =
         { compost = 0
         }
+    , money = 0
     , gameState = Playing
     , isMouseDown = False
     , mousePos = Vec2.vec2 -99 -99
@@ -167,6 +169,7 @@ initTryOut session savedMap =
       , inv =
             { compost = 0
             }
+      , money = 0
       , gameState = Playing
       , isMouseDown = False
       , mousePos = Vec2.vec2 -99 -99
@@ -525,10 +528,17 @@ update msg session model =
                                 }
 
                             ( Scythe, _, _ ) ->
+                                let
+                                    ( crops, fxs ) =
+                                        slashCrops session model
+                                in
                                 { model
                                     | timeSinceLastSlash = 0
                                     , slashEffects = ( 0, makeSlashEffect session model ) :: model.slashEffects
                                     , creeps = slashCreeps session model
+                                    , crops = crops
+                                    , fx = fxs ++ model.fx
+                                    , money = model.money + (List.length fxs * 10)
                                 }
 
                             _ ->
@@ -741,6 +751,40 @@ slashCreeps session model =
                 else
                     Just creep
             )
+
+
+slashCrops : Session -> Model -> ( List Crop, List Effect )
+slashCrops session model =
+    let
+        slashPoly =
+            getSlashPoly session model
+    in
+    model.crops
+        |> List.map
+            (\crop ->
+                case ( crop.state, crop.kind ) of
+                    ( Mature, MoneyCrop ) ->
+                        if
+                            Collision.collision 10
+                                ( slashPoly, polySupport )
+                                ( polyFromSquare (crop.pos |> vec2FromTilePos) 0.5, polySupport )
+                                |> Maybe.withDefault False
+                        then
+                            -- hit!
+                            ( Nothing, Just (DrawFx (crop.pos |> vec2FromTilePos) HarvestFx) )
+
+                        else
+                            ( Just crop, Nothing )
+
+                    _ ->
+                        ( Just crop, Nothing )
+            )
+        |> List.unzip
+        |> (\( maybeCrops, maybeFxs ) ->
+                ( maybeCrops |> List.filterMap identity
+                , maybeFxs |> List.filterMap identity
+                )
+           )
 
 
 getSlashPoly : Session -> Model -> List Collision.Pt
@@ -1848,6 +1892,8 @@ view session model =
                 , viewMeter model.waterAmt model.waterMax (session.c.getFloat "ui:meterWidth")
                 ]
             , Html.hr [] []
+            , Html.strong [] [ Html.text "Money: " ]
+            , Html.strong [] [ Html.text (String.fromInt model.money) ]
 
             --, Html.div
             --    [ Html.Attributes.style "margin" "5px 20px 0"
@@ -1938,7 +1984,7 @@ drawEquippables session model =
         equippables =
             [ ( Gun, "images/icon-watergun.png" )
             , ( Scythe, "images/scythe.png" )
-            , ( MoneyCropSeed, "images/moneyCrop.png" )
+            , ( MoneyCropSeed, "images/mature-money.png" )
             , ( TurretSeed, "images/turret.png" )
             , ( TurretSeed, "images/hedge.png" )
             ]
@@ -2243,13 +2289,17 @@ getSprites session model =
                                     , y = etY |> toFloat
                                     , texture =
                                         case crop.state of
-                                            Seedling _ ->
-                                                "seedling"
+                                            Seedling sData ->
+                                                if sData.waterConsumed / sData.waterNeededToMature < 0.25 then
+                                                    "seedling"
+
+                                                else
+                                                    "young-money"
 
                                             Mature ->
                                                 case crop.kind of
                                                     MoneyCrop ->
-                                                        "moneyCrop"
+                                                        "mature-money"
 
                                                     Turret _ ->
                                                         "turret"
@@ -2473,6 +2523,7 @@ type Effect
 type FxKind
     = Splash
     | CreepDeath
+    | HarvestFx
 
 
 drawHealthMeter : Vec2 -> Float -> Float -> Float -> List Graphic
