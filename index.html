@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GAME</title>
+    <link rel="stylesheet" type="text/css" href="./css/main.css">
+    <!--<link rel="stylesheet" type="text/css" href="./css/clock.css">-->
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,700|Rock+Salt" rel="stylesheet">
+  </head>
+  <body>
+    <div id="pixi"></div>
+    <div id="elm-container">
+      <div id="elm"></div>
+    </div>
+    <div id="stats"></div>
+    <script src="./js/pixi.min.js"></script>
+    <script src="./js/pixi-viewport.js"></script>
+    <script src="./js/pixi-layers.js"></script>
+    <script src="./js/pixi-particles.js"></script>
+    <script src="./js/main.js"></script>
+    <script src="./js/particles.js"></script>
+    <script>
+      window.WIDTH = window.innerWidth;
+      window.HEIGHT = window.innerHeight;
+
+      window.graphics = {};
+
+      let app;
+      let viewport;
+      let nameToPixiLayer = {};
+      let mapLayer = new PIXI.particles.ParticleContainer(100000);
+      let botLayer = new PIXI.Container();
+      let heroLayer = new PIXI.Container();
+      let gunLayerTop = new PIXI.Container();
+      let gunLayerBot = new PIXI.Container();
+      let oceanBg;
+
+
+      graphics.init = function() {
+        PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
+
+        app = new PIXI.Application({
+          width: WIDTH,
+          height: HEIGHT,
+          roundPixels: true,
+          resolution: 1,
+          antialias: true, // needed to fix health bars
+        });
+        document.getElementById("pixi").appendChild(app.view);
+
+        viewport = new PIXI.extras.Viewport({
+          screenWidth: WIDTH,
+          screenHeight: HEIGHT,
+          worldWidth: 20,
+          worldHeight: 20 * (HEIGHT / WIDTH),
+
+          // the interaction module is important for wheel() to
+          // work properly when renderer.view is placed or scaled
+          interaction: app.renderer.interaction
+        });
+
+        oceanBg = new PIXI.extras.TilingSprite(
+          PIXI.Texture.fromImage('images/water.png'),
+          app.screen.width,
+          app.screen.height
+        );
+        app.stage.addChild(oceanBg);
+        app.stage.addChild(viewport);
+        viewport.addChild(mapLayer);
+        viewport.addChild(botLayer);
+        viewport.addChild(gunLayerBot);
+        viewport.addChild(heroLayer);
+        viewport.addChild(gunLayerTop);
+
+        // debug stuff
+        // let rectangle = new PIXI.Graphics();
+        // rectangle.beginFill(0xFFCCFF);
+        // rectangle.drawRect(-999, 0, 2000, 1); // x axis
+        // rectangle.drawRect(0, -999, 1, 2000); // y axis
+        // rectangle.endFill();
+        // viewport.addChild(rectangle);
+        // end debug stuff
+      }
+
+      graphics.drawMap = function(mapData) {
+        for (let l = 0; l < mapData.sprites.length; l++) {
+          let spriteData = mapData.sprites[l];
+          if (spriteData.texture == "grass") {
+            let sprite = new PIXI.Sprite.fromImage('images/' + spriteData.texture + '.png')
+            sprite.x = spriteData.x + 0.5;
+            sprite.y = spriteData.y + 0.5;
+            mapLayer.addChild(sprite);
+          }
+        }
+        // figure out loading first!
+        //mapLayer.cacheAsBitmap = true;
+      };
+
+      graphics.drawSprites = function(layerData) {
+        for (let l = 0; l < layerData.length; l++) {
+          let layer = layerData[l];
+
+          let pixiLayer = nameToPixiLayer[layer.name]
+          if (!pixiLayer) {
+            //pixiLayer = new PIXI.display.Layer();
+            pixiLayer = new PIXI.Container();
+            pixiLayer.particleContainerContainer = new PIXI.Container();
+            pixiLayer.textureNameToParticleGroupCache = {};
+            pixiLayer.addChild(pixiLayer.particleContainerContainer);
+            nameToPixiLayer[layer.name] = pixiLayer;
+            botLayer.addChild(pixiLayer);
+          }
+
+          // SPRITES (maybe start above and refactor?)
+          particleContainerContainer = pixiLayer.particleContainerContainer;
+          textureNameToParticleGroupCache = pixiLayer.textureNameToParticleGroupCache;
+
+          // reset numDrawnSprites for all particle containers
+          let allPcs = particleContainerContainer.children;
+          for (let i = 0; i < allPcs.length; i++) {
+            allPcs[i].numDrawnSprites = 0;
+          }
+
+          for (let i = 0; i < layer.sprites.length; i++) {
+            let spriteData = layer.sprites[i]
+
+            // get the particle container (add one of it doesn't exist)
+            let particleContainer = textureNameToParticleGroupCache[spriteData.texture];
+            if (!particleContainer) {
+              // make new particle container
+              particleContainer = new PIXI.particles.ParticleContainer(100000);
+              particleContainer.numDrawnSprites = 0;
+              // add to particleContainerContainer
+              particleContainerContainer.addChild(particleContainer);
+              // add to textureNameToParticleGroupCache
+              textureNameToParticleGroupCache[spriteData.texture] = particleContainer;
+            }
+
+            // update the first undrawn sprite (add one if it doesn't exist)
+            let sprite;
+            try {
+              sprite = particleContainer.getChildAt(particleContainer.numDrawnSprites);
+            } catch(e) {
+              sprite = new PIXI.Sprite.fromImage('images/' + spriteData.texture + '.png')
+              particleContainer.addChildAt(sprite, particleContainer.numDrawnSprites);
+            }
+
+            sprite.x = spriteData.x + 0.5;
+            sprite.y = spriteData.y + 0.5;
+            particleContainer.numDrawnSprites++;
+          }
+
+          // lastly, remove any undrawn particles
+          allPcs = particleContainerContainer.children;
+          for (let i = 0; i < allPcs.length; i++) {
+            let particleContainer = allPcs[i];
+            for (let j = particleContainer.numDrawnSprites; j < particleContainer.children.length; j++) {
+              // TODO this is a little slow when removing a lot of sprites (like rect tool in editor)
+              // it takes a few frames to clear out all the sprites
+              //console.log("removin");
+              particleContainer.removeChildAt(j);
+            }
+          }
+
+          // GRAPHICS
+          // get the graphics container (add one of it doesn't exist)
+          let pixiGraphics = pixiLayer.daGraphicZone;
+          if (!pixiGraphics) {
+            // make new particle container
+            pixiGraphics = new PIXI.Graphics({
+              nativeLines: true
+            });
+            pixiLayer.addChild(pixiGraphics);
+            pixiLayer.daGraphicZone = pixiGraphics;
+            //console.log('creating');
+          } else {
+            pixiGraphics.clear();
+          }
+
+          // draw it!
+          for (let k = 0; k < layer.graphics.length; k++) {
+            let g = layer.graphics[k];
+            switch (g.shape) {
+              case "rect":
+                pixiGraphics.beginFill(
+                  toColor(g.bgColor),
+                  g.alpha
+                );
+                pixiGraphics.drawRect(
+                  g.x + 0.5,
+                  g.y + 0.5,
+                  g.width,
+                  g.height
+                );
+                break;
+              case "arc":
+                let x = g.x;
+                let y = g.y;
+                //let dist = Math.sqrt(((x - g.arcLeftX) ^ 2) + ((y - g.arcLeftY) ^ 2));
+
+                pixiGraphics.beginFill(0xFFFFFF, g.alpha);
+
+                pixiGraphics.moveTo(x, y);
+                pixiGraphics.lineTo(g.arcLeftX, g.arcLeftY);
+                pixiGraphics.quadraticCurveTo(g.arcTopX, g.arcTopY, g.arcRightX, g.arcRightY);
+
+                pixiGraphics.lineTo(x, y);
+                pixiGraphics.endFill();
+                break;
+              default:
+                console.error("Wrong shape! ", graphic);
+            }
+          }
+        }
+      };
+
+      graphics.drawFx = function(effect) {
+        switch (effect.kind) {
+          case "SPLASH":
+            makeSplashEmitter(botLayer, effect.x, effect.y)
+              .playOnceAndDestroy();
+            break;
+          case "CREEP_DEATH":
+            makeCreepDeathEmitter(botLayer, effect.x, effect.y)
+              .playOnceAndDestroy();
+            break;
+          case "HARVEST":
+            makeHarvestEmitter(botLayer, effect.x, effect.y)
+              .playOnceAndDestroy();
+            break;
+          default:
+            console.error("unknown fx!", effect);
+            break;
+        }
+      }
+
+      let heroSheet;
+      let heroSprite;
+      let equippableSprite;
+      let jsonPath = "images/hero/sprites/sprites.json";
+
+      PIXI.loader
+        .add(jsonPath)
+        .load(function() {
+          sheet = PIXI.loader.resources[jsonPath].spritesheet;
+          heroSprite = new PIXI.Sprite();
+          equippableSprite = new PIXI.Sprite();
+
+          heroLayer.addChild(heroSprite);
+          gunLayerTop.addChild(equippableSprite);
+
+          heroSprite.width = heroWidth;
+          heroSprite.height = heroHeight;
+
+          heroSprite.anchor.set(0.5);
+          equippableSprite.anchor.set(0.5);
+
+          return;
+        });
+
+      // 14x21
+      let w = 14;
+      let h = 21;
+      let lastImg = "down";
+      let lastFlip = false;
+      let heroWidth = w * 2;
+      let heroHeight = h * 2;
+      let lastEOffsetX = 0;
+      let lastEOffsetY = 22;
+      let lastGunBehindHero = false;
+
+      graphics.drawHero = function(hero) {
+        let currentWidth = heroWidth;
+        let currentHeight = heroHeight;
+        let isFlipped = false;
+        let imgPrefix = "down"
+        let eOffsetX = 0;
+        let eOffsetY = 22;
+        let gunBehindHero = false;
+
+        if (heroSprite) {
+          if (hero.xDir === 0 && hero.yDir === 0) {
+            imgPrefix = lastImg;
+            isFlipped = lastFlip;
+            eOffsetX = lastEOffsetX;
+            eOffsetY = lastEOffsetY;
+            gunBehindHero = lastGunBehindHero;
+          } else {
+            if (hero.yDir > 0) {
+              if (hero.xDir !== 0) {
+                imgPrefix = "diagdown";
+                eOffsetX = 18;
+                eOffsetY = 17;
+              } else {
+                imgPrefix = "down";
+              }
+            } else if (hero.yDir < 0) {
+              if (hero.xDir !== 0) {
+                gunBehindHero = true;
+                imgPrefix = "diagup";
+                eOffsetX = 18;
+                eOffsetY = -8;
+              } else {
+                gunBehindHero = true;
+                imgPrefix = "up";
+                eOffsetY = -12;
+              }
+            } else {
+              // y === 0
+              if (hero.xDir === 0) {
+                imgPrefix = "down";
+              } else {
+                gunBehindHero = true;
+                imgPrefix = "side";
+                eOffsetX = 22;
+                eOffsetY = 10;
+              }
+            }
+
+            if (hero.xDir < 0 && heroSprite.width > 0) {
+              isFlipped = true;
+            }
+          }
+          lastImg = imgPrefix;
+          lastFlip = isFlipped;
+          lastEOffsetX = eOffsetX;
+          lastEOffsetY = eOffsetY;
+          lastGunBehindHero = gunBehindHero;
+
+          let animFrame = hero.isWalking ? 1 + ((Math.round (Date.now() / 100)) % 4) : 1;
+
+          heroSprite.texture = PIXI.utils.TextureCache[imgPrefix + "_0" + animFrame + ".png"];
+          heroSprite.x = hero.x * 32;
+          heroSprite.y = hero.y * 32;
+
+          if (hero.equipped === "gun") {
+            equippableSprite.alpha = 1;
+            equippableSprite.texture = PIXI.utils.TextureCache["spazer_" + imgPrefix + ".png"];
+          } else if (hero.equipped === "scythe") {
+            equippableSprite.alpha = 1;
+            equippableSprite.texture = PIXI.utils.TextureCache["scythe_" + imgPrefix + ".png"];
+          } else {
+            equippableSprite.alpha = 0;
+          }
+          equippableSprite.x = hero.x * 32;
+          equippableSprite.y = hero.y * 32 + 22;
+
+          equippableSprite.scale.y = 2;
+
+          if (isFlipped) {
+            heroSprite.scale.x = -2;
+            equippableSprite.scale.x = -2;
+            equippableSprite.x = hero.x * 32 - eOffsetX;
+            equippableSprite.y = hero.y * 32 + eOffsetY;
+          } else {
+            heroSprite.scale.x = 2;
+            equippableSprite.scale.x = 2;
+            equippableSprite.x = hero.x * 32 + eOffsetX;
+            equippableSprite.y = hero.y * 32 + eOffsetY;
+          }
+
+          if (gunBehindHero) {
+            equippableSprite.setParent(gunLayerBot);
+          } else {
+            equippableSprite.setParent(gunLayerTop);
+          }
+        }
+      }
+
+      function toColor(str) {
+        return parseInt(str.substring(1), 16);
+      }
+    </script>
+    <script>
+      function init() {
+        var persistence;
+
+        try {
+          persistence = JSON.parse(localStorage.getItem("persistence"));
+
+          if (!persistence) { fail() }
+        } catch(e) {
+          persistence = null;
+          localStorage.removeItem("persistence");
+        }
+
+        graphics.init();
+
+        var app = Elm.Main.init({
+          node: document.getElementById('elm'),
+          flags: {
+            // CHANGE ME WHEN CHANGING FLAGS
+            persistence: persistence,
+            timestamp: Date.now(),
+            windowWidth: WIDTH,
+            windowHeight: HEIGHT,
+          }
+        });
+
+        app.ports.performEffects.subscribe(function(effects) {
+          for (let i = 0; i < effects.length; i++) {
+            let effect = effects[i];
+
+            // CHANGE ME WHEN CHANGING EFFECTS
+            switch (effect.id) {
+              case "SAVE":
+                console.log("savin");
+                console.log(effect.persistence);
+                localStorage.setItem("persistence", JSON.stringify(effect.persistence));
+                break;
+              case "HARD_RESET":
+                console.log("hard resetin");
+                //localStorage.removeItem("persistence"); // TOO DANGEROUS
+                break;
+              case "MOVE_CAMERA":
+                oceanBg.tilePosition.x = -effect.x;
+                oceanBg.tilePosition.y = -effect.y;
+                viewport.moveCenter(effect.x, effect.y);
+                break;
+              case "ZOOM":
+                viewport.snapZoom({
+                  width: effect.zoomLevel * 2 * 20 * 32,
+                  ease: "linear",
+                  time: 200,
+                  forceStart: true,
+                });
+                break;
+              case "DRAW":
+                graphics.drawSprites(effect.layers);
+                break;
+              case "DRAW_FX":
+                graphics.drawFx(effect);
+                break;
+              case "DRAW_HERO":
+                graphics.drawHero(effect);
+                break;
+              case "DRAW_MAP":
+                graphics.drawMap(effect);
+                break;
+              default:
+                //console.error("unknown effect: " + JSON.stringify(effect));
+            }
+          }
+        });
+
+        (function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.getElementById("stats").appendChild(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='//rawgit.com/mrdoob/stats.js/master/build/stats.min.js';document.head.appendChild(script);})()
+      }
+
+      init();
+    </script>
+  </body>
+</html>
