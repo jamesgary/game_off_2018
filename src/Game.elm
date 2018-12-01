@@ -2184,12 +2184,7 @@ getSprites session model =
 
         heroLayer =
             { name = "hero"
-            , sprites =
-                [ { x = Vec2.getX model.hero.pos - 0.5
-                  , y = Vec2.getY model.hero.pos - 0.5
-                  , texture = "hero"
-                  }
-                ]
+            , sprites = []
             , graphics =
                 drawHealthMeter
                     model.hero.pos
@@ -2345,8 +2340,7 @@ getSprites session model =
     in
     [ mapLayer
     , buildingsLayer
-
-    --, heroLayer
+    , heroLayer
     , creepsLayer
     , bulletsLayer
     , cursorLayer
