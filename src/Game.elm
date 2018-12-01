@@ -569,7 +569,21 @@ drawHero : Session -> Model -> HeroSprite
 drawHero session model =
     let
         ( xDir, yDir ) =
-            heroDir session model
+            if model.timeSinceLastSlash < 0.1 then
+                mouseAngleToHero session model
+                    - (pi / 4)
+                    |> (\angle ->
+                            if angle < -pi then
+                                angle + 2 * pi
+
+                            else
+                                angle
+                       )
+                    |> angleToDir
+
+            else
+                mouseAngleToHero session model
+                    |> angleToDir
     in
     { x = model.hero.pos |> Vec2.getX
     , y = model.hero.pos |> Vec2.getY
@@ -583,7 +597,13 @@ drawHero session model =
 heroDir : Session -> Model -> ( Int, Int )
 heroDir session model =
     mouseAngleToHero session model
-        |> (\angle -> angle / pi)
+        |> angleToDir
+
+
+angleToDir : Float -> ( Int, Int )
+angleToDir angle =
+    angle
+        / pi
         |> (\rads ->
                 if (5 / 8) < rads && (rads < 7 / 8) then
                     ( -1, 1 )
