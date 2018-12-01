@@ -4,6 +4,7 @@ import Browser
 import Browser.Events
 import Common exposing (..)
 import DefaultConfig
+import DefaultMap
 import Dict exposing (Dict)
 import Game
 import Html exposing (Html)
@@ -48,10 +49,13 @@ defaultPersistence =
             |> Result.withDefault Dict.empty
     , openConfigAccordions = [] |> Set.fromList
     , savedMaps =
-        [ { name = "New Map"
-          , map =
-                mapFromAscii
-                    """
+        DefaultMap.json
+            |> Json.Decode.decodeString (Json.Decode.list savedMapDecoder)
+            |> Result.withDefault
+                [ { name = "New Map"
+                  , map =
+                        mapFromAscii
+                            """
 11111111111111111111111111111
 10000000000011100000000000001
 10000000000001100000000000001
@@ -65,12 +69,12 @@ defaultPersistence =
 10000000000000000000011000001
 11111111111111111111111111111
 """
-          , hero = ( 3, 4 )
-          , enemyTowers = Set.fromList [ ( 24, 7 ) ]
-          , base = ( 2, 2 )
-          , size = ( 6, 5 )
-          }
-        ]
+                  , hero = ( 3, 4 )
+                  , enemyTowers = Set.fromList [ ( 24, 7 ) ]
+                  , base = ( 2, 2 )
+                  , size = ( 6, 5 )
+                  }
+                ]
     }
 
 
