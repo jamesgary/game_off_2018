@@ -23,9 +23,10 @@
       let app;
       let viewport;
       let nameToPixiLayer = {};
-      let topLayer = new PIXI.Container();
       let botLayer = new PIXI.Container();
       let heroLayer = new PIXI.Container();
+      let gunLayerTop = new PIXI.Container();
+      let gunLayerBot = new PIXI.Container();
 
       graphics.init = function() {
         PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
@@ -51,8 +52,9 @@
         });
         app.stage.addChild(viewport);
         viewport.addChild(botLayer);
-        viewport.addChild(topLayer);
+        viewport.addChild(gunLayerBot);
         viewport.addChild(heroLayer);
+        viewport.addChild(gunLayerTop);
 
         // debug stuff
         // let rectangle = new PIXI.Graphics();
@@ -200,6 +202,7 @@
 
       let heroSheet;
       let heroSprite;
+      let equippableSprite;
       let jsonPath = "images/hero/sprites/sprites.json";
 
       PIXI.loader
@@ -207,12 +210,16 @@
         .load(function() {
           sheet = PIXI.loader.resources[jsonPath].spritesheet;
           heroSprite = new PIXI.Sprite();
+          equippableSprite = new PIXI.Sprite();
 
           heroLayer.addChild(heroSprite);
+          gunLayerTop.addChild(equippableSprite);
 
           heroSprite.width = heroWidth;
           heroSprite.height = heroHeight;
+
           heroSprite.anchor.set(0.5);
+          equippableSprite.anchor.set(0.5);
 
           return;
         });
@@ -220,43 +227,62 @@
       // 14x21
       let w = 14;
       let h = 21;
-      let lastImg = "south";
+      let lastImg = "down";
       let lastFlip = false;
       let heroWidth = w * 2;
       let heroHeight = h * 2;
+      let lastEOffsetX = 0;
+      let lastEOffsetY = 22;
+      let lastGunBehindHero = false;
 
       graphics.drawHero = function(hero) {
         let currentWidth = heroWidth;
         let currentHeight = heroHeight;
         let isFlipped = false;
         let isMoving = false;
-        let imgPrefix = "south"
+        let imgPrefix = "down"
+        let eOffsetX = 0;
+        let eOffsetY = 22;
+        let gunBehindHero = false;
 
         if (heroSprite) {
           if (hero.xDir === 0 && hero.yDir === 0) {
             imgPrefix = lastImg;
             isFlipped = lastFlip;
             isMoving = false;
+            eOffsetX = lastEOffsetX;
+            eOffsetY = lastEOffsetY;
+            gunBehindHero = lastGunBehindHero;
           } else {
             isMoving = true;
             if (hero.yDir > 0) {
               if (hero.xDir !== 0) {
                 imgPrefix = "diagdown";
+                eOffsetX = 18;
+                eOffsetY = 17;
               } else {
-                imgPrefix = "south";
+                imgPrefix = "down";
               }
             } else if (hero.yDir < 0) {
               if (hero.xDir !== 0) {
+                gunBehindHero = true;
                 imgPrefix = "diagup";
+                eOffsetX = 18;
+                eOffsetY = -8;
               } else {
-                imgPrefix = "north";
+                gunBehindHero = true;
+                imgPrefix = "up";
+                eOffsetY = -12;
               }
             } else {
               // y === 0
               if (hero.xDir === 0) {
-                imgPrefix = "south";
+                imgPrefix = "down";
               } else {
+                gunBehindHero = true;
                 imgPrefix = "side";
+                eOffsetX = 22;
+                eOffsetY = 10;
               }
             }
 
@@ -266,16 +292,38 @@
           }
           lastImg = imgPrefix;
           lastFlip = isFlipped;
+          lastEOffsetX = eOffsetX;
+          lastEOffsetY = eOffsetY;
+          lastGunBehindHero = gunBehindHero;
 
           let animFrame = isMoving ? 1 + ((Math.round (Date.now() / 100)) % 4) : 1;
 
           heroSprite.texture = PIXI.utils.TextureCache[imgPrefix + "_0" + animFrame + ".png"];
           heroSprite.x = hero.x * 32;
           heroSprite.y = hero.y * 32;
+
+          equippableSprite.texture =  PIXI.utils.TextureCache["spazer_" + imgPrefix + ".png"];
+          equippableSprite.x = hero.x * 32;
+          equippableSprite.y = hero.y * 32 + 22;
+
+          equippableSprite.scale.y = 2;
+
           if (isFlipped) {
             heroSprite.scale.x = -2;
+            equippableSprite.scale.x = -2;
+            equippableSprite.x = hero.x * 32 - eOffsetX;
+            equippableSprite.y = hero.y * 32 + eOffsetY;
           } else {
             heroSprite.scale.x = 2;
+            equippableSprite.scale.x = 2;
+            equippableSprite.x = hero.x * 32 + eOffsetX;
+            equippableSprite.y = hero.y * 32 + eOffsetY;
+          }
+
+          if (gunBehindHero) {
+            equippableSprite.setParent(gunLayerBot);
+          } else {
+            equippableSprite.setParent(gunLayerTop);
           }
         }
       }
