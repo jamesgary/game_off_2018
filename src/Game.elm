@@ -1747,7 +1747,7 @@ moveHero session delta model =
 
 
 heroRad =
-    0.45
+    0.4
 
 
 isHeroColliding : Model -> Vec2 -> Bool
@@ -1775,15 +1775,14 @@ isHeroColliding model heroPos =
            )
         |> List.any
             (\( x, y ) ->
-                case Dict.get ( x, y ) model.map |> Maybe.map (not << isPassable) of
-                    Just True ->
-                        Collision.collision 10
-                            ( heroPoly, polySupport )
-                            ( polyFromSquare (Vec2.vec2 (0.5 + toFloat x) (0.5 + toFloat y)) 0.5, polySupport )
-                            |> Maybe.withDefault False
+                if Dict.get ( x, y ) model.map |> Maybe.withDefault Water |> isPassable then
+                    False
 
-                    _ ->
-                        False
+                else
+                    Collision.collision 10
+                        ( heroPoly, polySupport )
+                        ( polyFromSquare (Vec2.vec2 (0.5 + toFloat x) (0.1 + toFloat y)) 0.5, polySupport )
+                        |> Maybe.withDefault False
             )
         |> (\doesCollide ->
                 if doesCollide then
@@ -2810,13 +2809,18 @@ getSprites session model =
                         )
             , graphics =
                 model.creeps
-                    |> List.map
+                    |> List.filterMap
                         (\creep ->
-                            drawHealthMeter
-                                creep.pos
-                                1
-                                creep.healthAmt
-                                creep.healthMax
+                            if creep.healthAmt == creep.healthMax then
+                                Nothing
+
+                            else
+                                Just <|
+                                    drawHealthMeter
+                                        creep.pos
+                                        1
+                                        creep.healthAmt
+                                        creep.healthMax
                         )
                     |> List.concat
             }
