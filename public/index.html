@@ -19,6 +19,9 @@
     <script src="./js/main.js"></script>
     <script src="./js/particles.js"></script>
     <script>
+      window.WIDTH = window.innerWidth;
+      window.HEIGHT = window.innerHeight;
+
       window.graphics = {};
 
       let app;
@@ -31,12 +34,13 @@
       let gunLayerBot = new PIXI.Container();
       let oceanBg;
 
+
       graphics.init = function() {
         PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
 
         app = new PIXI.Application({
-          width: window.innerWidth,
-          height: window.innerHeight,
+          width: WIDTH,
+          height: HEIGHT,
           roundPixels: true,
           resolution: 1,
           antialias: true, // needed to fix health bars
@@ -44,10 +48,10 @@
         document.getElementById("pixi").appendChild(app.view);
 
         viewport = new PIXI.extras.Viewport({
-          screenWidth: window.innerWidth,
-          screenHeight: window.innerHeight,
+          screenWidth: WIDTH,
+          screenHeight: HEIGHT,
           worldWidth: 20,
-          worldHeight: 20 * (window.innerHeight / window.innerWidth),
+          worldHeight: 20 * (HEIGHT / WIDTH),
 
           // the interaction module is important for wheel() to
           // work properly when renderer.view is placed or scaled
@@ -387,8 +391,8 @@
             // CHANGE ME WHEN CHANGING FLAGS
             persistence: persistence,
             timestamp: Date.now(),
-            windowWidth: window.innerWidth,
-            windowHeight: window.innerHeight,
+            windowWidth: WIDTH,
+            windowHeight: HEIGHT,
           }
         });
 

@@ -8,8 +8,17 @@ html, body {
 }
 
 body {
-  background: #fafafa;
+  background: black;
 }
+
+/*
+#pixi {
+  margin: auto;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  top: 50%;
+}
+*/
 
 canvas {
   background: black;

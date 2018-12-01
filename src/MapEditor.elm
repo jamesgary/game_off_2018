@@ -51,6 +51,8 @@ defaultZoomLevels =
     , 1 / 2
     , 1
     , 2
+    , 4
+    , 8
     ]
         |> Zipper.fromList
         |> Zipper.withDefault 99

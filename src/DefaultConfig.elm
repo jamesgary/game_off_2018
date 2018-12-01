@@ -52,8 +52,33 @@ json =
     "min": 0,
     "max": 25
   },
-  "crops:moneyCrop:healthMax": {
-    "val": 5,
+  "crops:moolah:absorptionRate": {
+    "val": 0.0487938596491228,
+    "min": 0,
+    "max": 1
+  },
+  "crops:moolah:cashValue": {
+    "val": 20,
+    "min": 0,
+    "max": 100
+  },
+  "crops:moolah:waterNeededToMature": {
+    "val": 0.50452302631579,
+    "min": 0,
+    "max": 1
+  },
+  "crops:soilWaterCapacity": {
+    "val": 0.212993421052632,
+    "min": 0,
+    "max": 2
+  },
+  "crops:turret:bulletMaxAge": {
+    "val": 3,
+    "min": 0,
+    "max": 25
+  },
+  "crops:turret:bulletSpeed": {
+    "val": 3,
     "min": 0,
     "max": 25
   },
@@ -67,13 +92,8 @@ json =
     "min": 0,
     "max": 25
   },
-  "crops:turret:bulletMaxAge": {
-    "val": 3,
-    "min": 0,
-    "max": 25
-  },
-  "crops:turret:bulletSpeed": {
-    "val": 3,
+  "crops:turret:waterNeededToMature": {
+    "val": 5,
     "min": 0,
     "max": 25
   },
@@ -83,14 +103,14 @@ json =
     "max": 25
   },
   "enemyBase:healthMax": {
-    "val": 5,
+    "val": 25,
     "min": 0,
     "max": 25
   },
   "enemyBase:secondsBetweenSpawnsAtDay": {
-    "val": 0.790616854908775,
+    "val": 60,
     "min": 0,
-    "max": 5
+    "max": 60
   },
   "enemyBase:secondsBetweenSpawnsAtNight": {
     "val": 5,
@@ -108,7 +128,7 @@ json =
     "max": 25
   },
   "hero:maxSpeed": {
-    "val": 15,
+    "val": 6.58717105263158,
     "min": 0,
     "max": 15
   },
@@ -167,15 +187,15 @@ json =
     "min": 0,
     "max": 25
   },
-  "waterGun:refillRate": {
-    "val": 20.5721732654834,
-    "min": 0,
-    "max": 25
-  },
   "waterGun:maxCapacity": {
     "val": 100,
     "min": 0,
     "max": 1000
+  },
+  "waterGun:refillRate": {
+    "val": 20.5721732654834,
+    "min": 0,
+    "max": 25
   }
 }
 """

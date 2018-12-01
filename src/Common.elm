@@ -251,5 +251,4 @@ pct length =
 
 dlog : String -> a -> a
 dlog str val =
-    --Debug.log str val
-    val
+    Debug.log str val

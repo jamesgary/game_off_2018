@@ -719,7 +719,10 @@ jsonToFlags json =
             flags
 
         Err err ->
-            --Debug.todo ("flags bad man: " ++ Json.Decode.errorToString err)
+            let
+                _ =
+                    dlog "flags bad man: " (Json.Decode.errorToString err)
+            in
             { timestamp = 0
             , windowWidth = 800
             , windowHeight = 600

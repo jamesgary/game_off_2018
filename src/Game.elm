@@ -149,9 +149,9 @@ init session =
       , inv =
             { compost = 0
             }
-      , moolahSeedAmt = 0
+      , moolahSeedAmt = 4
       , turretSeedAmt = 0
-      , money = 1000
+      , money = 0
       , rangeLevel = 1
       , capacityLevel = 1
       , fireRateLevel = 1
@@ -311,7 +311,7 @@ type alias EnemyTower =
 
 
 waterNeededToMatureC =
-    300
+    3
 
 
 type alias Crop =
@@ -548,18 +548,19 @@ update msg session model =
                                 { m
                                     | crops =
                                         { pos = tilePos
-                                        , healthAmt = session.c.getFloat "crops:moneyCrop:healthMax"
-                                        , healthMax = session.c.getFloat "crops:moneyCrop:healthMax"
+                                        , healthAmt = 1
+                                        , healthMax = 1
                                         , state =
                                             Seedling
-                                                { waterNeededToMature = waterNeededToMatureC
+                                                { waterNeededToMature = session.c.getFloat "crops:moolah:waterNeededToMature"
                                                 , waterConsumed = 0
-                                                , waterCapacity = maxWaterCapacity
+                                                , waterCapacity = session.c.getFloat "crops:soilWaterCapacity"
                                                 , waterInSoil = 0
                                                 }
                                         , kind = MoneyCrop
                                         }
                                             :: m.crops
+                                    , moolahSeedAmt = model.moolahSeedAmt - 1
                                 }
 
                             ( TurretSeed, Can, Just tilePos ) ->
@@ -570,14 +571,15 @@ update msg session model =
                                         , healthMax = session.c.getFloat "crops:turret:healthMax"
                                         , state =
                                             Seedling
-                                                { waterNeededToMature = waterNeededToMatureC
+                                                { waterNeededToMature = session.c.getFloat "crops:turret:waterNeededToMature"
                                                 , waterConsumed = 0
-                                                , waterCapacity = maxWaterCapacity
+                                                , waterCapacity = session.c.getFloat "crops:soilWaterCapacity"
                                                 , waterInSoil = 0
                                                 }
                                         , kind = Turret { timeSinceLastFire = 0 }
                                         }
                                             :: m.crops
+                                    , turretSeedAmt = model.turretSeedAmt - 1
                                 }
 
                             ( Scythe, _, _ ) ->
@@ -591,7 +593,7 @@ update msg session model =
                                     , creeps = slashCreeps session model
                                     , crops = crops
                                     , fx = fxs ++ model.fx
-                                    , money = model.money + (List.length fxs * 10)
+                                    , money = model.money + (List.length fxs * round (session.c.getFloat "crops:moolah:cashValue"))
                                 }
 
                             _ ->
@@ -687,10 +689,6 @@ slashDmg =
 creepRad =
     -- inconsistent w/ sprite :(
     0.4
-
-
-absorptionRate =
-    50
 
 
 checkIfInStore : Session -> Float -> Model -> Model
@@ -804,7 +802,7 @@ soilAbsorbWaterFromBullets session delta model =
                                         Seedling
                                             { seedlingData
                                                 | waterInSoil =
-                                                    min (delta * 300 * numBullets + seedlingData.waterInSoil) seedlingData.waterCapacity
+                                                    min (delta * numBullets + seedlingData.waterInSoil) seedlingData.waterCapacity
                                             }
                                 }
 
@@ -825,7 +823,7 @@ cropsAbsorbWater session delta model =
                             Seedling { waterNeededToMature, waterConsumed, waterInSoil, waterCapacity } ->
                                 let
                                     amtToAbsorb =
-                                        min (delta * absorptionRate) waterInSoil
+                                        min (delta * session.c.getFloat "crops:moolah:absorptionRate") waterInSoil
                                 in
                                 if waterConsumed + amtToAbsorb > waterNeededToMature then
                                     { crop | state = Mature }
@@ -848,7 +846,7 @@ cropsAbsorbWater session delta model =
 
 
 maxWaterCapacity =
-    100
+    1
 
 
 slashCreeps : Session -> Model -> List Creep
@@ -1139,7 +1137,7 @@ getTilesSurroundingVec2 model pos =
                 , ( x + 1, y + 1 )
                 ]
            )
-        |> List.filterMap (\neighborPos -> Dict.get neighborPos model.map)
+        |> List.map (\neighborPos -> Dict.get neighborPos model.map |> Maybe.withDefault Water)
 
 
 getTilePosSurroundingVec2 : Model -> Vec2 -> List TilePos
@@ -2381,10 +2379,26 @@ drawEquippables session model =
             "50px"
 
         equippables =
-            [ ( Gun, "images/icon-watergun.png", Nothing )
-            , ( Scythe, "images/scythe.png", Nothing )
-            , ( MoolahCropSeed, "images/mature-money.png", Just model.moolahSeedAmt )
-            , ( TurretSeed, "images/turret.png", Just model.turretSeedAmt )
+            [ { equippable = Gun
+              , imgSrc = "images/icon-watergun.png"
+              , maybeAmt = Nothing
+              , keyStr = "1"
+              }
+            , { equippable = Scythe
+              , imgSrc = "images/scythe.png"
+              , maybeAmt = Nothing
+              , keyStr = "2"
+              }
+            , { equippable = MoolahCropSeed
+              , imgSrc = "images/mature-money.png"
+              , maybeAmt = Just model.moolahSeedAmt
+              , keyStr = "3"
+              }
+            , { equippable = TurretSeed
+              , imgSrc = "images/turret.png"
+              , maybeAmt = Just model.turretSeedAmt
+              , keyStr = "4"
+              }
             ]
     in
     Html.div
@@ -2398,13 +2412,15 @@ drawEquippables session model =
             ]
             (equippables
                 |> List.map
-                    (\( equippable, imgSrc, maybeAmt ) ->
+                    (\{ equippable, imgSrc, maybeAmt, keyStr } ->
                         Html.div
                             ([ Html.Attributes.style "border" "7px ridge white"
                              , Html.Attributes.style "border-radius" "4px"
                              , Html.Attributes.style "background" "rgba(255, 255, 255, 0.4)"
                              , Html.Attributes.style "margin" "0 5px"
                              , Html.Attributes.style "position" "relative"
+                             , Html.Attributes.style "cursor" "pointer"
+                             , Html.Events.onClick (KeyDown keyStr)
                              ]
                                 ++ (if model.equipped == equippable then
                                         [ Html.Attributes.style "background" "rgba(90, 255, 90, 0.6)"
@@ -2751,23 +2767,23 @@ getSprites session model =
                                         Seedling { waterNeededToMature, waterConsumed, waterCapacity, waterInSoil } ->
                                             [ drawMaturityMeter
                                                 (Vec2.vec2 (toFloat etX + 0.5) (toFloat etY + 0.4))
-                                                1.1
+                                                0.8
                                                 waterConsumed
                                                 waterNeededToMature
                                                 waterInSoil
                                             , drawWaterMeter
                                                 (Vec2.vec2 (toFloat etX + 0.5) (toFloat etY + 0.6))
-                                                1.1
+                                                0.8
                                                 waterInSoil
                                                 waterCapacity
                                             ]
 
                                         Mature ->
-                                            [ drawHealthMeter
-                                                (Vec2.vec2 (toFloat etX + 0.5) (toFloat etY + 0.5))
-                                                0.9
-                                                crop.healthAmt
-                                                crop.healthMax
+                                            [-- drawHealthMeter
+                                             --   (Vec2.vec2 (toFloat etX + 0.5) (toFloat etY + 0.5))
+                                             --   0.8
+                                             --   crop.healthAmt
+                                             --   crop.healthMax
                                             ]
                         )
                     |> List.concat
