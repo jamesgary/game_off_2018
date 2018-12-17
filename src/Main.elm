@@ -970,7 +970,7 @@ view model =
             MapEditor mapModel ->
                 MapEditor.view model.session mapModel
                     |> Html.map MapEditorMsg
-        , viewConfig model |> always (Html.text "")
+        , viewConfig model --|> always (Html.text "")
         ]
 
 

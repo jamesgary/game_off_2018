@@ -447,9 +447,9 @@ getSprites session model =
             , sprites =
                 case model.editingMap.hero of
                     ( x, y ) ->
-                        [ { x = x |> toFloat
-                          , y = y |> toFloat
-                          , texture = "hero"
+                        [ { x = toFloat x + 0.25
+                          , y = toFloat y + 0.25
+                          , texture = "hero/sprites/down_01"
                           }
                         ]
             , graphics =
