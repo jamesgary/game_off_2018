@@ -200,7 +200,7 @@ json =
   "waterGun:refillRate": {
     "val": 20.5721732654834,
     "min": 0,
-    "max": 25
+    "max": 250000
   }
 }
 """
